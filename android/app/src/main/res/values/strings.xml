@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">PromHub</string>
+    <string name="title_activity_main">PromHub</string>
+    <string name="package_name">com.promhub.app</string>
+    <string name="custom_url_scheme">com.promhub.app</string>
+</resources>
