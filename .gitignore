@@ -19,3 +19,5 @@ ios/App/Podfile.lock
 ios/App/output
 *.xcworkspace/xcuserdata
 *.xcodeproj/xcuserdata
+.vercel
+.env*.local

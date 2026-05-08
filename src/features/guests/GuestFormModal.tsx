@@ -63,7 +63,7 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
     if (!trimmed) { alert('Please enter a name.'); return; }
     if (venueId == null) { alert('Form error. Please try again.'); return; }
 
-    const invTypeNames = invTypeIds
+    const inviteTypeNames = invTypeIds
       .map((id) => (v?.inviteTypes || []).find((x) => x.id === id)?.name || '')
       .filter(Boolean);
 
