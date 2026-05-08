@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
 import { IonModal, IonContent } from '@ionic/react';
 import { useAppStore } from '@/store/useAppStore';
-import { todayWeekday } from '@/core/utils/date';
+import { isoDay, todayWeekday } from '@/core/utils/date';
+import { today } from '@/core/constants';
 import type { Timeslot, VipType, InviteType } from '@/core/types';
 import { TimeslotRows, VipRows, InviteTypeRows } from '@/features/venues/VenueEditor';
 import { DayChips } from '@/components/DayChips';
 import { SlotChips } from '@/components/SlotChips';
+import { Calendar } from '@/components/Calendar';
+import { NumberField } from '@/components/NumberField';
 
 type StepId = 'welcome' | 'venue' | 'event' | 'legend' | 'done';
 const STEPS: StepId[] = ['welcome', 'venue', 'event', 'legend', 'done'];
@@ -14,15 +17,33 @@ export const OnboardingFlow: React.FC<{ open: boolean; onDone: () => void }> = (
   const [stepIdx, setStepIdx] = useState(0);
   const step = STEPS[stepIdx];
   const next = () => setStepIdx((i) => Math.min(STEPS.length - 1, i + 1));
+  const back = () => setStepIdx((i) => Math.max(0, i - 1));
   const finish = () => onDone();
+  const canGoBack = stepIdx > 0 && step !== 'done';
 
   return (
     <IonModal isOpen={open} backdropDismiss={false} canDismiss>
       <IonContent>
-        <div className="onboard-progress">
-          {STEPS.map((_, i) => (
-            <div key={i} className={`onboard-dot ${i < stepIdx ? 'done' : i === stepIdx ? 'active' : ''}`} />
-          ))}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 10,
+          padding: '14px 16px 0', minHeight: 28,
+        }}>
+          {canGoBack && (
+            <button
+              type="button"
+              onClick={back}
+              aria-label="Back"
+              style={{
+                background: 'transparent', border: 'none', cursor: 'pointer',
+                fontSize: 22, color: 'var(--color-text-primary)', lineHeight: 1, padding: 0,
+              }}
+            >‹</button>
+          )}
+          <div className="onboard-progress" style={{ flex: 1, padding: 0 }}>
+            {STEPS.map((_, i) => (
+              <div key={i} className={`onboard-dot ${i < stepIdx ? 'done' : i === stepIdx ? 'active' : ''}`} />
+            ))}
+          </div>
         </div>
         <div className="onboard-screen">
           {step === 'welcome' && <WelcomeStep onNext={next} />}
@@ -165,6 +186,11 @@ const EventStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
   });
   const [isPriv, setPriv] = useState(false);
   const [isLate, setLate] = useState(false);
+  const [isOneTime, setIsOneTime] = useState(false);
+  const [eventDate, setEventDate] = useState<string>(isoDay(today()));
+  const [seasonStart, setSeasonStart] = useState<string>('');
+  const [seasonEnd, setSeasonEnd] = useState<string>('');
+  const [capacity, setCapacity] = useState<number | null>(null);
 
   const onVenueChange = (id: number) => {
     setVenueId(id);
@@ -182,24 +208,32 @@ const EventStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
     if (noVenues) { onNext(); return; }
     if (!name.trim()) { onNext(); return; }
     if (!slotIds.length) { alert('Select at least one timeslot.'); return; }
-    if (!days.length) { alert('Select at least one day.'); return; }
+    if (isOneTime) {
+      if (!eventDate) { alert('Pick a date.'); return; }
+    } else {
+      if (!days.length) { alert('Select at least one day.'); return; }
+      if (seasonStart && seasonEnd && seasonEnd < seasonStart) {
+        alert('Season end must be on or after season start.');
+        return;
+      }
+    }
     upsertEvent({
       id: nextId('event') as number,
       name: name.trim(),
       venueId: venueId!,
-      weekdays: [...days],
-      weekday: days[0],
+      weekdays: isOneTime ? [] : [...days],
+      weekday: isOneTime ? '' : days[0],
       selectedSlotIds: [...slotIds],
       description: '',
       videoUrl: '',
       isPrivate: isPriv,
       isLateClub: isLate,
       invitedGuests: [],
-      isOneTime: false,
-      eventDate: null,
-      capacity: null,
-      seasonStart: null,
-      seasonEnd: null,
+      isOneTime,
+      eventDate: isOneTime ? eventDate : null,
+      capacity: capacity && capacity > 0 ? capacity : null,
+      seasonStart: !isOneTime && seasonStart ? seasonStart : null,
+      seasonEnd: !isOneTime && seasonEnd ? seasonEnd : null,
     });
     onNext();
   };
@@ -229,12 +263,62 @@ const EventStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
             </select>
           </div>
           <div className="form-group">
-            <label className="form-label">Days of week</label>
-            <DayChips selected={days} onToggle={toggleDay} />
+            <label className="form-label">Schedule</label>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+              <button type="button" className={`tog-btn ${!isOneTime ? 'on' : ''}`} onClick={() => setIsOneTime(false)}>
+                Recurring
+              </button>
+              <button type="button" className={`tog-btn ${isOneTime ? 'on' : ''}`} onClick={() => setIsOneTime(true)}>
+                One-time
+              </button>
+            </div>
+
+            {isOneTime ? (
+              <Calendar
+                mode="single"
+                value={eventDate || null}
+                onChange={(iso) => setEventDate(iso ?? '')}
+                initialMonth={eventDate ? new Date(eventDate + 'T00:00:00') : undefined}
+              />
+            ) : (
+              <>
+                <DayChips selected={days} onToggle={toggleDay} />
+                <div style={{ marginTop: 12 }}>
+                  <div className="form-label" style={{ marginBottom: 6 }}>Season (optional)</div>
+                  <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 8 }}>
+                    Tap the start date, then the end date.
+                  </div>
+                  <Calendar
+                    mode="range"
+                    start={seasonStart || null}
+                    end={seasonEnd || null}
+                    onChange={(s, e) => { setSeasonStart(s ?? ''); setSeasonEnd(e ?? ''); }}
+                    initialMonth={seasonStart ? new Date(seasonStart + 'T00:00:00') : undefined}
+                  />
+                  {(seasonStart || seasonEnd) && (
+                    <button
+                      type="button"
+                      className="btn-sm"
+                      style={{ marginTop: 8, width: '100%' }}
+                      onClick={() => { setSeasonStart(''); setSeasonEnd(''); }}
+                    >Clear range (open-ended)</button>
+                  )}
+                </div>
+              </>
+            )}
           </div>
+
           <div className="form-group">
             <label className="form-label">Timeslots</label>
             <SlotChips venueId={venueId} selected={slotIds} onToggle={toggleSlot} />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Capacity (max guests, optional)</label>
+            <NumberField
+              className="form-input" placeholder="e.g. 20" min={0}
+              value={capacity} onChange={setCapacity}
+            />
           </div>
           <div className="form-group">
             <label className="form-label">Event type</label>

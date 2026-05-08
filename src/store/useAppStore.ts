@@ -26,6 +26,7 @@ interface AppState extends AppDataSnapshot {
   upsertGuest: (g: Guest) => void;
   removeGuest: (id: number) => void;
   toggleArrived: (id: number) => void;
+  toggleCancelled: (id: number) => void;
 
   // reservations
   upsertReservation: (r: Reservation) => void;
@@ -198,7 +199,20 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   toggleArrived: (id) => {
     set((s) => ({
-      guests: s.guests.map((g) => g.id === id ? { ...g, checked: !g.checked } : g),
+      guests: s.guests.map((g) =>
+        g.id === id
+          ? { ...g, checked: !g.checked, cancelled: false }   // arriving un-cancels
+          : g),
+    }));
+    get().persist();
+  },
+
+  toggleCancelled: (id) => {
+    set((s) => ({
+      guests: s.guests.map((g) =>
+        g.id === id
+          ? { ...g, cancelled: !g.cancelled, checked: false } // cancelling clears arrived
+          : g),
     }));
     get().persist();
   },

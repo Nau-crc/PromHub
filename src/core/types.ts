@@ -68,6 +68,8 @@ export interface Guest {
   pax: number;
   clubEventId: number | null;
   checked: boolean;
+  /** Guest cancelled (no-show before the night, or expressly cancelled). */
+  cancelled?: boolean;
   influencer: boolean;
   igHandle: string;
   igPlatform: Platform;

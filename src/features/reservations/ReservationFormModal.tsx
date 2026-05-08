@@ -13,7 +13,8 @@ import { today } from '@/core/constants';
 import { SheetHeader } from '@/components/SheetHeader';
 import { PlatformPicker } from '@/components/PlatformPicker';
 import { NumberField } from '@/components/NumberField';
-import { Calendar } from '@/components/Calendar';
+import { OccurrencePicker } from '@/components/OccurrencePicker';
+import { formatPhone, isValidPhone, maxDigits, onlyDigits, placeholderForCode } from '@/core/utils/phone';
 
 interface Props {
   open: boolean;
@@ -122,12 +123,19 @@ export const ReservationFormModal: React.FC<Props> = ({ open, onClose, editing, 
   const woman = fromInvite ? round2(promoter * womanPctN / 100) : 0;
   const net = round2(promoter - woman);
 
+  const phoneDigits = onlyDigits(phoneNum);
+  const phoneOk = !phoneDigits || isValidPhone(phoneCode, phoneDigits);
+
   const save = () => {
     const trimmed = name.trim();
     if (!trimmed) return;
     if (venueId == null) return;
     if (selectedEvent && !eventDateValid) {
       alert('The event date you picked is not a valid occurrence of this event.');
+      return;
+    }
+    if (phoneDigits && !phoneOk) {
+      alert(`Phone number doesn't match the format for ${phoneCode}.`);
       return;
     }
     const entry: Reservation = {
@@ -166,16 +174,38 @@ export const ReservationFormModal: React.FC<Props> = ({ open, onClose, editing, 
           <div className="form-group">
             <label className="form-label">Phone</label>
             <div className="phone-row">
-              <select className="form-select" value={phoneCode} onChange={(e) => setPhoneCode(e.target.value)}>
+              <select
+                className="form-select"
+                value={phoneCode}
+                onChange={(e) => {
+                  setPhoneCode(e.target.value);
+                  // Re-format / truncate the existing number for the new country
+                  const limited = onlyDigits(phoneNum).slice(0, maxDigits(e.target.value));
+                  setPhoneNum(formatPhone(e.target.value, limited));
+                }}
+              >
                 {COUNTRY_CODES.map((c) => (
                   <option key={c.code} value={c.code}>{c.flag} {c.code}</option>
                 ))}
               </select>
               <input
-                className="form-input" type="tel" placeholder="612 345 678"
-                value={phoneNum} onChange={(e) => setPhoneNum(e.target.value)}
+                className="form-input"
+                type="tel"
+                inputMode="numeric"
+                autoComplete="tel-national"
+                placeholder={placeholderForCode(phoneCode)}
+                value={phoneNum}
+                onChange={(e) => {
+                  const limited = onlyDigits(e.target.value).slice(0, maxDigits(phoneCode));
+                  setPhoneNum(formatPhone(phoneCode, limited));
+                }}
               />
             </div>
+            {phoneDigits.length > 0 && !phoneOk && (
+              <div style={{ fontSize: 11, color: 'var(--color-danger)', marginTop: 4 }}>
+                ⚠︎ Format for {phoneCode} doesn't match. Expected like: {placeholderForCode(phoneCode)}
+              </div>
+            )}
           </div>
 
           <div className="form-row">
@@ -235,16 +265,12 @@ export const ReservationFormModal: React.FC<Props> = ({ open, onClose, editing, 
             <div className="form-group">
               <label className="form-label">Event date</label>
               <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 6 }}>
-                Only this event's scheduled occurrences are selectable.
+                Use the arrows to step through this event's occurrences.
               </div>
-              <Calendar
-                mode="single"
-                value={eventDate || null}
-                onChange={(iso) => setEventDate(iso ?? '')}
-                isDateEnabled={(iso) => occurs(selectedEvent, iso)}
-                minDate={selectedEvent.seasonStart ?? undefined}
-                maxDate={selectedEvent.seasonEnd ?? undefined}
-                initialMonth={eventDate ? new Date(eventDate + 'T00:00:00') : undefined}
+              <OccurrencePicker
+                event={selectedEvent}
+                value={eventDate}
+                onChange={setEventDate}
               />
             </div>
           )}

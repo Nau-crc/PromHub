@@ -1,11 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { Timeslot, VipType, InviteType } from '@/core/types';
 import { useAppStore } from '@/store/useAppStore';
-import { timeOptions } from '@/core/constants';
 import { PaxStepper } from '@/components/PaxStepper';
 import { NumberField } from '@/components/NumberField';
-
-const TIME_OPTS = timeOptions();
+import { TimePicker } from '@/components/TimePicker';
 
 // ── TimeslotRows ────────────────────────────────────────────
 interface TsRowsProps {
@@ -14,6 +12,7 @@ interface TsRowsProps {
 }
 export const TimeslotRows: React.FC<TsRowsProps> = ({ rows, setRows }) => {
   const nextId = useAppStore((s) => s.nextId);
+  const [openPicker, setOpenPicker] = useState<{ idx: number; field: 'startTime' | 'endTime' } | null>(null);
   const update = (i: number, patch: Partial<Timeslot>) =>
     setRows(rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
   const remove = (i: number) => setRows(rows.filter((_, idx) => idx !== i));
@@ -54,25 +53,25 @@ export const TimeslotRows: React.FC<TsRowsProps> = ({ rows, setRows }) => {
           <div className="ts-block-row">
             <div>
               <div className="ts-label">Start (24h)</div>
-              <select
-                className="form-select"
-                style={{ fontSize: 13, padding: '9px 8px' }}
-                value={r.startTime}
-                onChange={(e) => update(i, { startTime: e.target.value })}
+              <button
+                type="button"
+                className="form-input"
+                style={{ fontSize: 13, padding: '9px 8px', textAlign: 'center', cursor: 'pointer' }}
+                onClick={() => setOpenPicker({ idx: i, field: 'startTime' })}
               >
-                {TIME_OPTS.map((t) => <option key={t} value={t}>{t}</option>)}
-              </select>
+                {r.startTime}
+              </button>
             </div>
             <div>
               <div className="ts-label">End (24h)</div>
-              <select
-                className="form-select"
-                style={{ fontSize: 13, padding: '9px 8px' }}
-                value={r.endTime}
-                onChange={(e) => update(i, { endTime: e.target.value })}
+              <button
+                type="button"
+                className="form-input"
+                style={{ fontSize: 13, padding: '9px 8px', textAlign: 'center', cursor: 'pointer' }}
+                onClick={() => setOpenPicker({ idx: i, field: 'endTime' })}
               >
-                {TIME_OPTS.map((t) => <option key={t} value={t}>{t}</option>)}
-              </select>
+                {r.endTime}
+              </button>
             </div>
             <div>
               <div className="ts-label">Guest cap.</div>
@@ -88,6 +87,15 @@ export const TimeslotRows: React.FC<TsRowsProps> = ({ rows, setRows }) => {
           </div>
         </div>
       ))}
+      <TimePicker
+        open={openPicker !== null}
+        value={openPicker ? rows[openPicker.idx]?.[openPicker.field] ?? '20:00' : '20:00'}
+        title={openPicker?.field === 'endTime' ? 'End time' : 'Start time'}
+        onClose={() => setOpenPicker(null)}
+        onChange={(v) => {
+          if (openPicker) update(openPicker.idx, { [openPicker.field]: v });
+        }}
+      />
     </div>
   );
 };

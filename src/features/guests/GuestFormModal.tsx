@@ -8,7 +8,7 @@ import {
   eventCapacity, lateClubEvents, nextOccurrence, occurs, venueById,
 } from '@/features/summary/calculations';
 import { Avatar } from '@/components/Avatar';
-import { Calendar } from '@/components/Calendar';
+import { OccurrencePicker } from '@/components/OccurrencePicker';
 import { SheetHeader } from '@/components/SheetHeader';
 import { PlatformPicker } from '@/components/PlatformPicker';
 import { NumberField } from '@/components/NumberField';
@@ -245,16 +245,12 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
             <div className="form-group">
               <label className="form-label">Event date</label>
               <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 6 }}>
-                Pick the specific occurrence this guest is attending.
+                Use the arrows to step through this event's scheduled occurrences.
               </div>
-              <Calendar
-                mode="single"
-                value={eventDate || null}
-                onChange={(iso) => setEventDate(iso ?? '')}
-                isDateEnabled={(iso) => occurs(selectedEvent, iso)}
-                minDate={selectedEvent.seasonStart ?? undefined}
-                maxDate={selectedEvent.seasonEnd ?? undefined}
-                initialMonth={eventDate ? new Date(eventDate + 'T00:00:00') : undefined}
+              <OccurrencePicker
+                event={selectedEvent}
+                value={eventDate}
+                onChange={setEventDate}
               />
             </div>
           )}

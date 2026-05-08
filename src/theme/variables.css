@@ -1,4 +1,4 @@
-/* ─── Design tokens (derived from PromHub MVP) ──────────────── */
+/* ─── Design tokens (light, default) ─────────────────────────── */
 :root {
   --color-background-primary: #ffffff;
   --color-background-secondary: #f5f4ef;
@@ -7,25 +7,80 @@
   --color-text-secondary: #6b6961;
   --color-border-secondary: #d8d5cb;
   --color-border-tertiary: #ebe9e0;
+  --color-input-bg: var(--color-background-primary);
+
+  /* Pill backgrounds — recomputed for dark mode below */
+  --pill-amber-bg: #FAEEDA;   --pill-amber-fg: #633806;
+  --pill-pink-bg: #FBEAF0;    --pill-pink-fg: #72243E;
+  --pill-teal-bg: #E1F5EE;    --pill-teal-fg: #0F6E56;
+  --pill-gray-bg: #F1EFE8;    --pill-gray-fg: #444441;
+  --pill-green-bg: #EAF3DE;   --pill-green-fg: #3B6D11;
+  --pill-blue-bg: #E6F1FB;    --pill-blue-fg: #185FA5;
+  --pill-purple-bg: #EEEDFE;  --pill-purple-fg: #3C3489;
+
+  /* Calendar range band */
+  --cal-range-band: #FFE7D2;
+
+  /* Brand colors — fixed across themes */
+  --color-primary: #f97316;
+  --color-success: #1d9e75;
+  --color-success-fg: #3B6D11;
+  --color-warning: #ba7517;
+  --color-danger: #a32d2d;
+
   --border-radius-md: 10px;
   --border-radius-lg: 14px;
   --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 
   /* Ionic theme overrides — orange brand */
-  --ion-color-primary: #f97316;
+  --ion-color-primary: var(--color-primary);
   --ion-color-primary-rgb: 249, 115, 22;
   --ion-color-primary-contrast: #ffffff;
   --ion-color-primary-contrast-rgb: 255, 255, 255;
   --ion-color-primary-shade: #db6614;
   --ion-color-primary-tint: #fa823a;
 
-  --ion-color-success: #1d9e75;
-  --ion-color-warning: #ba7517;
-  --ion-color-danger: #a32d2d;
+  --ion-color-success: var(--color-success);
+  --ion-color-warning: var(--color-warning);
+  --ion-color-danger: var(--color-danger);
 
   --ion-font-family: var(--font-sans);
   --ion-background-color: var(--color-background-tertiary);
   --ion-text-color: var(--color-text-primary);
+  --ion-card-background: var(--color-background-primary);
+  --ion-item-background: var(--color-background-primary);
+  --ion-toolbar-background: var(--color-background-primary);
+  --ion-toolbar-color: var(--color-text-primary);
+}
+
+/* ─── Dark theme ─────────────────────────────────────────────── */
+[data-theme="dark"] {
+  --color-background-primary: #1a1917;     /* card surface */
+  --color-background-secondary: #232220;   /* muted / inputs */
+  --color-background-tertiary: #0f0e0c;    /* page background */
+  --color-text-primary: #f5f4ef;
+  --color-text-secondary: #a09c91;
+  --color-border-secondary: #3a3835;
+  --color-border-tertiary: #2a2826;
+  --color-input-bg: #232220;
+
+  /* Pills get muted, slightly translucent dark backgrounds */
+  --pill-amber-bg: #3a2d12;   --pill-amber-fg: #f3c98c;
+  --pill-pink-bg: #3b1d29;    --pill-pink-fg: #f5a5be;
+  --pill-teal-bg: #14352a;    --pill-teal-fg: #7ed3b3;
+  --pill-gray-bg: #2c2a26;    --pill-gray-fg: #c9c5b9;
+  --pill-green-bg: #1e3018;   --pill-green-fg: #a5d585;
+  --pill-blue-bg: #15293f;    --pill-blue-fg: #82b6e8;
+  --pill-purple-bg: #211d3d;  --pill-purple-fg: #b3aae5;
+
+  --cal-range-band: #4a2810;
+
+  --ion-background-color: var(--color-background-tertiary);
+  --ion-text-color: var(--color-text-primary);
+  --ion-card-background: var(--color-background-primary);
+  --ion-item-background: var(--color-background-primary);
+  --ion-toolbar-background: var(--color-background-primary);
+  --ion-toolbar-color: var(--color-text-primary);
 }
 
 /* ─── Reset / shared ───────────────────────────────────────── */
@@ -44,13 +99,13 @@ body { font-family: var(--font-sans); }
 
 /* ─── Pills ────────────────────────────────────────────────── */
 .pill { display: inline-flex; align-items: center; padding: 3px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; white-space: nowrap; }
-.pill-amber { background: #FAEEDA; color: #633806; }
-.pill-pink { background: #FBEAF0; color: #72243E; }
-.pill-teal { background: #E1F5EE; color: #0F6E56; }
-.pill-gray { background: #F1EFE8; color: #444441; }
-.pill-green { background: #EAF3DE; color: #3B6D11; }
-.pill-blue { background: #E6F1FB; color: #185FA5; }
-.pill-purple { background: #EEEDFE; color: #3C3489; }
+.pill-amber  { background: var(--pill-amber-bg);  color: var(--pill-amber-fg); }
+.pill-pink   { background: var(--pill-pink-bg);   color: var(--pill-pink-fg); }
+.pill-teal   { background: var(--pill-teal-bg);   color: var(--pill-teal-fg); }
+.pill-gray   { background: var(--pill-gray-bg);   color: var(--pill-gray-fg); }
+.pill-green  { background: var(--pill-green-bg);  color: var(--pill-green-fg); }
+.pill-blue   { background: var(--pill-blue-bg);   color: var(--pill-blue-fg); }
+.pill-purple { background: var(--pill-purple-bg); color: var(--pill-purple-fg); }
 
 /* ─── Page header ──────────────────────────────────────────── */
 .page-header { background: var(--color-background-primary); padding: 14px 20px 10px; border-bottom: 0.5px solid var(--color-border-tertiary); position: sticky; top: 0; z-index: 50; }
@@ -74,7 +129,7 @@ body { font-family: var(--font-sans); }
 .list-row { padding: 12px 14px; border-bottom: 0.5px solid var(--color-border-tertiary); display: flex; align-items: center; gap: 10px; cursor: pointer; transition: background .1s; }
 .list-row:last-child { border-bottom: none; }
 .list-row:active { background: var(--color-background-secondary); }
-.list-avatar { width: 38px; height: 38px; border-radius: 50%; background: #FEF3C7; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 500; color: #92400E; flex-shrink: 0; }
+.list-avatar { width: 38px; height: 38px; border-radius: 50%; background: var(--pill-amber-bg); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 500; color: var(--pill-amber-fg); flex-shrink: 0; }
 .list-main { flex: 1; min-width: 0; }
 .list-name { font-size: 13px; font-weight: 500; color: var(--color-text-primary); display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
 .list-sub { font-size: 11px; color: var(--color-text-secondary); margin-top: 2px; }
@@ -91,9 +146,33 @@ body { font-family: var(--font-sans); }
 .empty-box { background: var(--color-background-primary); border-radius: var(--border-radius-lg); border: 0.5px solid var(--color-border-tertiary); margin: 0 16px; padding: 28px 16px; text-align: center; color: var(--color-text-secondary); font-size: 13px; line-height: 1.6; }
 
 /* Sliding guest rows — keep visual continuity with the rest of the list */
-.guest-sliding-item { background: var(--color-background-primary); border-radius: var(--border-radius-lg); border: 0.5px solid var(--color-border-tertiary); margin-bottom: 8px; overflow: hidden; }
+.guest-sliding-item { background: var(--color-background-primary); border-radius: var(--border-radius-lg); border: 0.5px solid var(--color-border-tertiary); margin-bottom: 8px; overflow: hidden; transition: background .25s; }
+.guest-sliding-item.state-arrived { background: rgba(249, 115, 22, .08); border-color: rgba(249, 115, 22, .35); }
+.guest-sliding-item.state-cancelled { opacity: .55; background: var(--color-background-secondary); }
 .guest-sliding-item ion-item.guest-row { --background: transparent; --padding-start: 6px; --inner-padding-end: 6px; --min-height: 0; }
 .guest-sliding-item ion-item-option { font-size: 13px; font-weight: 500; }
+
+/* Status indicator (replaces the arrived-dot/pending-dot inside guest list) */
+.status-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.status-dot--arrived   { background: var(--color-primary); }
+.status-dot--pending   { background: var(--color-text-secondary); opacity: .55; }
+.status-dot--cancelled { background: var(--color-danger); }
+.state-label--arrived   { color: var(--color-primary); font-weight: 500; }
+.state-label--cancelled { color: var(--color-danger); font-weight: 500; }
+.state-label--pending   { color: var(--color-text-secondary); }
+
+/* Peek animation: nudges the first row's slide options on first render
+   so users notice the swipe affordance. Pure CSS — no JS gesture mock. */
+.guest-sliding-item.peek-left  { animation: ph-peek-left 700ms ease-in-out; }
+.guest-sliding-item.peek-right { animation: ph-peek-right 700ms ease-in-out; }
+@keyframes ph-peek-right {
+  0%, 100% { transform: translateX(0); }
+  50%      { transform: translateX(-44px); }
+}
+@keyframes ph-peek-left {
+  0%, 100% { transform: translateX(0); }
+  50%      { transform: translateX(44px); }
+}
 
 /* ─── Summary blocks ───────────────────────────────────────── */
 .summary-block { background: var(--color-background-primary); border-radius: var(--border-radius-lg); border: 0.5px solid var(--color-border-tertiary); margin: 0 16px 12px; overflow: hidden; }
@@ -115,7 +194,11 @@ body { font-family: var(--font-sans); }
 /* ─── Forms ────────────────────────────────────────────────── */
 .form-group { margin-bottom: 14px; }
 .form-label { font-size: 12px; color: var(--color-text-secondary); margin-bottom: 5px; display: block; }
-.form-input, .form-select, .form-textarea { width: 100%; padding: 11px 12px; font-size: 14px; border: 0.5px solid var(--color-border-secondary); border-radius: var(--border-radius-md); background: var(--color-background-primary); color: var(--color-text-primary); font-family: var(--font-sans); -webkit-appearance: none; }
+.form-input, .form-select, .form-textarea { width: 100%; padding: 11px 12px; font-size: 14px; border: 0.5px solid var(--color-border-secondary); border-radius: var(--border-radius-md); background: var(--color-input-bg); color: var(--color-text-primary); font-family: var(--font-sans); -webkit-appearance: none; }
+.form-input::placeholder, .form-textarea::placeholder { color: var(--color-text-secondary); opacity: .7; }
+.form-select { color: var(--color-text-primary); }
+/* Dropdown indicator color in dark mode */
+[data-theme="dark"] .form-select { background-image: linear-gradient(45deg, transparent 50%, var(--color-text-secondary) 50%), linear-gradient(135deg, var(--color-text-secondary) 50%, transparent 50%); background-position: calc(100% - 18px) 50%, calc(100% - 13px) 50%; background-size: 5px 5px; background-repeat: no-repeat; padding-right: 30px; }
 .form-textarea { resize: none; height: 64px; }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .check-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; }
@@ -229,6 +312,22 @@ body { font-family: var(--font-sans); }
 .cal-nav-btn:disabled { opacity: .4; cursor: not-allowed; }
 .cal-month-label { font-size: 14px; font-weight: 500; color: var(--color-text-primary); }
 .cal-range-summary { display: flex; align-items: center; padding: 10px 14px; border-top: 0.5px solid var(--color-border-tertiary); background: var(--color-background-secondary); font-size: 12px; }
+
+/* Occurrence stepper */
+.occ-picker { display: flex; align-items: center; gap: 10px; background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); padding: 10px 12px; }
+
+/* Wheel time picker — Trainline-style infinite-scroll columns */
+.time-wheel-wrap { position: relative; display: flex; align-items: center; justify-content: center; gap: 10px; padding: 32px 16px; min-height: 220px; }
+.time-wheel-band { position: absolute; left: 16px; right: 16px; top: 50%; transform: translateY(-50%); height: 36px; background: var(--color-background-secondary); border-radius: var(--border-radius-md); pointer-events: none; }
+.time-wheel-col { width: 80px; height: 180px; overflow-y: auto; scroll-snap-type: y mandatory; scrollbar-width: none; -ms-overflow-style: none; -webkit-overflow-scrolling: touch; mask-image: linear-gradient(to bottom, transparent 0, #000 30%, #000 70%, transparent 100%); -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 30%, #000 70%, transparent 100%); position: relative; z-index: 1; }
+.time-wheel-col::-webkit-scrollbar { display: none; }
+.time-wheel-pad { height: 72px; }
+.time-wheel-row { height: 36px; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 500; color: var(--color-text-primary); scroll-snap-align: center; font-variant-numeric: tabular-nums; }
+.time-wheel-sep { font-size: 22px; font-weight: 500; color: var(--color-text-primary); z-index: 2; }
+.occ-picker .cal-nav-btn { padding: 8px 14px; font-size: 16px; }
+.occ-picker-display { flex: 1; text-align: center; }
+.occ-picker-label { font-size: 10px; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: .04em; }
+.occ-picker-value { font-size: 14px; font-weight: 500; color: var(--color-text-primary); margin-top: 3px; }
 .cal-range-lbl { font-size: 10px; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: .04em; }
 .cal-range-val { font-size: 13px; font-weight: 500; color: var(--color-text-primary); margin-top: 2px; }
 .year-bars { display: flex; align-items: flex-end; gap: 3px; height: 80px; }
@@ -250,7 +349,10 @@ body { font-family: var(--font-sans); }
 .onboard-feature:last-child { border-bottom: none; }
 .legend-row { display: flex; gap: 12px; align-items: center; padding: 8px 0; border-bottom: 0.5px solid var(--color-border-tertiary); }
 .legend-row:last-child { border-bottom: none; }
-.legend-row-sample { width: 32px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+/* The sample column is wide enough for the longest pill ("3/20 guests")
+   without breaking the row layout. Pills sit centered inside it. */
+.legend-row-sample { flex: 0 0 auto; min-width: 60px; max-width: 110px; display: flex; align-items: center; justify-content: center; }
+.legend-row-sample .pill { font-size: 10px; padding: 2px 7px; }
 .onboard-feature-icon { font-size: 22px; width: 32px; text-align: center; flex-shrink: 0; margin-top: 2px; }
 .onboard-feature-title { font-size: 14px; font-weight: 500; color: var(--color-text-primary); }
 .onboard-feature-sub { font-size: 12px; color: var(--color-text-secondary); margin-top: 3px; line-height: 1.5; }
