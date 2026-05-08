@@ -7,6 +7,8 @@ import { isoDay } from '@/core/utils/date';
 import {
   eventCapacity, lateClubEvents, nextOccurrence, occurs, venueById,
 } from '@/features/summary/calculations';
+import { Avatar } from '@/components/Avatar';
+import { Calendar } from '@/components/Calendar';
 import { SheetHeader } from '@/components/SheetHeader';
 import { PlatformPicker } from '@/components/PlatformPicker';
 import { NumberField } from '@/components/NumberField';
@@ -99,11 +101,15 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
       return;
     }
 
+    const cleanHandle = handle.trim().replace(/^@+/, '');
+    if (influencer && !cleanHandle) {
+      alert('Influencers must have an Instagram or TikTok handle.');
+      return;
+    }
+
     const inviteTypeNames = invTypeIds
       .map((id) => (v?.inviteTypes || []).find((x) => x.id === id)?.name || '')
       .filter(Boolean);
-
-    const cleanHandle = handle.trim().replace(/^@+/, '');
     const entry: Guest = {
       id: editing?.id ?? (nextId('guest') as number),
       name: trimmed,
@@ -238,22 +244,18 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
           {selectedEvent && !selectedEvent.isOneTime && (
             <div className="form-group">
               <label className="form-label">Event date</label>
-              <input
-                className="form-input"
-                type="date"
-                value={eventDate}
-                min={selectedEvent.seasonStart ?? undefined}
-                max={selectedEvent.seasonEnd ?? undefined}
-                onChange={(e) => setEventDate(e.target.value)}
-              />
-              <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 4 }}>
-                Pick the specific date this guest is attending.
+              <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 6 }}>
+                Pick the specific occurrence this guest is attending.
               </div>
-              {eventDate && !eventDateValid && (
-                <div style={{ fontSize: 11, color: '#A32D2D', marginTop: 4 }}>
-                  ⚠︎ {eventDate} is not an occurrence of "{selectedEvent.name}".
-                </div>
-              )}
+              <Calendar
+                mode="single"
+                value={eventDate || null}
+                onChange={(iso) => setEventDate(iso ?? '')}
+                isDateEnabled={(iso) => occurs(selectedEvent, iso)}
+                minDate={selectedEvent.seasonStart ?? undefined}
+                maxDate={selectedEvent.seasonEnd ?? undefined}
+                initialMonth={eventDate ? new Date(eventDate + 'T00:00:00') : undefined}
+              />
             </div>
           )}
 
@@ -264,9 +266,32 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
           )}
 
           <div className="form-group">
-            <label className="form-label">Social platform</label>
+            <label className="form-label">
+              Social platform {influencer && <span style={{ color: '#A32D2D' }}>*</span>}
+            </label>
             <PlatformPicker value={platform} onChange={setPlatform} />
-            <input className="form-input" placeholder="Handle (without @)" value={handle} onChange={(e) => setHandle(e.target.value)} />
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+              <input
+                className="form-input"
+                placeholder="Handle (without @)"
+                value={handle}
+                onChange={(e) => setHandle(e.target.value)}
+                style={{ flex: 1 }}
+              />
+              {handle.trim() && (
+                <Avatar
+                  name={name || handle}
+                  handle={handle}
+                  platform={platform}
+                  size={40}
+                />
+              )}
+            </div>
+            {influencer && !handle.trim() && (
+              <div style={{ fontSize: 11, color: '#A32D2D', marginTop: 4 }}>
+                ⚠︎ Influencers must have an Instagram or TikTok handle.
+              </div>
+            )}
           </div>
 
           <div className="check-row">

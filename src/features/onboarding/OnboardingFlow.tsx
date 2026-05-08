@@ -7,8 +7,8 @@ import { TimeslotRows, VipRows, InviteTypeRows } from '@/features/venues/VenueEd
 import { DayChips } from '@/components/DayChips';
 import { SlotChips } from '@/components/SlotChips';
 
-type StepId = 'welcome' | 'venue' | 'event' | 'done';
-const STEPS: StepId[] = ['welcome', 'venue', 'event', 'done'];
+type StepId = 'welcome' | 'venue' | 'event' | 'legend' | 'done';
+const STEPS: StepId[] = ['welcome', 'venue', 'event', 'legend', 'done'];
 
 export const OnboardingFlow: React.FC<{ open: boolean; onDone: () => void }> = ({ open, onDone }) => {
   const [stepIdx, setStepIdx] = useState(0);
@@ -28,6 +28,7 @@ export const OnboardingFlow: React.FC<{ open: boolean; onDone: () => void }> = (
           {step === 'welcome' && <WelcomeStep onNext={next} />}
           {step === 'venue' && <VenueStep onNext={next} />}
           {step === 'event' && <EventStep onNext={next} />}
+          {step === 'legend' && <LegendStep onNext={next} />}
           {step === 'done' && <DoneStep onFinish={finish} />}
         </div>
       </IonContent>
@@ -254,7 +255,116 @@ const EventStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
   );
 };
 
-// ── Step 3: Done ──────────────────────────────────────────
+// ── Step 3: Legend ─────────────────────────────────────────
+//  Visual key for every color/dot/border the app uses. Promoters
+//  who skim the UI fast will benefit from seeing these once up
+//  front so they don't wonder what each marker means.
+const LegendStep: React.FC<{ onNext: () => void }> = ({ onNext }) => (
+  <>
+    <div style={{ marginTop: 24 }} />
+    <div className="onboard-step-label">Quick reference</div>
+    <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 6 }}>
+      Color & icon legend
+    </div>
+    <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 16, lineHeight: 1.5 }}>
+      A quick reference so you can read the app at a glance.
+    </div>
+
+    <LegendSection title="Event cards">
+      <LegendRow
+        sample={<div style={{
+          width: 26, height: 26, background: 'var(--color-background-primary)',
+          borderRadius: 6, borderLeft: '3px solid #D4537E',
+        }} />}
+        label="Pink left border"
+        sub="Private event — invite-only guest list."
+      />
+      <LegendRow
+        sample={<div style={{
+          width: 26, height: 26, background: 'var(--color-background-primary)',
+          borderRadius: 6, borderLeft: '3px solid #7C3AED',
+        }} />}
+        label="Purple left border"
+        sub="Late-night club — runs after midnight."
+      />
+    </LegendSection>
+
+    <LegendSection title="Guest list">
+      <LegendRow
+        sample={<span style={{ color: '#F97316', fontSize: 18 }}>★</span>}
+        label="Orange star"
+        sub="Influencer (10k+ followers). Counts in the influencer summary."
+      />
+      <LegendRow
+        sample={<div className="arrived-dot" style={{ width: 9, height: 9 }} />}
+        label="Green dot"
+        sub="Arrived (checked in tonight)."
+      />
+      <LegendRow
+        sample={<div className="pending-dot" style={{ width: 9, height: 9 }} />}
+        label="Gray dot"
+        sub="Pending (still expected). Swipe right on a guest to toggle."
+      />
+      <LegendRow
+        sample={<span className="ig-badge">IG</span>}
+        label="IG / TT badge"
+        sub="Instagram or TikTok handle. Tap to open the profile."
+      />
+    </LegendSection>
+
+    <LegendSection title="Pills & status">
+      <LegendRow sample={<span className="pill pill-blue">3/20 guests</span>} label="Blue pill" sub="Guests on this date / capacity." />
+      <LegendRow sample={<span className="pill pill-green">2 res.</span>} label="Green pill" sub="Reservations on this date." />
+      <LegendRow sample={<span className="pill pill-teal">5 invited</span>} label="Teal pill" sub="Invitations sent for a private event." />
+      <LegendRow sample={<span className="pill pill-purple">🌙 Club</span>} label="Purple pill" sub="Linked late-night club event." />
+      <LegendRow sample={<span className="pill pill-pink">Private</span>} label="Pink pill" sub="Private event marker." />
+    </LegendSection>
+
+    <LegendSection title="Capacity bar">
+      <div style={{ padding: '4px 0' }}>
+        <div className="capacity-bar"><div className="capacity-fill" style={{ width: '40%' }} /></div>
+        <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 4 }}>Orange — comfortably under capacity.</div>
+      </div>
+      <div style={{ padding: '4px 0' }}>
+        <div className="capacity-bar"><div className="capacity-fill warn" style={{ width: '85%' }} /></div>
+        <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 4 }}>Amber — close to full (75%+).</div>
+      </div>
+      <div style={{ padding: '4px 0' }}>
+        <div className="capacity-bar"><div className="capacity-fill full" style={{ width: '100%' }} /></div>
+        <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 4 }}>Red — full or over capacity.</div>
+      </div>
+    </LegendSection>
+
+    <button className="onboard-btn" onClick={onNext}>Got it →</button>
+  </>
+);
+
+const LegendSection: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
+  <div style={{
+    background: 'var(--color-background-secondary)',
+    borderRadius: 'var(--border-radius-lg)',
+    padding: '4px 14px', marginBottom: 14,
+  }}>
+    <div style={{
+      fontSize: 11, fontWeight: 500, color: 'var(--color-text-secondary)',
+      textTransform: 'uppercase', letterSpacing: '.04em',
+      padding: '10px 0 4px',
+    }}>{title}</div>
+    {children}
+  </div>
+);
+
+const LegendRow: React.FC<{ sample: React.ReactNode; label: string; sub: string }> = ({ sample, label, sub }) => (
+  <div className="legend-row">
+    <div className="legend-row-sample">{sample}</div>
+    <div style={{ flex: 1, minWidth: 0 }}>
+      <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>{label}</div>
+      <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', lineHeight: 1.4 }}>{sub}</div>
+    </div>
+  </div>
+);
+
+// ── Step 4: Done ──────────────────────────────────────────
 const DoneStep: React.FC<{ onFinish: () => void }> = ({ onFinish }) => {
   const { venues, events } = useAppStore((s) => ({ venues: s.venues, events: s.events }));
   const sub = venues.length

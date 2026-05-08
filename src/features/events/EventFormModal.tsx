@@ -8,6 +8,7 @@ import { DayChips } from '@/components/DayChips';
 import { SlotChips } from '@/components/SlotChips';
 import { SheetHeader } from '@/components/SheetHeader';
 import { NumberField } from '@/components/NumberField';
+import { Calendar } from '@/components/Calendar';
 
 interface Props {
   open: boolean;
@@ -158,11 +159,11 @@ export const EventFormModal: React.FC<Props> = ({ open, onClose, editing, onRequ
             </div>
 
             {isOneTime ? (
-              <input
-                className="form-input"
-                type="date"
-                value={eventDate}
-                onChange={(e) => setEventDate(e.target.value)}
+              <Calendar
+                mode="single"
+                value={eventDate || null}
+                onChange={(iso) => setEventDate(iso ?? '')}
+                initialMonth={eventDate ? new Date(eventDate + 'T00:00:00') : undefined}
               />
             ) : (
               <>
@@ -171,26 +172,25 @@ export const EventFormModal: React.FC<Props> = ({ open, onClose, editing, onRequ
                   <div className="form-label" style={{ marginBottom: 6 }}>
                     Season (optional)
                   </div>
-                  <div className="form-row">
-                    <div>
-                      <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 3 }}>From</div>
-                      <input
-                        className="form-input" type="date"
-                        value={seasonStart}
-                        onChange={(e) => setSeasonStart(e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 3 }}>Until</div>
-                      <input
-                        className="form-input" type="date"
-                        value={seasonEnd}
-                        onChange={(e) => setSeasonEnd(e.target.value)}
-                      />
-                    </div>
+                  <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 8 }}>
+                    Tap the start date, then the end date. Tap any date again to reset.
                   </div>
-                  <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 4 }}>
-                    Leave empty for an open-ended event.
+                  <Calendar
+                    mode="range"
+                    start={seasonStart || null}
+                    end={seasonEnd || null}
+                    onChange={(s, e) => { setSeasonStart(s ?? ''); setSeasonEnd(e ?? ''); }}
+                    initialMonth={seasonStart ? new Date(seasonStart + 'T00:00:00') : undefined}
+                  />
+                  <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                    <button
+                      type="button"
+                      className="btn-sm"
+                      style={{ flex: 1 }}
+                      onClick={() => { setSeasonStart(''); setSeasonEnd(''); }}
+                    >
+                      Clear range (open-ended)
+                    </button>
                   </div>
                 </div>
               </>

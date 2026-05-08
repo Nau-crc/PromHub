@@ -1,15 +1,20 @@
 import React, { useState } from 'react';
-import { IonPage, IonContent, IonHeader, IonToolbar, IonButtons, IonMenuButton } from '@ionic/react';
+import {
+  IonPage, IonContent, IonHeader, IonToolbar, IonButtons, IonMenuButton,
+  IonList, IonItem, IonItemSliding, IonItemOptions, IonItemOption,
+} from '@ionic/react';
 import { useAppStore } from '@/store/useAppStore';
 import { useUIStore } from '@/store/useUIStore';
-import { initials } from '@/core/utils/format';
 import { venueName } from '@/features/summary/calculations';
 import { StarBadge, SocialBadge } from '@/components/SocialBadge';
+import { Avatar } from '@/components/Avatar';
 import { Pill } from '@/components/Pill';
 import { EmptyBox } from '@/components/EmptyBox';
 
 export const GuestsPage: React.FC = () => {
-  const { guests, venues } = useAppStore((s) => ({ guests: s.guests, venues: s.venues }));
+  const { guests, venues, toggleArrived } = useAppStore((s) => ({
+    guests: s.guests, venues: s.venues, toggleArrived: s.toggleArrived,
+  }));
   const open = useUIStore((s) => s.open);
   const [activeVenue, setActiveVenue] = useState<'all' | number>('all');
 
@@ -39,40 +44,67 @@ export const GuestsPage: React.FC = () => {
                 >{v.name}</button>
               ))}
             </div>
+            <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', paddingBottom: 6 }}>
+              ← Swipe a guest to mark arrived/pending
+            </div>
           </div>
         </IonToolbar>
       </IonHeader>
       <IonContent>
         <div className="spacer" />
         {filtered.length ? (
-          <div className="list-card">
+          <IonList lines="none" style={{ background: 'transparent', padding: '0 16px' }}>
             {filtered.map((g) => (
-              <div key={g.id} className="list-row" onClick={() => open('guestDetail', { id: g.id })}>
-                <div className={g.checked ? 'arrived-dot' : 'pending-dot'} />
-                <div className="list-avatar">{initials(g.name)}</div>
-                <div className="list-main">
-                  <div className="list-name">
-                    <StarBadge on={g.influencer} />
-                    <span>{g.name}</span>
-                    <SocialBadge handle={g.igHandle} platform={g.igPlatform} />
+              <IonItemSliding key={g.id} className="guest-sliding-item">
+                <IonItem
+                  button
+                  detail={false}
+                  onClick={() => open('guestDetail', { id: g.id })}
+                  className="guest-row"
+                  lines="none"
+                >
+                  <div className="list-row" style={{ flex: 1, padding: '8px 4px', borderBottom: 'none' }}>
+                    <div className={g.checked ? 'arrived-dot' : 'pending-dot'} />
+                    <Avatar name={g.name} handle={g.igHandle} platform={g.igPlatform} />
+                    <div className="list-main">
+                      <div className="list-name">
+                        <StarBadge on={g.influencer} />
+                        <span>{g.name}</span>
+                        <SocialBadge handle={g.igHandle} platform={g.igPlatform} />
+                      </div>
+                      <div className="list-sub">
+                        {venueName(g.venueId, venues)} · {(g.inviteTypeNames || []).join(', ') || 'No type'} · {g.pax} pax
+                      </div>
+                    </div>
+                    <div className="list-right">
+                      <div className="list-right-sub" style={{ color: g.checked ? '#0F6E56' : undefined }}>
+                        {g.checked ? 'Arrived' : 'Pending'}
+                      </div>
+                      {g.clubEventId && (
+                        <Pill tone="purple" style={{ fontSize: 10, marginTop: 3, display: 'inline-block' }}>
+                          🌙 Club
+                        </Pill>
+                      )}
+                    </div>
                   </div>
-                  <div className="list-sub">
-                    {venueName(g.venueId, venues)} · {(g.inviteTypeNames || []).join(', ') || 'No type'} · {g.pax} pax
-                  </div>
-                </div>
-                <div className="list-right">
-                  <div className="list-right-sub" style={{ color: g.checked ? '#0F6E56' : undefined }}>
-                    {g.checked ? 'Arrived' : 'Pending'}
-                  </div>
-                  {g.clubEventId && (
-                    <Pill tone="purple" style={{ fontSize: 10, marginTop: 3, display: 'inline-block' }}>
-                      🌙 Club
-                    </Pill>
-                  )}
-                </div>
-              </div>
+                </IonItem>
+                <IonItemOptions side="start" onIonSwipe={() => toggleArrived(g.id)}>
+                  <IonItemOption
+                    expandable
+                    color={g.checked ? 'medium' : 'success'}
+                    onClick={(ev) => {
+                      toggleArrived(g.id);
+                      // Close the sliding state after toggling
+                      const ion = (ev.currentTarget.closest('ion-item-sliding') as HTMLIonItemSlidingElement | null);
+                      ion?.close();
+                    }}
+                  >
+                    {g.checked ? 'Mark pending' : '✓ Arrived'}
+                  </IonItemOption>
+                </IonItemOptions>
+              </IonItemSliding>
             ))}
-          </div>
+          </IonList>
         ) : (
           <EmptyBox>
             No guests yet.<br />

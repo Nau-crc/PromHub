@@ -6,6 +6,7 @@ import {
   occurs, nextOccurrence, previousOccurrence, eventScheduleLabel,
 } from '@/features/summary/calculations';
 import { Pill, SlotPill } from '@/components/Pill';
+import { Avatar } from '@/components/Avatar';
 import { initials } from '@/core/utils/format';
 import { isoDay } from '@/core/utils/date';
 import { today } from '@/core/constants';
@@ -196,7 +197,7 @@ export const EventDetailModal: React.FC<Props> = ({ open, onClose, eventId, onEd
             <div className="list-card" style={{ margin: '0 0 14px' }}>
               {evG.map((g) => (
                 <div key={g.id} className="list-row" style={{ cursor: 'default' }}>
-                  <div className="list-avatar">{initials(g.name)}</div>
+                  <Avatar name={g.name} handle={g.igHandle} platform={g.igPlatform} />
                   <div className="list-main">
                     <div className="list-name"><StarBadge on={g.influencer} /><span>{g.name}</span></div>
                     <div className="list-sub">{(g.inviteTypeNames || []).join(', ')} · {g.pax} pax</div>
@@ -252,7 +253,7 @@ export const EventDetailModal: React.FC<Props> = ({ open, onClose, eventId, onEd
                   const inv = (e.invitedGuests || []).includes(g.name);
                   return (
                     <div key={g.id} className="list-row" onClick={() => togglePrivateInvite(e.id, g.name)}>
-                      <div className="list-avatar">{initials(g.name)}</div>
+                      <Avatar name={g.name} handle={g.igHandle} platform={g.igPlatform} />
                       <div className="list-main">
                         <div className="list-name"><StarBadge on={g.influencer} /><span>{g.name}</span></div>
                       </div>

@@ -13,6 +13,7 @@ import { today } from '@/core/constants';
 import { SheetHeader } from '@/components/SheetHeader';
 import { PlatformPicker } from '@/components/PlatformPicker';
 import { NumberField } from '@/components/NumberField';
+import { Calendar } from '@/components/Calendar';
 
 interface Props {
   open: boolean;
@@ -233,19 +234,18 @@ export const ReservationFormModal: React.FC<Props> = ({ open, onClose, editing, 
           {selectedEvent && !selectedEvent.isOneTime && (
             <div className="form-group">
               <label className="form-label">Event date</label>
-              <input
-                className="form-input"
-                type="date"
-                value={eventDate}
-                min={selectedEvent.seasonStart ?? undefined}
-                max={selectedEvent.seasonEnd ?? undefined}
-                onChange={(e) => setEventDate(e.target.value)}
+              <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 6 }}>
+                Only this event's scheduled occurrences are selectable.
+              </div>
+              <Calendar
+                mode="single"
+                value={eventDate || null}
+                onChange={(iso) => setEventDate(iso ?? '')}
+                isDateEnabled={(iso) => occurs(selectedEvent, iso)}
+                minDate={selectedEvent.seasonStart ?? undefined}
+                maxDate={selectedEvent.seasonEnd ?? undefined}
+                initialMonth={eventDate ? new Date(eventDate + 'T00:00:00') : undefined}
               />
-              {eventDate && !eventDateValid && (
-                <div style={{ fontSize: 11, color: '#A32D2D', marginTop: 4 }}>
-                  ⚠︎ {eventDate} is not an occurrence of "{selectedEvent.name}".
-                </div>
-              )}
             </div>
           )}
           {selectedEvent?.isOneTime && selectedEvent.eventDate && (

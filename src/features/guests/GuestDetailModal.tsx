@@ -1,9 +1,10 @@
 import React from 'react';
 import { IonModal, IonContent } from '@ionic/react';
 import { useAppStore } from '@/store/useAppStore';
-import { initials, profileUrl } from '@/core/utils/format';
+import { profileUrl } from '@/core/utils/format';
 import { venueName } from '@/features/summary/calculations';
 import { StarBadge } from '@/components/SocialBadge';
+import { Avatar } from '@/components/Avatar';
 import { SheetHeader } from '@/components/SheetHeader';
 import { sendViaSocial } from '@/services/messaging';
 
@@ -15,8 +16,8 @@ interface Props {
 }
 
 export const GuestDetailModal: React.FC<Props> = ({ open, onClose, guestId, onEdit }) => {
-  const { guests, venues, events, toggleArrived } = useAppStore((s) => ({
-    guests: s.guests, venues: s.venues, events: s.events, toggleArrived: s.toggleArrived,
+  const { guests, venues, events } = useAppStore((s) => ({
+    guests: s.guests, venues: s.venues, events: s.events,
   }));
   const g = guestId != null ? guests.find((x) => x.id === guestId) : null;
   if (!g) return <IonModal isOpen={open} onDidDismiss={onClose}><IonContent /></IonModal>;
@@ -41,7 +42,7 @@ export const GuestDetailModal: React.FC<Props> = ({ open, onClose, guestId, onEd
           position: 'sticky', top: 0, background: 'var(--color-background-primary)', zIndex: 10,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div className="list-avatar" style={{ width: 42, height: 42, fontSize: 15 }}>{initials(g.name)}</div>
+            <Avatar name={g.name} handle={g.igHandle} platform={g.igPlatform} size={42} />
             <div>
               <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--color-text-primary)' }}>
                 <StarBadge on={g.influencer} /> {g.name}
@@ -88,10 +89,13 @@ export const GuestDetailModal: React.FC<Props> = ({ open, onClose, guestId, onEd
               ✈️ Send event description on {g.igPlatform === 'tiktok' ? 'TikTok' : 'Instagram'}
             </button>
           )}
-          <div style={{ display: 'flex', gap: 8, marginTop: canSendDescription ? 8 : 20 }}>
-            <button className="btn-secondary" onClick={() => toggleArrived(g.id)}>
-              {g.checked ? 'Mark pending' : 'Mark arrived'}
-            </button>
+          <div style={{
+            fontSize: 11, color: 'var(--color-text-secondary)',
+            marginTop: 12, fontStyle: 'italic',
+          }}>
+            Tip: swipe right on a guest in the list to mark arrived/pending.
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
             <button className="btn-primary" style={{ flex: 1, padding: 13, fontSize: 14 }} onClick={() => onEdit(g.id)}>
               Edit
             </button>
