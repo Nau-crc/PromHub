@@ -6,6 +6,7 @@ import { Pill, SlotPill } from '@/components/Pill';
 import { initials } from '@/core/utils/format';
 import { StarBadge, SocialBadge } from '@/components/SocialBadge';
 import { CapacityBar } from '@/components/CapacityBar';
+import { CopyButton } from '@/components/CopyButton';
 import { SheetHeader } from '@/components/SheetHeader';
 
 interface Props {
@@ -82,9 +83,30 @@ export const EventDetailModal: React.FC<Props> = ({ open, onClose, eventId, onEd
           )}
 
           {e.description && (
-            <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 14, lineHeight: 1.5 }}>
-              {e.description}
-            </p>
+            <div style={{
+              background: 'var(--color-background-secondary)',
+              border: '0.5px solid var(--color-border-tertiary)',
+              borderRadius: 'var(--border-radius-md)',
+              padding: '10px 12px',
+              marginBottom: 14,
+            }}>
+              <div style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                marginBottom: 6,
+              }}>
+                <span style={{
+                  fontSize: 11, fontWeight: 500, color: 'var(--color-text-secondary)',
+                  textTransform: 'uppercase', letterSpacing: '.04em',
+                }}>Description</span>
+                <CopyButton text={e.description} />
+              </div>
+              <p style={{
+                fontSize: 13, color: 'var(--color-text-primary)', lineHeight: 1.5,
+                whiteSpace: 'pre-wrap', wordBreak: 'break-word', margin: 0,
+              }}>
+                {e.description}
+              </p>
+            </div>
           )}
 
           {/* ── Guests linked to this event ───────────────── */}
