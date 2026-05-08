@@ -48,7 +48,8 @@ export const ReservationsPage: React.FC = () => {
                     </div>
                     <div className="list-sub">
                       {venueName(r.venueId, venues)} · {r.vipType || '—'}
-                      {c.price ? ` (€${c.price} table)` : ''} · {r.pax} pax
+                      {c.price ? ` (€${c.price})` : ''} · {r.pax} pax
+                      {r.time ? ` · ${r.time}` : ''}
                     </div>
                   </div>
                   <div className="list-right">

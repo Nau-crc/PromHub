@@ -9,6 +9,7 @@ import { DayChips } from '@/components/DayChips';
 import { SlotChips } from '@/components/SlotChips';
 import { Calendar } from '@/components/Calendar';
 import { NumberField } from '@/components/NumberField';
+import { SelectField } from '@/components/SelectField';
 
 type StepId = 'welcome' | 'venue' | 'event' | 'legend' | 'done';
 const STEPS: StepId[] = ['welcome', 'venue', 'event', 'legend', 'done'];
@@ -258,9 +259,12 @@ const EventStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
           </div>
           <div className="form-group">
             <label className="form-label">Venue</label>
-            <select className="form-select" value={venueId ?? ''} onChange={(e) => onVenueChange(parseInt(e.target.value))}>
-              {venues.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
-            </select>
+            <SelectField
+              value={venueId}
+              onChange={(v) => onVenueChange(Number(v))}
+              title="Pick a venue"
+              options={venues.map((v) => ({ value: v.id, label: v.name }))}
+            />
           </div>
           <div className="form-group">
             <label className="form-label">Schedule</label>

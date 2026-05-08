@@ -76,14 +76,25 @@ function migrateSnapshot(snap: AppDataSnapshot): AppDataSnapshot {
     }
     return { ...g, eventDate, createdAt: g.createdAt || '' };
   });
+  // Build a venue→timeslot lookup so we can resolve old slotIds to a start time
+  const slotById = new Map<string, { startTime: string }>();
+  for (const v of (snap.venues || [])) {
+    for (const t of (v.timeslots || [])) slotById.set(t.id, { startTime: t.startTime });
+  }
   const reservations = (snap.reservations || []).map((r) => {
-    if (r.eventDate !== undefined && r.eventDate !== null) return r;
-    let eventDate: string | null = null;
-    if (r.eventId != null) {
-      const ev = eventById.get(r.eventId);
-      eventDate = ev?.isOneTime ? ev.eventDate : (r.createdAt || null);
+    let eventDate = r.eventDate;
+    if (eventDate == null) {
+      if (r.eventId != null) {
+        const ev = eventById.get(r.eventId);
+        eventDate = ev?.isOneTime ? (ev.eventDate ?? null) : (r.createdAt || null);
+      } else {
+        eventDate = null;
+      }
     }
-    return { ...r, eventDate, createdAt: r.createdAt || '' };
+    // Backfill time: prefer existing, else slot's start time, else 20:00
+    const time = r.time
+      ?? (r.slotId ? slotById.get(r.slotId)?.startTime ?? '20:00' : '20:00');
+    return { ...r, eventDate, createdAt: r.createdAt || '', time, slotId: r.slotId ?? '' };
   });
   return { ...snap, events, guests, reservations };
 }

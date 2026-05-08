@@ -87,9 +87,15 @@ export interface Reservation {
   phoneCode: string;
   phoneNum: string;
   venueId: number;
+  /** Optional informational link to an event scheduled that night.
+   *  Reservations are NOT functionally bound to events. */
   eventId: number | null;
   vipType: string;
+  /** @deprecated Reservations are no longer tied to a venue timeslot.
+   *  Kept on the type for backwards-compat; new records leave it as ''. */
   slotId: string;
+  /** "HH:MM" 24h. Reservations have a free time, not a venue timeslot. */
+  time: string;
   pax: number;
   fromInvite: boolean;
   inviterHandle: string;

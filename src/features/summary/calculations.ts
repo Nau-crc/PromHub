@@ -170,6 +170,52 @@ export function previousOccurrence(event: PromEvent, untilIsoDate: string): stri
   return null;
 }
 
+// ── Time-of-day overlap ────────────────────────────────────
+// True when `time` ("HH:MM") falls inside [start, end). End <= start
+// means the slot wraps past midnight (e.g. 22:00 → 02:00, or end "00:00").
+export function timeInSlot(time: string, startTime: string, endTime: string): boolean {
+  if (!time || !startTime || !endTime) return false;
+  const wraps = endTime <= startTime;
+  if (!wraps) return time >= startTime && time < endTime;
+  return time >= startTime || time < endTime;
+}
+
+/**
+ * Find every event scheduled at the venue on `isoDate` whose timeslot
+ * window contains `time`. Used by the reservation form to surface a
+ * "there's an event happening at this time" banner.
+ */
+export interface EventSlotMatch {
+  event: PromEvent;
+  slotName: string;
+  startTime: string;
+  endTime: string;
+}
+export function findEventsAt(
+  venueId: number | null,
+  isoDate: string,
+  time: string,
+  events: PromEvent[],
+  venues: Venue[],
+): EventSlotMatch[] {
+  if (venueId == null || !isoDate) return [];
+  const v = venueById(venueId, venues);
+  if (!v) return [];
+  const out: EventSlotMatch[] = [];
+  for (const e of events) {
+    if (e.venueId !== venueId) continue;
+    if (!occurs(e, isoDate)) continue;
+    for (const sid of e.selectedSlotIds || []) {
+      const slot = (v.timeslots || []).find((s) => s.id === sid);
+      if (!slot) continue;
+      if (!time || timeInSlot(time, slot.startTime, slot.endTime)) {
+        out.push({ event: e, slotName: slot.name, startTime: slot.startTime, endTime: slot.endTime });
+      }
+    }
+  }
+  return out;
+}
+
 /**
  * Has this event finished running entirely?
  *  - One-time: its date is strictly before today.

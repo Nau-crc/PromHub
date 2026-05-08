@@ -10,6 +10,7 @@ import {
 } from '@/features/summary/calculations';
 import { Avatar } from '@/components/Avatar';
 import { OccurrencePicker } from '@/components/OccurrencePicker';
+import { SelectField } from '@/components/SelectField';
 import { SheetHeader } from '@/components/SheetHeader';
 import { PlatformPicker } from '@/components/PlatformPicker';
 import { NumberField } from '@/components/NumberField';
@@ -181,9 +182,13 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
           <div className="form-row">
             <div className="form-group">
               <label className="form-label">Venue</label>
-              <select className="form-select" value={venueId ?? ''} onChange={(e) => onVenueChange(parseInt(e.target.value))}>
-                {venues.map((vv) => <option key={vv.id} value={vv.id}>{vv.name}</option>)}
-              </select>
+              <SelectField
+                value={venueId}
+                onChange={(v) => onVenueChange(Number(v))}
+                title="Pick a venue"
+                options={venues.map((vv) => ({ value: vv.id, label: vv.name }))}
+                placeholder="— Select venue —"
+              />
             </div>
             <div className="form-group">
               <label className="form-label">Pax</label>

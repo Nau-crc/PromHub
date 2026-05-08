@@ -10,6 +10,7 @@ import { SlotChips } from '@/components/SlotChips';
 import { SheetHeader } from '@/components/SheetHeader';
 import { NumberField } from '@/components/NumberField';
 import { Calendar } from '@/components/Calendar';
+import { SelectField } from '@/components/SelectField';
 
 interface Props {
   open: boolean;
@@ -153,11 +154,16 @@ export const EventFormModal: React.FC<Props> = ({ open, onClose, editing, onRequ
 
           <div className="form-group">
             <label className="form-label">Venue (optional)</label>
-            <select className="form-select" value={venueId ?? NO_VENUE} onChange={(e) => onVenueChange(e.target.value)}>
-              <option value={NO_VENUE}>— No venue —</option>
-              {venues.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
-              <option value={NEW_VENUE}>+ Add new venue…</option>
-            </select>
+            <SelectField
+              value={venueId == null ? NO_VENUE : String(venueId)}
+              onChange={(v) => onVenueChange(v)}
+              title="Pick a venue"
+              options={[
+                { value: NO_VENUE, label: '— No venue —' },
+                ...venues.map((v) => ({ value: String(v.id), label: v.name })),
+                { value: NEW_VENUE, label: '+ Add new venue…' },
+              ]}
+            />
           </div>
 
           <div className="form-group">

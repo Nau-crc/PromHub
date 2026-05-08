@@ -3,7 +3,7 @@ import { IonModal, IonContent } from '@ionic/react';
 import { useAppStore } from '@/store/useAppStore';
 import { useConfirm } from '@/store/useConfirmStore';
 import { initials } from '@/core/utils/format';
-import { commCalc, slotLabel, venueName, netToYou } from '@/features/summary/calculations';
+import { commCalc, venueName, netToYou } from '@/features/summary/calculations';
 import { SocialBadge } from '@/components/SocialBadge';
 
 interface Props {
@@ -46,7 +46,17 @@ export const ReservationDetailModal: React.FC<Props> = ({ open, onClose, reserva
         <div style={{ padding: '16px 16px 32px' }}>
           <div className="detail-kv"><span className="dk">Venue</span><span className="dv">{venueName(r.venueId, venues)}</span></div>
           <div className="detail-kv"><span className="dk">VIP type</span><span className="dv">{r.vipType} · €{c.price}/table</span></div>
-          <div className="detail-kv"><span className="dk">Timeslot</span><span className="dv">{slotLabel(r.slotId, venues)}</span></div>
+          <div className="detail-kv">
+            <span className="dk">When</span>
+            <span className="dv">
+              {r.eventDate
+                ? new Date(r.eventDate + 'T00:00:00').toLocaleDateString(undefined, {
+                    weekday: 'short', month: 'short', day: 'numeric',
+                  })
+                : '—'}
+              {r.time ? ` · ${r.time}` : ''}
+            </span>
+          </div>
           <div className="detail-kv"><span className="dk">Pax</span><span className="dv">{r.pax}</span></div>
           <div className="detail-kv"><span className="dk">Table total</span><span className="dv">€{c.tableTotal}</span></div>
           <div className="detail-kv">

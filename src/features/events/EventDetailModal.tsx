@@ -228,7 +228,7 @@ export const EventDetailModal: React.FC<Props> = ({ open, onClose, eventId, onEd
                         {r.fromInvite && <SocialBadge handle={r.inviterHandle} platform={r.inviterPlatform} />}
                       </div>
                       <div className="list-sub">
-                        {r.vipType || '—'}{c.price ? ` (€${c.price})` : ''} · {r.pax} pax
+                        {r.vipType || '—'}{c.price ? ` (€${c.price})` : ''} · {r.pax} pax{r.time ? ` · ${r.time}` : ''}
                       </div>
                     </div>
                     <div className="list-right">

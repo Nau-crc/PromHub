@@ -5,7 +5,7 @@ import { useAppStore } from '@/store/useAppStore';
 import { useConfirm } from '@/store/useConfirmStore';
 import { COUNTRY_CODES } from '@/core/constants';
 import {
-  getVipOptionsForPax, getVipPrice, nextOccurrence,
+  findEventsAt, getVipOptionsForPax, getVipPrice, nextOccurrence,
   venueById, venueVipSlotsLeft,
 } from '@/features/summary/calculations';
 import { round2 } from '@/core/utils/format';
@@ -14,6 +14,8 @@ import { today } from '@/core/constants';
 import { SheetHeader } from '@/components/SheetHeader';
 import { PlatformPicker } from '@/components/PlatformPicker';
 import { NumberField } from '@/components/NumberField';
+import { TimePicker } from '@/components/TimePicker';
+import { SelectField } from '@/components/SelectField';
 import { formatPhone, isValidPhone, maxDigits, onlyDigits, placeholderForCode } from '@/core/utils/phone';
 
 interface Props {
@@ -46,8 +48,9 @@ export const ReservationFormModal: React.FC<Props> = ({ open, onClose, editing, 
   const [venueId, setVenueId] = useState<number | null>(null);
   const [pax, setPax] = useState<number | null>(null);
   const [vipType, setVipType] = useState<string>('');
-  const [slotId, setSlotId] = useState<string>('');
   const [eventDate, setEventDate] = useState<string>('');
+  const [time, setTime] = useState<string>('20:00');
+  const [timePickerOpen, setTimePickerOpen] = useState(false);
   const [commissionPct, setCommissionPct] = useState<number | null>(10);
   const [fromInvite, setFromInvite] = useState(false);
   const [inviterPlatform, setInviterPlatform] = useState<Platform>('instagram');
@@ -67,8 +70,8 @@ export const ReservationFormModal: React.FC<Props> = ({ open, onClose, editing, 
     setVenueId(initVid);
     setPax(editing?.pax ?? null);
     setVipType(editing?.vipType ?? '');
-    setSlotId(editing?.slotId ?? '');
     setEventDate(editing?.eventDate ?? defaultEventNight(initVid));
+    setTime(editing?.time ?? '20:00');
     setCommissionPct(editing?.commissionPct ?? 10);
     setFromInvite(!!editing?.fromInvite);
     setInviterPlatform(editing?.inviterPlatform ?? 'instagram');
@@ -126,14 +129,11 @@ export const ReservationFormModal: React.FC<Props> = ({ open, onClose, editing, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [venueId]);
 
-  const v = venueId != null ? venueById(venueId, venues) : undefined;
   const paxN = pax ?? 0;
   const vipOpts = useMemo(
     () => (venueId != null ? getVipOptionsForPax(venueId, paxN, venues) : []),
     [venueId, paxN, venues],
   );
-  const slots = v?.timeslots || [];
-
   // Auto-correct VIP type when options change (matches MVP `updateResVipForPax`)
   useEffect(() => {
     if (!vipOpts.length) {
@@ -145,13 +145,14 @@ export const ReservationFormModal: React.FC<Props> = ({ open, onClose, editing, 
     }
   }, [vipOpts]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-default slot when venue changes
-  useEffect(() => {
-    if (!slots.length) { if (slotId) setSlotId(''); return; }
-    if (!slots.find((s) => s.id === slotId)) {
-      setSlotId(slots[0].id);
-    }
-  }, [venueId]); // eslint-disable-line react-hooks/exhaustive-deps
+  // ── Event overlap banner ──────────────────────────────────
+  // Reservations are independent of events, but we surface any
+  // event scheduled at the venue at this date/time so the promoter
+  // knows the room is busy. Purely informational.
+  const eventsAtThisTime = useMemo(
+    () => findEventsAt(venueId, eventDate, time, events, venues),
+    [venueId, eventDate, time, events, venues],
+  );
 
   // ── Live commission preview (mirrors `previewComm` byte-for-byte) ──
   const price = venueId != null ? getVipPrice(venueId, vipType, venues) : 0;
@@ -182,7 +183,9 @@ export const ReservationFormModal: React.FC<Props> = ({ open, onClose, editing, 
       phoneNum: phoneNum.trim(),
       venueId,
       vipType,
-      slotId,
+      // slotId is deprecated — leave it empty for new records.
+      slotId: editing?.slotId ?? '',
+      time: time || '20:00',
       pax: pax ?? 2,
       fromInvite,
       inviterHandle: fromInvite ? inviterHandle.trim() : '',
@@ -216,20 +219,20 @@ export const ReservationFormModal: React.FC<Props> = ({ open, onClose, editing, 
           <div className="form-group">
             <label className="form-label">Phone</label>
             <div className="phone-row">
-              <select
-                className="form-select"
+              <SelectField
                 value={phoneCode}
-                onChange={(e) => {
-                  setPhoneCode(e.target.value);
-                  // Re-format / truncate the existing number for the new country
-                  const limited = onlyDigits(phoneNum).slice(0, maxDigits(e.target.value));
-                  setPhoneNum(formatPhone(e.target.value, limited));
+                onChange={(code) => {
+                  setPhoneCode(code);
+                  const limited = onlyDigits(phoneNum).slice(0, maxDigits(code));
+                  setPhoneNum(formatPhone(code, limited));
                 }}
-              >
-                {COUNTRY_CODES.map((c) => (
-                  <option key={c.code} value={c.code}>{c.flag} {c.code}</option>
-                ))}
-              </select>
+                title="Country code"
+                style={{ minWidth: 110, flexShrink: 0 }}
+                options={COUNTRY_CODES.map((c) => ({
+                  value: c.code,
+                  label: `${c.flag} ${c.code}`,
+                }))}
+              />
               <input
                 className="form-input"
                 type="tel"
@@ -252,10 +255,14 @@ export const ReservationFormModal: React.FC<Props> = ({ open, onClose, editing, 
 
           <div className="form-row">
             <div className="form-group">
-              <label className="form-label">Venue</label>
-              <select className="form-select" value={venueId ?? ''} onChange={(e) => setVenueId(parseInt(e.target.value))}>
-                {venues.map((vv) => <option key={vv.id} value={vv.id}>{vv.name}</option>)}
-              </select>
+              <label className="form-label">Venue *</label>
+              <SelectField
+                value={venueId}
+                onChange={(v) => setVenueId(Number(v))}
+                title="Pick a venue"
+                placeholder="— Select venue —"
+                options={venues.map((vv) => ({ value: vv.id, label: vv.name }))}
+              />
             </div>
             <div className="form-group">
               <label className="form-label">Pax</label>
@@ -272,26 +279,35 @@ export const ReservationFormModal: React.FC<Props> = ({ open, onClose, editing, 
 
           <div className="form-row">
             <div className="form-group">
-              <label className="form-label">VIP type</label>
-              <select className="form-select" value={vipType} onChange={(e) => setVipType(e.target.value)}>
-                {vipOpts.length ? vipOpts.map((t) => {
+              <label className="form-label">VIP type *</label>
+              <SelectField
+                value={vipType || null}
+                onChange={(v) => setVipType(String(v))}
+                title="Pick a VIP table"
+                placeholder={vipOpts.length ? '— Select VIP type —' : '— Enter pax above —'}
+                disabled={!vipOpts.length}
+                options={vipOpts.map((t) => {
                   const left = venueVipSlotsLeft(venueId!, t.name, venues, reservations);
                   const cap = t.tableCapacity || 0;
-                  return (
-                    <option key={t.id} value={t.name}>
-                      {t.name} ({t.minPax}–{t.maxPax} pax) €{t.price}{cap ? ` · ${left}/${cap} tbls left` : ''}
-                    </option>
-                  );
-                }) : <option value="">— Enter pax above —</option>}
-              </select>
+                  return {
+                    value: t.name,
+                    label: `${t.name} · €${t.price}`,
+                    sub: `${t.minPax}–${t.maxPax} pax${cap ? ` · ${left}/${cap} tables left` : ''}`,
+                    disabled: cap > 0 && left === 0,
+                  };
+                })}
+              />
             </div>
             <div className="form-group">
-              <label className="form-label">Timeslot</label>
-              <select className="form-select" value={slotId} onChange={(e) => setSlotId(e.target.value)}>
-                {slots.length ? slots.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name} ({s.startTime}–{s.endTime})</option>
-                )) : <option value="">No timeslots</option>}
-              </select>
+              <label className="form-label">Time</label>
+              <button
+                type="button"
+                className="form-input"
+                style={{ textAlign: 'center', cursor: 'pointer', fontVariantNumeric: 'tabular-nums' }}
+                onClick={() => setTimePickerOpen(true)}
+              >
+                {time || '20:00'}
+              </button>
             </div>
           </div>
 
@@ -341,6 +357,26 @@ export const ReservationFormModal: React.FC<Props> = ({ open, onClose, editing, 
               onChange={(e) => setEventDate(e.target.value)}
             />
           </div>
+
+          {eventsAtThisTime.length > 0 && (
+            <div className="info-box" style={{
+              borderLeft: '3px solid var(--color-primary)',
+              background: 'rgba(249, 115, 22, .08)',
+              color: 'var(--color-text-primary)',
+            }}>
+              ℹ️ {eventsAtThisTime.length === 1 ? 'There is an event' : 'There are events'} at this venue at this time:
+              <ul style={{ margin: '6px 0 0 18px', padding: 0 }}>
+                {eventsAtThisTime.map((m, i) => (
+                  <li key={i} style={{ fontSize: 12, lineHeight: 1.6 }}>
+                    <b>{m.event.name}</b> · {m.slotName} ({m.startTime}–{m.endTime})
+                  </li>
+                ))}
+              </ul>
+              <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 6 }}>
+                The reservation isn't linked to {eventsAtThisTime.length === 1 ? 'it' : 'them'} — this is just a heads-up.
+              </div>
+            </div>
+          )}
 
           <div className="form-group">
             <label className="form-label">Your commission %</label>
@@ -411,6 +447,13 @@ export const ReservationFormModal: React.FC<Props> = ({ open, onClose, editing, 
             </button>
           </div>
         </div>
+        <TimePicker
+          open={timePickerOpen}
+          value={time || '20:00'}
+          onClose={() => setTimePickerOpen(false)}
+          onChange={(t) => setTime(t)}
+          title="Reservation time"
+        />
       </IonContent>
     </IonModal>
   );
