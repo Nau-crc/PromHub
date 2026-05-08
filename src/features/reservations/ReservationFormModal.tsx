@@ -2,9 +2,10 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { IonModal, IonContent } from '@ionic/react';
 import type { Platform, Reservation } from '@/core/types';
 import { useAppStore } from '@/store/useAppStore';
+import { useConfirm } from '@/store/useConfirmStore';
 import { COUNTRY_CODES } from '@/core/constants';
 import {
-  getVipOptionsForPax, getVipPrice, nextOccurrence, occurs,
+  getVipOptionsForPax, getVipPrice, nextOccurrence,
   venueById, venueVipSlotsLeft,
 } from '@/features/summary/calculations';
 import { round2 } from '@/core/utils/format';
@@ -13,7 +14,6 @@ import { today } from '@/core/constants';
 import { SheetHeader } from '@/components/SheetHeader';
 import { PlatformPicker } from '@/components/PlatformPicker';
 import { NumberField } from '@/components/NumberField';
-import { OccurrencePicker } from '@/components/OccurrencePicker';
 import { formatPhone, isValidPhone, maxDigits, onlyDigits, placeholderForCode } from '@/core/utils/phone';
 
 interface Props {
@@ -28,6 +28,17 @@ export const ReservationFormModal: React.FC<Props> = ({ open, onClose, editing, 
     venues: s.venues, events: s.events, reservations: s.reservations,
     upsertReservation: s.upsertReservation, removeReservation: s.removeReservation, nextId: s.nextId,
   }));
+  const confirm = useConfirm();
+
+  const askDelete = async () => {
+    if (!editing) return;
+    const ok = await confirm({
+      title: `Delete reservation for ${editing.name}?`,
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (ok) { removeReservation(editing.id); onClose(); }
+  };
 
   const [name, setName] = useState('');
   const [phoneCode, setPhoneCode] = useState('+34');
@@ -36,7 +47,6 @@ export const ReservationFormModal: React.FC<Props> = ({ open, onClose, editing, 
   const [pax, setPax] = useState<number | null>(null);
   const [vipType, setVipType] = useState<string>('');
   const [slotId, setSlotId] = useState<string>('');
-  const [eventId, setEventId] = useState<number | null>(null);
   const [eventDate, setEventDate] = useState<string>('');
   const [commissionPct, setCommissionPct] = useState<number | null>(10);
   const [fromInvite, setFromInvite] = useState(false);
@@ -51,42 +61,70 @@ export const ReservationFormModal: React.FC<Props> = ({ open, onClose, editing, 
     setName(editing?.name ?? '');
     setPhoneCode(editing?.phoneCode ?? '+34');
     setPhoneNum(editing?.phoneNum ?? '');
-    setVenueId(editing?.venueId ?? venues[0]?.id ?? null);
+    const initVid = editing?.venueId ?? (seedEventId
+      ? events.find((e) => e.id === seedEventId)?.venueId ?? venues[0]?.id ?? null
+      : venues[0]?.id ?? null);
+    setVenueId(initVid);
     setPax(editing?.pax ?? null);
     setVipType(editing?.vipType ?? '');
     setSlotId(editing?.slotId ?? '');
-    const startEv = editing ? editing.eventId : (seedEventId ?? null);
-    setEventId(startEv);
-    setEventDate(initialEventDate(startEv, editing?.eventDate ?? null));
+    setEventDate(editing?.eventDate ?? defaultEventNight(initVid));
     setCommissionPct(editing?.commissionPct ?? 10);
     setFromInvite(!!editing?.fromInvite);
     setInviterPlatform(editing?.inviterPlatform ?? 'instagram');
     setInviterHandle(editing?.inviterHandle ?? '');
     setCommissionEarner(editing?.commissionEarner ?? '');
     setWomanPct(editing?.womanPct ?? 50);
-  }, [open, editing, seedEventId, venues]);
+  }, [open, editing, seedEventId, venues]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Defaults eventDate when an event is (re)picked
-  function initialEventDate(evId: number | null, prevDate: string | null): string {
-    if (evId == null) return '';
-    const ev = events.find((e) => e.id === evId);
-    if (!ev) return '';
-    if (ev.isOneTime) return ev.eventDate ?? '';
-    if (prevDate) return prevDate;
-    return nextOccurrence(ev, isoDay(today())) ?? '';
+  // ── Event nights at the selected venue ────────────────────
+  // Per the data model a reservation belongs to a VENUE, not an event.
+  // We still surface "upcoming nights with an event here" so the
+  // promoter can pick a date in one tap. The eventId stays nullable
+  // for context — useful when reporting later — but is not required.
+  const todayIso = isoDay(today());
+  const eventNightsAtVenue = useMemo(() => {
+    if (venueId == null) return [];
+    const out: { iso: string; events: typeof events }[] = [];
+    const seen = new Map<string, typeof events>();
+    for (const e of events) {
+      if (e.venueId !== venueId) continue;
+      // Look ahead 90 days for occurrences
+      let cursor = todayIso;
+      for (let i = 0; i < 90; i++) {
+        const next = nextOccurrence(e, cursor);
+        if (!next || (e.seasonEnd && next > e.seasonEnd)) break;
+        const arr = seen.get(next) ?? [];
+        if (!arr.find((x) => x.id === e.id)) arr.push(e);
+        seen.set(next, arr);
+        // step one day after the occurrence to find the next
+        const [y, m, d] = next.split('-').map(Number);
+        cursor = isoDay(new Date(y, m - 1, d + 1));
+      }
+    }
+    [...seen.entries()]
+      .sort(([a], [b]) => (a < b ? -1 : 1))
+      .forEach(([iso, evs]) => out.push({ iso, events: evs }));
+    return out;
+  }, [venueId, events, todayIso]);
+
+  function defaultEventNight(vid: number | null): string {
+    if (vid == null) return '';
+    // First upcoming event night, or empty if none
+    let earliest = '';
+    for (const e of events) {
+      if (e.venueId !== vid) continue;
+      const next = nextOccurrence(e, todayIso);
+      if (next && (!earliest || next < earliest)) earliest = next;
+    }
+    return earliest;
   }
 
-  const selectedEvent = eventId != null ? events.find((e) => e.id === eventId) : null;
-  const eventDateValid = !selectedEvent
-    || (selectedEvent.isOneTime
-        ? selectedEvent.eventDate === eventDate
-        : !!eventDate && occurs(selectedEvent, eventDate));
-
-  // Re-default eventDate when the linked event changes
+  // When the venue changes, reset the date to its first event night
   useEffect(() => {
-    setEventDate((prev) => initialEventDate(eventId, prev || null));
+    setEventDate((prev) => prev || defaultEventNight(venueId));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [eventId]);
+  }, [venueId]);
 
   const v = venueId != null ? venueById(venueId, venues) : undefined;
   const paxN = pax ?? 0;
@@ -128,12 +166,11 @@ export const ReservationFormModal: React.FC<Props> = ({ open, onClose, editing, 
 
   const save = () => {
     const trimmed = name.trim();
-    if (!trimmed) return;
-    if (venueId == null) return;
-    if (selectedEvent && !eventDateValid) {
-      alert('The event date you picked is not a valid occurrence of this event.');
-      return;
-    }
+    if (!trimmed) { alert('Contact name is required.'); return; }
+    if (venueId == null) { alert('Pick a venue.'); return; }
+    if (!pax || pax < 1) { alert('Number of pax is required.'); return; }
+    if (!vipType) { alert('Pick a VIP type.'); return; }
+    if (!eventDate) { alert('Reservation date is required.'); return; }
     if (phoneDigits && !phoneOk) {
       alert(`Phone number doesn't match the format for ${phoneCode}.`);
       return;
@@ -144,7 +181,6 @@ export const ReservationFormModal: React.FC<Props> = ({ open, onClose, editing, 
       phoneCode,
       phoneNum: phoneNum.trim(),
       venueId,
-      eventId: eventId ?? null,
       vipType,
       slotId,
       pax: pax ?? 2,
@@ -155,7 +191,13 @@ export const ReservationFormModal: React.FC<Props> = ({ open, onClose, editing, 
       womanPct: fromInvite ? womanPctN : 0,
       commissionEarner: fromInvite ? commissionEarner.trim() : '',
       createdAt: editing?.createdAt ?? isoDay(today()),
-      eventDate: selectedEvent ? (eventDate || null) : null,
+      eventDate: eventDate || null,
+      // Event link is informational only; we attach it when the user picked
+      // a date that has an event scheduled at this venue.
+      eventId: (() => {
+        const night = eventNightsAtVenue.find((n) => n.iso === eventDate);
+        return night?.events[0]?.id ?? null;
+      })(),
     };
     upsertReservation(entry);
     onClose();
@@ -254,31 +296,51 @@ export const ReservationFormModal: React.FC<Props> = ({ open, onClose, editing, 
           </div>
 
           <div className="form-group">
-            <label className="form-label">Linked event</label>
-            <select className="form-select" value={eventId ?? ''} onChange={(e) => setEventId(e.target.value ? parseInt(e.target.value) : null)}>
-              <option value="">— None —</option>
-              {events.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
-            </select>
-          </div>
-
-          {selectedEvent && !selectedEvent.isOneTime && (
-            <div className="form-group">
-              <label className="form-label">Event date</label>
-              <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 6 }}>
-                Use the arrows to step through this event's occurrences.
+            <label className="form-label">Reservation date *</label>
+            <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 8 }}>
+              Pick the night this table is for. The list shows nights with an event at this venue.
+            </div>
+            {eventNightsAtVenue.length ? (
+              <div>
+                {eventNightsAtVenue.slice(0, 12).map(({ iso, events: evs }) => {
+                  const on = eventDate === iso;
+                  const dt = new Date(iso + 'T00:00:00');
+                  const label = dt.toLocaleDateString(undefined, {
+                    weekday: 'short', month: 'short', day: 'numeric',
+                  });
+                  return (
+                    <div
+                      key={iso}
+                      className={`event-picker-item ${on ? 'sel' : ''}`}
+                      onClick={() => setEventDate(iso)}
+                    >
+                      <div className="event-picker-info">
+                        <div className="event-picker-name">{label}</div>
+                        <div className="event-picker-sub">
+                          {evs.map((e) => e.name).join(' · ')}
+                        </div>
+                      </div>
+                      <div className="event-picker-check">{on ? '✓' : ''}</div>
+                    </div>
+                  );
+                })}
               </div>
-              <OccurrencePicker
-                event={selectedEvent}
-                value={eventDate}
-                onChange={setEventDate}
-              />
+            ) : (
+              <div className="info-box">
+                No upcoming event nights at this venue. Add an event first
+                (or pick a custom date below).
+              </div>
+            )}
+            <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', margin: '8px 0 4px' }}>
+              Or pick a custom date:
             </div>
-          )}
-          {selectedEvent?.isOneTime && selectedEvent.eventDate && (
-            <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', margin: '-6px 0 12px' }}>
-              Event date: <b>{selectedEvent.eventDate}</b>
-            </div>
-          )}
+            <input
+              className="form-input"
+              type="date"
+              value={eventDate}
+              onChange={(e) => setEventDate(e.target.value)}
+            />
+          </div>
 
           <div className="form-group">
             <label className="form-label">Your commission %</label>
@@ -340,7 +402,7 @@ export const ReservationFormModal: React.FC<Props> = ({ open, onClose, editing, 
 
           <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
             {editing && (
-              <button className="btn-danger" onClick={() => { removeReservation(editing.id); onClose(); }}>
+              <button className="btn-danger" onClick={askDelete}>
                 Delete
               </button>
             )}

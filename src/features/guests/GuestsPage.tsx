@@ -5,6 +5,7 @@ import {
 } from '@ionic/react';
 import { useAppStore } from '@/store/useAppStore';
 import { useUIStore } from '@/store/useUIStore';
+import { useConfirm } from '@/store/useConfirmStore';
 import { venueName } from '@/features/summary/calculations';
 import { StarBadge, SocialBadge } from '@/components/SocialBadge';
 import { Avatar } from '@/components/Avatar';
@@ -17,6 +18,7 @@ export const GuestsPage: React.FC = () => {
     toggleArrived: s.toggleArrived, toggleCancelled: s.toggleCancelled,
   }));
   const open = useUIStore((s) => s.open);
+  const confirm = useConfirm();
   const [activeVenue, setActiveVenue] = useState<'all' | number>('all');
 
   const filtered = activeVenue === 'all' ? guests : guests.filter((g) => g.venueId === activeVenue);
@@ -54,8 +56,14 @@ export const GuestsPage: React.FC = () => {
     return () => { cancelled = true; };
   }, [filtered.length]);
 
-  const askCancel = (id: number, name: string) => {
-    if (window.confirm(`Cancel invitation for ${name}?`)) toggleCancelled(id);
+  const askCancel = async (id: number, name: string) => {
+    const ok = await confirm({
+      title: `Cancel ${name}'s spot?`,
+      message: "The invitation will stay visible (struck through) and the seats free up for someone else.",
+      confirmLabel: 'Cancel invitation',
+      destructive: true,
+    });
+    if (ok) toggleCancelled(id);
   };
 
   return (
@@ -102,15 +110,24 @@ export const GuestsPage: React.FC = () => {
                   ref={i === 0 ? firstRowRef : undefined}
                   className={`guest-sliding-item state-${rowState}`}
                 >
-                  {/* Left side: arrived */}
-                  <IonItemOptions side="start" onIonSwipe={() => toggleArrived(g.id)}>
+                  {/* Left side: arrived. Closes after 1s so the user
+                      sees the action confirmed before the panel slides
+                      back to the normal list view. */}
+                  <IonItemOptions
+                    side="start"
+                    onIonSwipe={(ev) => {
+                      toggleArrived(g.id);
+                      const ion = (ev.target as HTMLElement).closest('ion-item-sliding') as HTMLIonItemSlidingElement | null;
+                      setTimeout(() => ion?.close(), 1000);
+                    }}
+                  >
                     <IonItemOption
                       expandable
                       color={isArrived ? 'medium' : 'primary'}
                       onClick={(ev) => {
                         toggleArrived(g.id);
                         const ion = ev.currentTarget.closest('ion-item-sliding') as HTMLIonItemSlidingElement | null;
-                        ion?.close();
+                        setTimeout(() => ion?.close(), 1000);
                       }}
                     >
                       {isArrived ? 'Mark pending' : '✓ Arrived'}
@@ -151,18 +168,27 @@ export const GuestsPage: React.FC = () => {
                     </div>
                   </IonItem>
 
-                  {/* Right side: cancel (with confirmation prompt) */}
+                  {/* Right side: cancel (with styled confirmation prompt). */}
                   <IonItemOptions
                     side="end"
-                    onIonSwipe={() => askCancel(g.id, g.name)}
+                    onIonSwipe={async (ev) => {
+                      const ion = (ev.target as HTMLElement).closest('ion-item-sliding') as HTMLIonItemSlidingElement | null;
+                      if (isCancelled) {
+                        toggleCancelled(g.id);            // restore — no confirm needed
+                      } else {
+                        await askCancel(g.id, g.name);    // confirm dialog handles actual cancel
+                      }
+                      setTimeout(() => ion?.close(), 1000);
+                    }}
                   >
                     <IonItemOption
                       expandable
                       color={isCancelled ? 'medium' : 'danger'}
-                      onClick={(ev) => {
-                        askCancel(g.id, g.name);
+                      onClick={async (ev) => {
                         const ion = ev.currentTarget.closest('ion-item-sliding') as HTMLIonItemSlidingElement | null;
-                        ion?.close();
+                        if (isCancelled) toggleCancelled(g.id);
+                        else await askCancel(g.id, g.name);
+                        setTimeout(() => ion?.close(), 1000);
                       }}
                     >
                       {isCancelled ? 'Restore' : '✕ Cancel'}

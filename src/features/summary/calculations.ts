@@ -170,6 +170,22 @@ export function previousOccurrence(event: PromEvent, untilIsoDate: string): stri
   return null;
 }
 
+/**
+ * Has this event finished running entirely?
+ *  - One-time: its date is strictly before today.
+ *  - Recurring with seasonEnd: seasonEnd is strictly before today.
+ *  - Recurring without seasonEnd: never (open-ended).
+ *
+ * Used for cascading deletes: when a venue is removed we keep
+ * past events for historical reporting, and only drop future ones.
+ */
+export function isEventPast(event: PromEvent, todayIso: string): boolean {
+  if (event.isOneTime) {
+    return !!event.eventDate && event.eventDate < todayIso;
+  }
+  return !!event.seasonEnd && event.seasonEnd < todayIso;
+}
+
 /** Human-readable schedule label for an event ("Sat/Sun · until Sep 30", "Jul 15", "Recurring"). */
 export function eventScheduleLabel(event: PromEvent): string {
   if (event.isOneTime) {
@@ -215,8 +231,12 @@ export function eventCapacity(
   isoDate: string | null = null,
 ): EventCapacity {
   const e = events.find((x) => x.id === eventId);
+  // Cancelled guests free up their seats — they don't count toward the
+  // used capacity, so the next swipe-cancel widens "left" again.
   const used = guests
-    .filter((g) => g.eventId === eventId && (isoDate == null || g.eventDate === isoDate))
+    .filter((g) => g.eventId === eventId
+      && !g.cancelled
+      && (isoDate == null || g.eventDate === isoDate))
     .reduce((a, g) => a + g.pax, 0);
   const capacity = e?.capacity ?? 0;
   if (!capacity) {

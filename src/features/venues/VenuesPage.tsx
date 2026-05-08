@@ -2,6 +2,7 @@ import React from 'react';
 import { IonPage, IonContent, IonHeader, IonToolbar, IonButtons, IonMenuButton } from '@ionic/react';
 import { useAppStore } from '@/store/useAppStore';
 import { useUIStore } from '@/store/useUIStore';
+import { useConfirm } from '@/store/useConfirmStore';
 import { venueGuestCount } from '@/features/summary/calculations';
 import { CapacityBar } from '@/components/CapacityBar';
 import { EmptyBox } from '@/components/EmptyBox';
@@ -11,9 +12,16 @@ export const VenuesPage: React.FC = () => {
     venues: s.venues, guests: s.guests, removeVenue: s.removeVenue,
   }));
   const open = useUIStore((s) => s.open);
+  const confirm = useConfirm();
 
-  const onDelete = (id: number, name: string) => {
-    if (window.confirm(`Delete ${name}?`)) removeVenue(id);
+  const onDelete = async (id: number, name: string) => {
+    const ok = await confirm({
+      title: `Delete ${name}?`,
+      message: 'Future events at this venue and their guests will be removed. Past events stay for reporting.',
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (ok) removeVenue(id);
   };
 
   return (

@@ -90,7 +90,11 @@ body { font-family: var(--font-sans); }
 /* ─── Buttons ──────────────────────────────────────────────── */
 .btn-primary { background: #F97316; color: #fff; border: none; border-radius: var(--border-radius-md); padding: 9px 16px; font-size: 13px; font-weight: 600; cursor: pointer; }
 .btn-secondary { background: var(--color-background-primary); border: 0.5px solid var(--color-border-secondary); border-radius: var(--border-radius-md); padding: 8px 14px; font-size: 13px; cursor: pointer; color: var(--color-text-primary); }
-.btn-ghost { background: transparent; border: none; font-size: 14px; cursor: pointer; color: #F97316; padding: 4px; }
+.btn-ghost { background: transparent; border: none; font-size: 14px; cursor: pointer; color: #F97316; padding: 8px 10px; min-height: 36px; }
+/* Big circular close — used at the top-right of every detail/form sheet
+   to give the user a comfortable tap target (40×40 ≥ WCAG 2.5.5). */
+.btn-close { width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center; background: var(--color-background-secondary); border: none; border-radius: 50%; cursor: pointer; font-size: 18px; color: var(--color-text-primary); padding: 0; }
+.btn-close:active { background: var(--color-border-secondary); }
 .btn-danger { background: #A32D2D; color: #fff; border: none; border-radius: var(--border-radius-md); padding: 9px 14px; font-size: 13px; cursor: pointer; }
 .btn-sm { padding: 5px 10px; font-size: 12px; border-radius: var(--border-radius-md); border: 0.5px solid var(--color-border-secondary); background: var(--color-background-secondary); color: var(--color-text-secondary); cursor: pointer; }
 
@@ -363,3 +367,8 @@ ion-content { --background: var(--color-background-tertiary); }
 ion-toolbar { --background: var(--color-background-primary); --border-color: var(--color-border-tertiary); }
 ion-modal { --background: var(--color-background-primary); }
 ion-modal::part(content) { background: var(--color-background-primary); }
+
+/* Confirm dialog (IonAlert) — destructive variant */
+.confirm-destructive { color: var(--color-danger) !important; font-weight: 600 !important; }
+.confirm-primary { color: var(--color-primary) !important; font-weight: 600 !important; }
+ion-alert.alert-translucent { --backdrop-opacity: 0.45; }

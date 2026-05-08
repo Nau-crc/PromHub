@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { IonModal, IonContent } from '@ionic/react';
 import type { Venue, Timeslot, VipType, InviteType } from '@/core/types';
 import { useAppStore } from '@/store/useAppStore';
+import { useConfirm } from '@/store/useConfirmStore';
 import { TimeslotRows, VipRows, InviteTypeRows } from './VenueEditor';
 import { SheetHeader } from '@/components/SheetHeader';
 
@@ -15,6 +16,7 @@ export const VenueFormModal: React.FC<Props> = ({ open, onClose, editing }) => {
   const { upsertVenue, removeVenue, nextId } = useAppStore((s) => ({
     upsertVenue: s.upsertVenue, removeVenue: s.removeVenue, nextId: s.nextId,
   }));
+  const confirm = useConfirm();
 
   const [name, setName] = useState('');
   const [guestCap, setGuestCap] = useState<number | ''>('');
@@ -33,7 +35,12 @@ export const VenueFormModal: React.FC<Props> = ({ open, onClose, editing }) => {
 
   const save = () => {
     const trimmed = name.trim();
-    if (!trimmed) return;
+    if (!trimmed) { alert('Venue name is required.'); return; }
+    // At least one timeslot is needed for events to schedule against.
+    if (!tsRows.filter((r) => r.name.trim()).length) {
+      alert('Add at least one timeslot.');
+      return;
+    }
     const newTs = tsRows.filter((r) => r.name.trim()).map((r) => ({
       ...r, name: r.name.trim(), guestCapacity: r.guestCapacity || 0,
     }));
@@ -59,9 +66,15 @@ export const VenueFormModal: React.FC<Props> = ({ open, onClose, editing }) => {
     onClose();
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!editing) return;
-    if (window.confirm(`Delete ${editing.name}?`)) {
+    const ok = await confirm({
+      title: `Delete ${editing.name}?`,
+      message: 'Future events at this venue and their guests will be removed. Past events stay for reporting.',
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (ok) {
       removeVenue(editing.id);
       onClose();
     }

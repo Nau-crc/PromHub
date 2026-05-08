@@ -3,6 +3,14 @@ import type { AppDataSnapshot, Venue, PromEvent, Guest, Reservation } from '@/co
 import { storage } from '@/services/storage';
 import { STORAGE_KEYS } from '@/core/constants';
 
+// Local helpers — kept here to avoid an import cycle with calculations.ts
+const isoDayLocal = (d: Date): string =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const isEventPastSync = (e: PromEvent, todayIso: string): boolean => {
+  if (e.isOneTime) return !!e.eventDate && e.eventDate < todayIso;
+  return !!e.seasonEnd && e.seasonEnd < todayIso;
+};
+
 interface AppState extends AppDataSnapshot {
   // hydration / onboarding
   hydrated: boolean;
@@ -150,7 +158,30 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   removeVenue: (id) => {
-    set((s) => ({ venues: s.venues.filter((x) => x.id !== id) }));
+    // Cascade: when a venue is deleted, drop FUTURE events at it
+    // (and their guests/reservations). Past events stay for history.
+    set((s) => {
+      const todayIso = isoDayLocal(new Date());
+      const futureEventIds = new Set(
+        s.events
+          .filter((e) => e.venueId === id && !isEventPastSync(e, todayIso))
+          .map((e) => e.id),
+      );
+      const events = s.events.filter((e) => !futureEventIds.has(e.id));
+      const guests = s.guests.filter((g) => g.eventId == null || !futureEventIds.has(g.eventId));
+      // Reservations belong to a venue, not an event. Drop only future reservations at this venue.
+      const reservations = s.reservations.filter((r) => {
+        if (r.venueId !== id) return true;
+        if (!r.eventDate) return false; // no date → assume current → drop
+        return r.eventDate < todayIso;  // past reservation → keep
+      });
+      return {
+        venues: s.venues.filter((x) => x.id !== id),
+        events,
+        guests,
+        reservations,
+      };
+    });
     get().persist();
   },
 
@@ -164,7 +195,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   removeEvent: (id) => {
-    set((s) => ({ events: s.events.filter((x) => x.id !== id) }));
+    // Cascade: removing an event drops the guests linked to it.
+    // Reservations are NOT linked to events (per the data model),
+    // so they're untouched.
+    set((s) => ({
+      events: s.events.filter((x) => x.id !== id),
+      guests: s.guests.filter((g) => g.eventId !== id),
+    }));
     get().persist();
   },
 

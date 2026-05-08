@@ -23,7 +23,7 @@ export const SheetHeader: React.FC<Props> = ({ title, onClose, rightExtras }) =>
     <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--color-text-primary)' }}>{title}</div>
     <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
       {rightExtras}
-      <button className="btn-ghost" onClick={onClose}>✕</button>
+      <button type="button" className="btn-close" aria-label="Close" onClick={onClose}>✕</button>
     </div>
   </div>
 );

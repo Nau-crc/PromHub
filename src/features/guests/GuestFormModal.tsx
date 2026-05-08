@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { IonModal, IonContent } from '@ionic/react';
 import type { Guest, Platform, PromEvent } from '@/core/types';
 import { useAppStore } from '@/store/useAppStore';
+import { useConfirm } from '@/store/useConfirmStore';
 import { today } from '@/core/constants';
 import { isoDay } from '@/core/utils/date';
 import {
@@ -27,6 +28,17 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
     venues: s.venues, events: s.events, guests: s.guests,
     upsertGuest: s.upsertGuest, removeGuest: s.removeGuest, nextId: s.nextId,
   }));
+  const confirm = useConfirm();
+
+  const askDelete = async () => {
+    if (!editing) return;
+    const ok = await confirm({
+      title: `Delete ${editing.name}?`,
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (ok) { removeGuest(editing.id); onClose(); }
+  };
 
   const [name, setName] = useState('');
   const [venueId, setVenueId] = useState<number | null>(null);
@@ -93,9 +105,12 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
 
   const save = async () => {
     const trimmed = name.trim();
-    if (!trimmed) { alert('Please enter a name.'); return; }
-    if (venueId == null) { alert('Form error. Please try again.'); return; }
-
+    if (!trimmed) { alert('Name is required.'); return; }
+    // Per the data model a guest belongs to an event. We block saving
+    // until the user has picked one — no "uncategorised" guests.
+    if (eventId == null) { alert('Pick an event for this guest.'); return; }
+    if (venueId == null) { alert('Pick a venue.'); return; }
+    if (!pax || pax < 1) { alert('At least 1 pax is required.'); return; }
     if (selectedEvent && !eventDateValid) {
       alert('The event date you picked is not a valid occurrence of this event.');
       return;
@@ -140,11 +155,11 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
       const desc = ev?.description?.trim();
       if (desc) {
         const platformLabel = platform === 'tiktok' ? 'TikTok' : 'Instagram';
-        const ok = window.confirm(
-          `Send the event description to @${cleanHandle} on ${platformLabel}?\n\n` +
-          `The text will be copied to your clipboard and ${platformLabel} will open ` +
-          `at her profile — just tap the airplane icon and paste.`,
-        );
+        const ok = await confirm({
+          title: `Send to @${cleanHandle} on ${platformLabel}?`,
+          message: `The event description will be copied to your clipboard and ${platformLabel} will open at her profile — just tap the airplane icon and paste.`,
+          confirmLabel: 'Send',
+        });
         if (ok) {
           await sendViaSocial(platform, cleanHandle, desc);
         }
@@ -201,13 +216,9 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
           </div>
 
           <div className="form-group">
-            <label className="form-label">Select event</label>
-            <div
-              className={`event-picker-item none-opt ${eventId == null ? 'sel' : ''}`}
-              onClick={() => onPickEvent(null)}
-            >
-              <div className="event-picker-info"><div className="event-picker-name">— No event</div></div>
-              <div className="event-picker-check">{eventId == null ? '✓' : ''}</div>
+            <label className="form-label">Select event *</label>
+            <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 6 }}>
+              A guest always attends an event.
             </div>
             {events.map((e) => {
               const vv = e.venueId != null ? venueById(e.venueId, venues) : undefined;
@@ -338,7 +349,7 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
 
           <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
             {editing && (
-              <button className="btn-danger" onClick={() => { removeGuest(editing.id); onClose(); }}>
+              <button className="btn-danger" onClick={askDelete}>
                 Delete
               </button>
             )}

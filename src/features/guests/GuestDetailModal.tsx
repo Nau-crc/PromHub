@@ -56,7 +56,7 @@ export const GuestDetailModal: React.FC<Props> = ({ open, onClose, guestId, onEd
               )}
             </div>
           </div>
-          <button className="btn-ghost" onClick={onClose}>✕</button>
+          <button className="btn-close" onClick={onClose} aria-label="Close">✕</button>
         </div>
         <div style={{ padding: '16px 16px 32px' }}>
           <div className="detail-kv"><span className="dk">Venue</span><span className="dv">{venueName(g.venueId, venues)}</span></div>

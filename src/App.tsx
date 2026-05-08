@@ -20,6 +20,7 @@ import { VenuesPage } from '@/features/venues/VenuesPage';
 import { SummaryPage } from '@/features/summary/SummaryPage';
 
 import { ModalsHost } from '@/features/ModalsHost';
+import { ConfirmHost } from '@/components/ConfirmHost';
 import { OnboardingFlow } from '@/features/onboarding/OnboardingFlow';
 import { useAppStore } from '@/store/useAppStore';
 import { useUIStore } from '@/store/useUIStore';
@@ -179,6 +180,7 @@ const App: React.FC = () => {
           <Tabs />
         </IonSplitPane>
         <ModalsHost />
+        <ConfirmHost />
         <OnboardingFlow open={!onboarded} onDone={() => setOnboarded(true)} />
       </IonReactRouter>
     </IonApp>

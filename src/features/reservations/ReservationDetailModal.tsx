@@ -1,6 +1,7 @@
 import React from 'react';
 import { IonModal, IonContent } from '@ionic/react';
 import { useAppStore } from '@/store/useAppStore';
+import { useConfirm } from '@/store/useConfirmStore';
 import { initials } from '@/core/utils/format';
 import { commCalc, slotLabel, venueName, netToYou } from '@/features/summary/calculations';
 import { SocialBadge } from '@/components/SocialBadge';
@@ -16,6 +17,7 @@ export const ReservationDetailModal: React.FC<Props> = ({ open, onClose, reserva
   const { reservations, venues, removeReservation } = useAppStore((s) => ({
     reservations: s.reservations, venues: s.venues, removeReservation: s.removeReservation,
   }));
+  const confirm = useConfirm();
   const r = reservationId != null ? reservations.find((x) => x.id === reservationId) : null;
   if (!r) return <IonModal isOpen={open} onDidDismiss={onClose}><IonContent /></IonModal>;
   const c = commCalc(r, venues);
@@ -39,7 +41,7 @@ export const ReservationDetailModal: React.FC<Props> = ({ open, onClose, reserva
               </div>
             </div>
           </div>
-          <button className="btn-ghost" onClick={onClose}>✕</button>
+          <button className="btn-close" onClick={onClose} aria-label="Close">✕</button>
         </div>
         <div style={{ padding: '16px 16px 32px' }}>
           <div className="detail-kv"><span className="dk">Venue</span><span className="dv">{venueName(r.venueId, venues)}</span></div>
@@ -70,7 +72,17 @@ export const ReservationDetailModal: React.FC<Props> = ({ open, onClose, reserva
             </>
           )}
           <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
-            <button className="btn-secondary" onClick={() => { removeReservation(r.id); onClose(); }}>Delete</button>
+            <button
+              className="btn-secondary"
+              onClick={async () => {
+                const ok = await confirm({
+                  title: `Delete reservation for ${r.name}?`,
+                  confirmLabel: 'Delete',
+                  destructive: true,
+                });
+                if (ok) { removeReservation(r.id); onClose(); }
+              }}
+            >Delete</button>
             <button className="btn-primary" style={{ flex: 1, padding: 13, fontSize: 14 }} onClick={() => onEdit(r.id)}>Edit</button>
           </div>
         </div>

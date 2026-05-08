@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { IonModal, IonContent } from '@ionic/react';
 import type { PromEvent } from '@/core/types';
 import { useAppStore } from '@/store/useAppStore';
+import { useConfirm } from '@/store/useConfirmStore';
 import { isoDay, todayWeekday } from '@/core/utils/date';
 import { today } from '@/core/constants';
 import { DayChips } from '@/components/DayChips';
@@ -27,6 +28,18 @@ export const EventFormModal: React.FC<Props> = ({ open, onClose, editing, onRequ
     removeEvent: s.removeEvent,
     nextId: s.nextId,
   }));
+  const confirm = useConfirm();
+
+  const askDelete = async () => {
+    if (!editing) return;
+    const ok = await confirm({
+      title: `Delete "${editing.name}"?`,
+      message: 'All guests linked to this event will be removed too. Reservations stay (they belong to the venue).',
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (ok) { removeEvent(editing.id); onClose(); }
+  };
 
   const [name, setName] = useState('');
   const [venueId, setVenueId] = useState<number | null>(null);
@@ -88,7 +101,7 @@ export const EventFormModal: React.FC<Props> = ({ open, onClose, editing, onRequ
 
   const save = () => {
     const trimmed = name.trim();
-    if (!trimmed) return;
+    if (!trimmed) { alert('Event name is required.'); return; }
 
     if (isOneTime) {
       if (!eventDate) { alert('Pick a date.'); return; }
@@ -229,7 +242,7 @@ export const EventFormModal: React.FC<Props> = ({ open, onClose, editing, onRequ
           </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
             {editing && (
-              <button className="btn-danger" onClick={() => { removeEvent(editing.id); onClose(); }}>
+              <button className="btn-danger" onClick={askDelete}>
                 Delete
               </button>
             )}
