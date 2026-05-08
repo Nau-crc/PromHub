@@ -4,7 +4,8 @@ import type { Platform, Reservation } from '@/core/types';
 import { useAppStore } from '@/store/useAppStore';
 import { COUNTRY_CODES } from '@/core/constants';
 import {
-  getVipOptionsForPax, getVipPrice, venueById, venueVipSlotsLeft,
+  getVipOptionsForPax, getVipPrice, nextOccurrence, occurs,
+  venueById, venueVipSlotsLeft,
 } from '@/features/summary/calculations';
 import { round2 } from '@/core/utils/format';
 import { isoDay } from '@/core/utils/date';
@@ -34,6 +35,7 @@ export const ReservationFormModal: React.FC<Props> = ({ open, onClose, editing, 
   const [vipType, setVipType] = useState<string>('');
   const [slotId, setSlotId] = useState<string>('');
   const [eventId, setEventId] = useState<number | null>(null);
+  const [eventDate, setEventDate] = useState<string>('');
   const [commissionPct, setCommissionPct] = useState<number | null>(10);
   const [fromInvite, setFromInvite] = useState(false);
   const [inviterPlatform, setInviterPlatform] = useState<Platform>('instagram');
@@ -51,7 +53,9 @@ export const ReservationFormModal: React.FC<Props> = ({ open, onClose, editing, 
     setPax(editing?.pax ?? null);
     setVipType(editing?.vipType ?? '');
     setSlotId(editing?.slotId ?? '');
-    setEventId(editing ? editing.eventId : (seedEventId ?? null));
+    const startEv = editing ? editing.eventId : (seedEventId ?? null);
+    setEventId(startEv);
+    setEventDate(initialEventDate(startEv, editing?.eventDate ?? null));
     setCommissionPct(editing?.commissionPct ?? 10);
     setFromInvite(!!editing?.fromInvite);
     setInviterPlatform(editing?.inviterPlatform ?? 'instagram');
@@ -59,6 +63,28 @@ export const ReservationFormModal: React.FC<Props> = ({ open, onClose, editing, 
     setCommissionEarner(editing?.commissionEarner ?? '');
     setWomanPct(editing?.womanPct ?? 50);
   }, [open, editing, seedEventId, venues]);
+
+  // Defaults eventDate when an event is (re)picked
+  function initialEventDate(evId: number | null, prevDate: string | null): string {
+    if (evId == null) return '';
+    const ev = events.find((e) => e.id === evId);
+    if (!ev) return '';
+    if (ev.isOneTime) return ev.eventDate ?? '';
+    if (prevDate) return prevDate;
+    return nextOccurrence(ev, isoDay(today())) ?? '';
+  }
+
+  const selectedEvent = eventId != null ? events.find((e) => e.id === eventId) : null;
+  const eventDateValid = !selectedEvent
+    || (selectedEvent.isOneTime
+        ? selectedEvent.eventDate === eventDate
+        : !!eventDate && occurs(selectedEvent, eventDate));
+
+  // Re-default eventDate when the linked event changes
+  useEffect(() => {
+    setEventDate((prev) => initialEventDate(eventId, prev || null));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eventId]);
 
   const v = venueId != null ? venueById(venueId, venues) : undefined;
   const paxN = pax ?? 0;
@@ -99,6 +125,10 @@ export const ReservationFormModal: React.FC<Props> = ({ open, onClose, editing, 
     const trimmed = name.trim();
     if (!trimmed) return;
     if (venueId == null) return;
+    if (selectedEvent && !eventDateValid) {
+      alert('The event date you picked is not a valid occurrence of this event.');
+      return;
+    }
     const entry: Reservation = {
       id: editing?.id ?? (nextId('res') as number),
       name: trimmed,
@@ -116,6 +146,7 @@ export const ReservationFormModal: React.FC<Props> = ({ open, onClose, editing, 
       womanPct: fromInvite ? womanPctN : 0,
       commissionEarner: fromInvite ? commissionEarner.trim() : '',
       createdAt: editing?.createdAt ?? isoDay(today()),
+      eventDate: selectedEvent ? (eventDate || null) : null,
     };
     upsertReservation(entry);
     onClose();
@@ -198,6 +229,30 @@ export const ReservationFormModal: React.FC<Props> = ({ open, onClose, editing, 
               {events.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
             </select>
           </div>
+
+          {selectedEvent && !selectedEvent.isOneTime && (
+            <div className="form-group">
+              <label className="form-label">Event date</label>
+              <input
+                className="form-input"
+                type="date"
+                value={eventDate}
+                min={selectedEvent.seasonStart ?? undefined}
+                max={selectedEvent.seasonEnd ?? undefined}
+                onChange={(e) => setEventDate(e.target.value)}
+              />
+              {eventDate && !eventDateValid && (
+                <div style={{ fontSize: 11, color: '#A32D2D', marginTop: 4 }}>
+                  ⚠︎ {eventDate} is not an occurrence of "{selectedEvent.name}".
+                </div>
+              )}
+            </div>
+          )}
+          {selectedEvent?.isOneTime && selectedEvent.eventDate && (
+            <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', margin: '-6px 0 12px' }}>
+              Event date: <b>{selectedEvent.eventDate}</b>
+            </div>
+          )}
 
           <div className="form-group">
             <label className="form-label">Your commission %</label>

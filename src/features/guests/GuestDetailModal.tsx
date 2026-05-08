@@ -5,6 +5,7 @@ import { initials, profileUrl } from '@/core/utils/format';
 import { venueName } from '@/features/summary/calculations';
 import { StarBadge } from '@/components/SocialBadge';
 import { SheetHeader } from '@/components/SheetHeader';
+import { sendViaSocial } from '@/services/messaging';
 
 interface Props {
   open: boolean;
@@ -23,6 +24,13 @@ export const GuestDetailModal: React.FC<Props> = ({ open, onClose, guestId, onEd
   const url = profileUrl(g.igHandle, g.igPlatform);
   const visitCount = guests.filter((x) => x.name === g.name && x.influencer).length;
   const clubEv = g.clubEventId ? events.find((x) => x.id === g.clubEventId) : null;
+  const linkedEvent = g.eventId ? events.find((x) => x.id === g.eventId) : null;
+  const canSendDescription = !!g.igHandle && !!linkedEvent?.description?.trim();
+
+  const sendDescription = async () => {
+    if (!canSendDescription || !linkedEvent) return;
+    await sendViaSocial(g.igPlatform, g.igHandle, linkedEvent.description.trim());
+  };
 
   return (
     <IonModal isOpen={open} onDidDismiss={onClose} initialBreakpoint={1} breakpoints={[0, 1]}>
@@ -71,7 +79,16 @@ export const GuestDetailModal: React.FC<Props> = ({ open, onClose, guestId, onEd
               <span className="dv" style={{ color: '#F97316', fontWeight: 600 }}>{visitCount}×</span>
             </div>
           )}
-          <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
+          {canSendDescription && (
+            <button
+              className="btn-secondary"
+              style={{ width: '100%', marginTop: 16, padding: 12 }}
+              onClick={sendDescription}
+            >
+              ✈️ Send event description on {g.igPlatform === 'tiktok' ? 'TikTok' : 'Instagram'}
+            </button>
+          )}
+          <div style={{ display: 'flex', gap: 8, marginTop: canSendDescription ? 8 : 20 }}>
             <button className="btn-secondary" onClick={() => toggleArrived(g.id)}>
               {g.checked ? 'Mark pending' : 'Mark arrived'}
             </button>

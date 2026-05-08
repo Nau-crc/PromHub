@@ -35,6 +35,50 @@ interface AppState extends AppDataSnapshot {
   nextId: (kind: 'venue' | 'event' | 'guest' | 'res' | 'ts' | 'vip' | 'inv') => number | string;
 }
 
+// ─────────────────────────────────────────────────────────────
+//  Forward-compatible migration. Records persisted by older
+//  versions of the app may be missing fields added later
+//  (createdAt, eventDate, isOneTime, capacity, season ranges).
+//  We fill them in with sensible defaults so the rest of the
+//  code can assume the new shape without null checks everywhere.
+// ─────────────────────────────────────────────────────────────
+function migrateSnapshot(snap: AppDataSnapshot): AppDataSnapshot {
+  const events = (snap.events || []).map((e) => ({
+    ...e,
+    isOneTime: e.isOneTime ?? false,
+    eventDate: e.eventDate ?? null,
+    capacity: e.capacity ?? null,
+    seasonStart: e.seasonStart ?? null,
+    seasonEnd: e.seasonEnd ?? null,
+    weekdays: e.weekdays ?? (e.weekday ? [e.weekday] : []),
+    invitedGuests: e.invitedGuests ?? [],
+  }));
+  const eventById = new Map(events.map((e) => [e.id, e]));
+  // Backfill `eventDate` on old guests/reservations:
+  //  - linked to a one-time event → use that event's date
+  //  - linked to a recurring event → use createdAt as best-effort guess
+  //  - unlinked → null
+  const guests = (snap.guests || []).map((g) => {
+    if (g.eventDate !== undefined && g.eventDate !== null) return g;
+    let eventDate: string | null = null;
+    if (g.eventId != null) {
+      const ev = eventById.get(g.eventId);
+      eventDate = ev?.isOneTime ? ev.eventDate : (g.createdAt || null);
+    }
+    return { ...g, eventDate, createdAt: g.createdAt || '' };
+  });
+  const reservations = (snap.reservations || []).map((r) => {
+    if (r.eventDate !== undefined && r.eventDate !== null) return r;
+    let eventDate: string | null = null;
+    if (r.eventId != null) {
+      const ev = eventById.get(r.eventId);
+      eventDate = ev?.isOneTime ? ev.eventDate : (r.createdAt || null);
+    }
+    return { ...r, eventDate, createdAt: r.createdAt || '' };
+  });
+  return { ...snap, events, guests, reservations };
+}
+
 const emptyState: AppDataSnapshot = {
   venues: [],
   events: [],
@@ -57,7 +101,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   load: async () => {
     const snap = await storage.get<AppDataSnapshot>(STORAGE_KEYS.state);
     const onboarded = (await storage.get<boolean>(STORAGE_KEYS.onboarded)) ?? false;
-    set({ ...(snap ?? emptyState), hydrated: true, onboarded });
+    const hydrated = snap ? migrateSnapshot(snap) : emptyState;
+    set({ ...hydrated, hydrated: true, onboarded });
   },
 
   persist: async () => {

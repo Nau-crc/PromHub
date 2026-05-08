@@ -104,6 +104,96 @@ export function getVipOptionsForPax(venueId: number, pax: number, venues: Venue[
 export const lateClubEvents = (events: PromEvent[]): PromEvent[] =>
   events.filter((e) => e.isLateClub);
 
+// ── Occurrence helpers ─────────────────────────────────────
+//
+// An event "occurs on" a given ISO date when:
+//  - One-time event: `event.eventDate === isoDate`
+//  - Recurring event: today's weekday is in `event.weekdays`
+//                     AND date is within [seasonStart, seasonEnd]
+//                     (each bound is optional → open-ended).
+//
+// Used by HomePage to show only today's events, and by event
+// detail to enumerate the dates a recurring event runs on.
+
+const WEEKDAY_NAMES = [
+  'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday',
+];
+
+export function occurs(event: PromEvent, isoDate: string): boolean {
+  if (event.isOneTime) return event.eventDate === isoDate;
+  // Parse local date — `new Date('2026-05-15')` parses as UTC, which can shift
+  // the weekday by 1 across timezones. Build via Y/M/D constructor instead.
+  const [y, m, d] = isoDate.split('-').map(Number);
+  if (!y || !m || !d) return false;
+  const local = new Date(y, m - 1, d);
+  const wd = WEEKDAY_NAMES[local.getDay()];
+  if (!event.weekdays?.includes(wd)) return false;
+  if (event.seasonStart && isoDate < event.seasonStart) return false;
+  if (event.seasonEnd && isoDate > event.seasonEnd) return false;
+  return true;
+}
+
+/** First occurrence of `event` on or after `fromIsoDate`. Returns null if none. */
+export function nextOccurrence(event: PromEvent, fromIsoDate: string): string | null {
+  if (event.isOneTime) {
+    if (!event.eventDate) return null;
+    return event.eventDate >= fromIsoDate ? event.eventDate : null;
+  }
+  if (!event.weekdays?.length) return null;
+  const [y, m, d] = fromIsoDate.split('-').map(Number);
+  if (!y || !m || !d) return null;
+  const start = new Date(y, m - 1, d);
+  // Look up to 366 days forward
+  for (let i = 0; i < 366; i++) {
+    const t = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
+    const iso = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+    if (occurs(event, iso)) return iso;
+  }
+  return null;
+}
+
+/** Most recent occurrence on or before `untilIsoDate`. Returns null if none. */
+export function previousOccurrence(event: PromEvent, untilIsoDate: string): string | null {
+  if (event.isOneTime) {
+    if (!event.eventDate) return null;
+    return event.eventDate <= untilIsoDate ? event.eventDate : null;
+  }
+  if (!event.weekdays?.length) return null;
+  const [y, m, d] = untilIsoDate.split('-').map(Number);
+  if (!y || !m || !d) return null;
+  const start = new Date(y, m - 1, d);
+  for (let i = 0; i < 366; i++) {
+    const t = new Date(start.getFullYear(), start.getMonth(), start.getDate() - i);
+    const iso = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+    if (occurs(event, iso)) return iso;
+  }
+  return null;
+}
+
+/** Human-readable schedule label for an event ("Sat/Sun · until Sep 30", "Jul 15", "Recurring"). */
+export function eventScheduleLabel(event: PromEvent): string {
+  if (event.isOneTime) {
+    if (!event.eventDate) return 'One-time (no date)';
+    return new Date(event.eventDate + 'T00:00:00').toLocaleDateString(undefined, {
+      weekday: 'short', month: 'short', day: 'numeric',
+    });
+  }
+  const dayList = (event.weekdays || []).map((d) => d.slice(0, 3)).join('/');
+  const fmt = (iso: string) => new Date(iso + 'T00:00:00').toLocaleDateString(undefined, {
+    month: 'short', day: 'numeric',
+  });
+  const parts: string[] = [];
+  if (dayList) parts.push(dayList);
+  if (event.seasonStart && event.seasonEnd) {
+    parts.push(`${fmt(event.seasonStart)} – ${fmt(event.seasonEnd)}`);
+  } else if (event.seasonEnd) {
+    parts.push(`until ${fmt(event.seasonEnd)}`);
+  } else if (event.seasonStart) {
+    parts.push(`from ${fmt(event.seasonStart)}`);
+  }
+  return parts.join(' · ') || 'Recurring';
+}
+
 // ── Event capacity helpers ─────────────────────────────────
 export interface EventCapacity {
   used: number;       // pax already invited
@@ -113,9 +203,21 @@ export interface EventCapacity {
   fillClass: '' | 'warn' | 'full';
 }
 
-export function eventCapacity(eventId: number, guests: Guest[], events: PromEvent[]): EventCapacity {
+/**
+ * Capacity for a specific occurrence of the event.
+ * If `isoDate` is provided, only guests on that date count toward `used`.
+ * If null, all guests linked to the event count (legacy behaviour).
+ */
+export function eventCapacity(
+  eventId: number,
+  guests: Guest[],
+  events: PromEvent[],
+  isoDate: string | null = null,
+): EventCapacity {
   const e = events.find((x) => x.id === eventId);
-  const used = guests.filter((g) => g.eventId === eventId).reduce((a, g) => a + g.pax, 0);
+  const used = guests
+    .filter((g) => g.eventId === eventId && (isoDate == null || g.eventDate === isoDate))
+    .reduce((a, g) => a + g.pax, 0);
   const capacity = e?.capacity ?? 0;
   if (!capacity) {
     return { used, capacity: 0, left: Infinity, pct: 0, fillClass: '' };

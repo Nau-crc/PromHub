@@ -1,29 +1,48 @@
 import React from 'react';
 import type { PromEvent } from '@/core/types';
 import { useAppStore } from '@/store/useAppStore';
-import { venueById } from '@/features/summary/calculations';
+import { eventScheduleLabel, venueById } from '@/features/summary/calculations';
 import { Pill, SlotPill } from './Pill';
 
 interface Props {
   event: PromEvent;
+  /**
+   * If provided, counters and the date label refer to that specific
+   * occurrence. Used by HomePage to show today's instance only.
+   * If omitted, the card shows the whole-event totals (Events page).
+   */
+  occurrenceDate?: string;
   onClick: () => void;
 }
 
-export const EventCard: React.FC<Props> = ({ event: e, onClick }) => {
+export const EventCard: React.FC<Props> = ({ event: e, occurrenceDate, onClick }) => {
   const { venues, guests, reservations } = useAppStore((s) => ({
     venues: s.venues, guests: s.guests, reservations: s.reservations,
   }));
   const v = e.venueId != null ? venueById(e.venueId, venues) : undefined;
-  const gc = guests.filter((g) => g.eventId === e.id).reduce((a, g) => a + g.pax, 0);
-  const rc = reservations.filter((r) => r.eventId === e.id).length;
+
+  // Per-occurrence counters when a date is given; otherwise totals.
+  const matchByDate = (date: string | null) =>
+    occurrenceDate ? date === occurrenceDate : true;
+
+  const gc = guests
+    .filter((g) => g.eventId === e.id && matchByDate(g.eventDate))
+    .reduce((a, g) => a + g.pax, 0);
+  const rc = reservations
+    .filter((r) => r.eventId === e.id && matchByDate(r.eventDate))
+    .length;
   const inv = (e.invitedGuests || []).length;
   const ids = e.selectedSlotIds || [];
-  const dateLabel = e.isOneTime && e.eventDate
-    ? new Date(e.eventDate + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
-    : (e.weekdays || [e.weekday || ''])
-        .filter(Boolean)
-        .map((d) => d.slice(0, 3))
-        .join(', ');
+
+  // Date label:
+  //  - If we know the occurrence, show that exact date.
+  //  - Otherwise: show the schedule (e.g. "Sat/Sun · until Sep 30" or "Jul 15").
+  const dateLabel = occurrenceDate
+    ? new Date(occurrenceDate + 'T00:00:00').toLocaleDateString(undefined, {
+        weekday: 'short', month: 'short', day: 'numeric',
+      })
+    : eventScheduleLabel(e);
+
   const cardCls = e.isPrivate ? 'private-card' : e.isLateClub ? 'lateclub-card' : '';
 
   return (

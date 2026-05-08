@@ -197,6 +197,8 @@ const EventStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
       isOneTime: false,
       eventDate: null,
       capacity: null,
+      seasonStart: null,
+      seasonEnd: null,
     });
     onNext();
   };

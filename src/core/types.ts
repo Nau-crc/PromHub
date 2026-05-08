@@ -50,8 +50,12 @@ export interface PromEvent {
   isOneTime: boolean;
   /** ISO yyyy-mm-dd. Only meaningful when isOneTime === true. */
   eventDate: string | null;
-  /** Maximum guests for this event. 0 / null = no cap. */
+  /** Maximum guests per occurrence. 0 / null = no cap. */
   capacity: number | null;
+  /** Season start (ISO yyyy-mm-dd). Recurring only. null = open-ended past. */
+  seasonStart: string | null;
+  /** Season end (ISO yyyy-mm-dd). Recurring only. null = open-ended future. */
+  seasonEnd: string | null;
 }
 
 export interface Guest {
@@ -70,6 +74,9 @@ export interface Guest {
   createdMonth: number;
   /** ISO yyyy-mm-dd date when the guest record was created. */
   createdAt: string;
+  /** Specific occurrence date of the linked event (yyyy-mm-dd).
+   *  null when the guest is not tied to any event. */
+  eventDate: string | null;
 }
 
 export interface Reservation {
@@ -90,6 +97,9 @@ export interface Reservation {
   commissionEarner: string;
   /** ISO yyyy-mm-dd date when the reservation was created. */
   createdAt: string;
+  /** Specific occurrence date of the linked event (yyyy-mm-dd).
+   *  null when the reservation is not tied to any event. */
+  eventDate: string | null;
 }
 
 export interface AppDataSnapshot {

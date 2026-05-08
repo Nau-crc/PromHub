@@ -1,15 +1,24 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { IonPage, IonContent, IonHeader, IonToolbar, IonButtons, IonMenuButton } from '@ionic/react';
 import { useAppStore } from '@/store/useAppStore';
 import { useUIStore } from '@/store/useUIStore';
 import { today } from '@/core/constants';
-import { fmtDateLong } from '@/core/utils/date';
+import { fmtDateLong, isoDay } from '@/core/utils/date';
+import { occurs } from '@/features/summary/calculations';
 import { EventCard } from '@/components/EventCard';
 import { EmptyBox } from '@/components/EmptyBox';
 
 export const HomePage: React.FC = () => {
   const events = useAppStore((s) => s.events);
   const open = useUIStore((s) => s.open);
+
+  // Today's events: one-time matching today, OR recurring whose
+  // weekday + season covers today.
+  const todayKey = isoDay(today());
+  const todayEvents = useMemo(
+    () => events.filter((e) => occurs(e, todayKey)),
+    [events, todayKey],
+  );
 
   return (
     <IonPage>
@@ -35,12 +44,12 @@ export const HomePage: React.FC = () => {
       </IonHeader>
       <IonContent>
         <div className="spacer" />
-        {events.length ? events.map((e) => (
-          <EventCard key={e.id} event={e} onClick={() => open('eventDetail', { id: e.id })} />
+        {todayEvents.length ? todayEvents.map((e) => (
+          <EventCard key={e.id} event={e} occurrenceDate={todayKey} onClick={() => open('eventDetail', { id: e.id })} />
         )) : (
           <EmptyBox>
-            No events yet.<br />
-            Tap <b>+ Event</b> to add your first night.
+            No events today.<br />
+            All scheduled events will show here on their date.
           </EmptyBox>
         )}
         <div className="spacer" />

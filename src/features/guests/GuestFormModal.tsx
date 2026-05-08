@@ -4,10 +4,13 @@ import type { Guest, Platform, PromEvent } from '@/core/types';
 import { useAppStore } from '@/store/useAppStore';
 import { today } from '@/core/constants';
 import { isoDay } from '@/core/utils/date';
-import { eventCapacity, lateClubEvents, venueById } from '@/features/summary/calculations';
+import {
+  eventCapacity, lateClubEvents, nextOccurrence, occurs, venueById,
+} from '@/features/summary/calculations';
 import { SheetHeader } from '@/components/SheetHeader';
 import { PlatformPicker } from '@/components/PlatformPicker';
 import { NumberField } from '@/components/NumberField';
+import { sendViaSocial } from '@/services/messaging';
 
 interface Props {
   open: boolean;
@@ -28,6 +31,7 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
   const [pax, setPax] = useState<number | null>(1);
   const [invTypeIds, setInvTypeIds] = useState<string[]>([]);
   const [eventId, setEventId] = useState<number | null>(null);
+  const [eventDate, setEventDate] = useState<string>('');
   const [platform, setPlatform] = useState<Platform>('instagram');
   const [handle, setHandle] = useState('');
   const [influencer, setInfluencer] = useState(false);
@@ -40,7 +44,9 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
     setVenueId(editing?.venueId ?? venues[0]?.id ?? null);
     setPax(editing?.pax ?? 1);
     setInvTypeIds(editing ? [...(editing.inviteTypeIds || [])] : []);
-    setEventId(editing ? editing.eventId : (seedEventId ?? null));
+    const startEv = editing ? editing.eventId : (seedEventId ?? null);
+    setEventId(startEv);
+    setEventDate(initialEventDate(startEv, editing?.eventDate ?? null));
     setPlatform(editing?.igPlatform ?? 'instagram');
     setHandle(editing?.igHandle ?? '');
     setInfluencer(!!editing?.influencer);
@@ -52,6 +58,29 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
   const invTypes = v?.inviteTypes || [];
   const lateEvents: PromEvent[] = useMemo(() => lateClubEvents(events), [events]);
 
+  // Computes the default `eventDate` to surface in the picker when the user
+  // (re)selects an event. One-time events lock the date; recurring default to
+  // the next occurrence on or after today, or whatever the guest already had.
+  function initialEventDate(evId: number | null, prevDate: string | null): string {
+    if (evId == null) return '';
+    const ev = events.find((e) => e.id === evId);
+    if (!ev) return '';
+    if (ev.isOneTime) return ev.eventDate ?? '';
+    if (prevDate) return prevDate;
+    return nextOccurrence(ev, isoDay(today())) ?? '';
+  }
+
+  const onPickEvent = (id: number | null) => {
+    setEventId(id);
+    setEventDate(initialEventDate(id, null));
+  };
+
+  const selectedEvent = eventId != null ? events.find((e) => e.id === eventId) : null;
+  const eventDateValid = !selectedEvent
+    || (selectedEvent.isOneTime
+        ? selectedEvent.eventDate === eventDate
+        : !!eventDate && occurs(selectedEvent, eventDate));
+
   const onVenueChange = (id: number) => {
     setVenueId(id);
     setInvTypeIds([]); // reset like MVP
@@ -60,15 +89,21 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
   const toggleInvType = (id: string) =>
     setInvTypeIds((arr) => (arr.includes(id) ? arr.filter((x) => x !== id) : [...arr, id]));
 
-  const save = () => {
+  const save = async () => {
     const trimmed = name.trim();
     if (!trimmed) { alert('Please enter a name.'); return; }
     if (venueId == null) { alert('Form error. Please try again.'); return; }
+
+    if (selectedEvent && !eventDateValid) {
+      alert('The event date you picked is not a valid occurrence of this event.');
+      return;
+    }
 
     const inviteTypeNames = invTypeIds
       .map((id) => (v?.inviteTypes || []).find((x) => x.id === id)?.name || '')
       .filter(Boolean);
 
+    const cleanHandle = handle.trim().replace(/^@+/, '');
     const entry: Guest = {
       id: editing?.id ?? (nextId('guest') as number),
       name: trimmed,
@@ -80,13 +115,36 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
       clubEventId: goingToClub ? (clubEventId ?? null) : null,
       checked: editing?.checked ?? false,
       influencer,
-      igHandle: handle.trim(),
+      igHandle: cleanHandle,
       igPlatform: platform,
       createdMonth: editing?.createdMonth ?? today().getMonth(),
       createdAt: editing?.createdAt ?? isoDay(today()),
+      eventDate: selectedEvent ? (eventDate || null) : null,
     };
 
     upsertGuest(entry);
+
+    // ── Double trigger: send the linked event's description over IG/TT ──
+    // Only on creation (not edit), and only if we have a handle + an event
+    // with a non-empty description. We confirm so the user keeps full
+    // control — promoters often want to review before sending.
+    const isCreating = !editing;
+    if (isCreating && cleanHandle && eventId != null) {
+      const ev = events.find((e) => e.id === eventId);
+      const desc = ev?.description?.trim();
+      if (desc) {
+        const platformLabel = platform === 'tiktok' ? 'TikTok' : 'Instagram';
+        const ok = window.confirm(
+          `Send the event description to @${cleanHandle} on ${platformLabel}?\n\n` +
+          `The text will be copied to your clipboard and ${platformLabel} will open ` +
+          `at her profile — just tap the airplane icon and paste.`,
+        );
+        if (ok) {
+          await sendViaSocial(platform, cleanHandle, desc);
+        }
+      }
+    }
+
     onClose();
   };
 
@@ -140,7 +198,7 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
             <label className="form-label">Select event</label>
             <div
               className={`event-picker-item none-opt ${eventId == null ? 'sel' : ''}`}
-              onClick={() => setEventId(null)}
+              onClick={() => onPickEvent(null)}
             >
               <div className="event-picker-info"><div className="event-picker-name">— No event</div></div>
               <div className="event-picker-check">{eventId == null ? '✓' : ''}</div>
@@ -157,7 +215,7 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
                 <div
                   key={e.id}
                   className={`event-picker-item ${on ? 'sel' : ''}`}
-                  onClick={() => setEventId(e.id)}
+                  onClick={() => onPickEvent(e.id)}
                 >
                   <div className="event-picker-info">
                     <div className="event-picker-name">{e.name}</div>
@@ -176,6 +234,34 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
               );
             })}
           </div>
+
+          {selectedEvent && !selectedEvent.isOneTime && (
+            <div className="form-group">
+              <label className="form-label">Event date</label>
+              <input
+                className="form-input"
+                type="date"
+                value={eventDate}
+                min={selectedEvent.seasonStart ?? undefined}
+                max={selectedEvent.seasonEnd ?? undefined}
+                onChange={(e) => setEventDate(e.target.value)}
+              />
+              <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 4 }}>
+                Pick the specific date this guest is attending.
+              </div>
+              {eventDate && !eventDateValid && (
+                <div style={{ fontSize: 11, color: '#A32D2D', marginTop: 4 }}>
+                  ⚠︎ {eventDate} is not an occurrence of "{selectedEvent.name}".
+                </div>
+              )}
+            </div>
+          )}
+
+          {selectedEvent?.isOneTime && selectedEvent.eventDate && (
+            <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', margin: '-6px 0 12px' }}>
+              Event date: <b>{selectedEvent.eventDate}</b>
+            </div>
+          )}
 
           <div className="form-group">
             <label className="form-label">Social platform</label>

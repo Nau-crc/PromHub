@@ -37,6 +37,8 @@ export const EventFormModal: React.FC<Props> = ({ open, onClose, editing, onRequ
   const [isPriv, setPriv] = useState(false);
   const [isLate, setLate] = useState(false);
   const [capacity, setCapacity] = useState<number | null>(null);
+  const [seasonStart, setSeasonStart] = useState<string>('');
+  const [seasonEnd, setSeasonEnd] = useState<string>('');
 
   useEffect(() => {
     if (!open) return;
@@ -57,6 +59,8 @@ export const EventFormModal: React.FC<Props> = ({ open, onClose, editing, onRequ
     setPriv(!!editing?.isPrivate);
     setLate(!!editing?.isLateClub);
     setCapacity(editing?.capacity ?? null);
+    setSeasonStart(editing?.seasonStart ?? '');
+    setSeasonEnd(editing?.seasonEnd ?? '');
   }, [open, editing, venues]);
 
   const onVenueChange = (val: string) => {
@@ -89,6 +93,10 @@ export const EventFormModal: React.FC<Props> = ({ open, onClose, editing, onRequ
       if (!eventDate) { alert('Pick a date.'); return; }
     } else {
       if (!days.length) { alert('Select at least one day.'); return; }
+      if (seasonStart && seasonEnd && seasonEnd < seasonStart) {
+        alert('Season end must be on or after season start.');
+        return;
+      }
     }
 
     // Timeslots only required when a venue is set (otherwise the event has none)
@@ -112,6 +120,8 @@ export const EventFormModal: React.FC<Props> = ({ open, onClose, editing, onRequ
       isOneTime,
       eventDate: isOneTime ? eventDate : null,
       capacity: capacity && capacity > 0 ? capacity : null,
+      seasonStart: !isOneTime && seasonStart ? seasonStart : null,
+      seasonEnd: !isOneTime && seasonEnd ? seasonEnd : null,
     };
     upsertEvent(entry);
     onClose();
@@ -155,7 +165,35 @@ export const EventFormModal: React.FC<Props> = ({ open, onClose, editing, onRequ
                 onChange={(e) => setEventDate(e.target.value)}
               />
             ) : (
-              <DayChips selected={days} onToggle={toggleDay} />
+              <>
+                <DayChips selected={days} onToggle={toggleDay} />
+                <div style={{ marginTop: 12 }}>
+                  <div className="form-label" style={{ marginBottom: 6 }}>
+                    Season (optional)
+                  </div>
+                  <div className="form-row">
+                    <div>
+                      <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 3 }}>From</div>
+                      <input
+                        className="form-input" type="date"
+                        value={seasonStart}
+                        onChange={(e) => setSeasonStart(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 3 }}>Until</div>
+                      <input
+                        className="form-input" type="date"
+                        value={seasonEnd}
+                        onChange={(e) => setSeasonEnd(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 4 }}>
+                    Leave empty for an open-ended event.
+                  </div>
+                </div>
+              </>
             )}
           </div>
 
