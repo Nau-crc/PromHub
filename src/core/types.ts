@@ -36,7 +36,8 @@ export interface Venue {
 export interface PromEvent {
   id: number;
   name: string;
-  venueId: number;
+  /** Optional — events without a venue are allowed (e.g. private dinners). */
+  venueId: number | null;
   weekdays: string[];
   weekday: string;
   selectedSlotIds: string[];
@@ -45,6 +46,12 @@ export interface PromEvent {
   isPrivate: boolean;
   isLateClub: boolean;
   invitedGuests: string[];
+  /** When true, `eventDate` is the single date the event runs on. */
+  isOneTime: boolean;
+  /** ISO yyyy-mm-dd. Only meaningful when isOneTime === true. */
+  eventDate: string | null;
+  /** Maximum guests for this event. 0 / null = no cap. */
+  capacity: number | null;
 }
 
 export interface Guest {
@@ -61,6 +68,8 @@ export interface Guest {
   igHandle: string;
   igPlatform: Platform;
   createdMonth: number;
+  /** ISO yyyy-mm-dd date when the guest record was created. */
+  createdAt: string;
 }
 
 export interface Reservation {
@@ -79,6 +88,8 @@ export interface Reservation {
   commissionPct: number;
   womanPct: number;
   commissionEarner: string;
+  /** ISO yyyy-mm-dd date when the reservation was created. */
+  createdAt: string;
 }
 
 export interface AppDataSnapshot {

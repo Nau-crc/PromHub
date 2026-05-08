@@ -3,6 +3,7 @@ import type { Timeslot, VipType, InviteType } from '@/core/types';
 import { useAppStore } from '@/store/useAppStore';
 import { timeOptions } from '@/core/constants';
 import { PaxStepper } from '@/components/PaxStepper';
+import { NumberField } from '@/components/NumberField';
 
 const TIME_OPTS = timeOptions();
 
@@ -41,14 +42,15 @@ export const TimeslotRows: React.FC<TsRowsProps> = ({ rows, setRows }) => {
       )}
       {rows.map((r, i) => (
         <div className="ts-block" key={r.id}>
-          <button type="button" className="ts-block-del" onClick={() => remove(i)}>✕</button>
-          <input
-            className="ts-block-name"
-            placeholder="Timeslot name e.g. Tardeo"
-            value={r.name}
-            onChange={(e) => update(i, { name: e.target.value })}
-            style={{ paddingRight: 34 }}
-          />
+          <div className="ts-block-head">
+            <input
+              className="ts-block-name"
+              placeholder="Timeslot name e.g. Tardeo"
+              value={r.name}
+              onChange={(e) => update(i, { name: e.target.value })}
+            />
+            <button type="button" className="row-del-btn" aria-label="Delete" onClick={() => remove(i)}>✕</button>
+          </div>
           <div className="ts-block-row">
             <div>
               <div className="ts-label">Start (24h)</div>
@@ -74,14 +76,13 @@ export const TimeslotRows: React.FC<TsRowsProps> = ({ rows, setRows }) => {
             </div>
             <div>
               <div className="ts-label">Guest cap.</div>
-              <input
-                type="number"
-                min={0}
+              <NumberField
                 className="form-input"
                 style={{ fontSize: 13, padding: '9px 8px' }}
-                placeholder="0"
-                value={r.guestCapacity || ''}
-                onChange={(e) => update(i, { guestCapacity: parseInt(e.target.value) || 0 })}
+                placeholder="—"
+                min={0}
+                value={r.guestCapacity || null}
+                onChange={(v) => update(i, { guestCapacity: v ?? 0 })}
               />
             </div>
           </div>
@@ -130,48 +131,47 @@ export const VipRows: React.FC<VipRowsProps> = ({ rows, setRows }) => {
       )}
       {rows.map((r, i) => (
         <div className="vip-block" key={r.id}>
-          <button type="button" className="vip-block-del" onClick={() => remove(i)}>✕</button>
-          <input
-            className="vip-block-name"
-            placeholder="VIP type name e.g. SUPER VIP"
-            value={r.name}
-            onChange={(e) => update(i, { name: e.target.value })}
-            style={{ paddingRight: 34 }}
-          />
+          <div className="vip-block-head">
+            <input
+              className="vip-block-name"
+              placeholder="VIP type name e.g. SUPER VIP"
+              value={r.name}
+              onChange={(e) => update(i, { name: e.target.value })}
+            />
+            <button type="button" className="row-del-btn" aria-label="Delete" onClick={() => remove(i)}>✕</button>
+          </div>
           <div className="vip-block-row">
             <div>
               <div className="vip-sub-label">Price (€ / table)</div>
-              <input
-                type="number"
-                min={0}
+              <NumberField
                 className="form-input"
                 style={{ fontSize: 13, padding: '9px 8px' }}
-                placeholder="0"
-                value={r.price}
-                onChange={(e) => update(i, { price: parseFloat(e.target.value) || 0 })}
+                placeholder="—"
+                min={0}
+                decimal
+                value={r.price || null}
+                onChange={(v) => update(i, { price: v ?? 0 })}
               />
             </div>
             <div>
               <div className="vip-sub-label">Pax range</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
-                <input
-                  type="number"
-                  min={1}
+                <NumberField
                   className="form-input"
                   style={{ fontSize: 13, padding: '9px 6px', width: 48, textAlign: 'center' }}
                   title="Min pax"
-                  value={r.minPax}
-                  onChange={(e) => update(i, { minPax: parseInt(e.target.value) || 1 })}
+                  min={1}
+                  value={r.minPax || null}
+                  onChange={(v) => update(i, { minPax: v ?? 0 })}
                 />
                 <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>–</span>
-                <input
-                  type="number"
-                  min={1}
+                <NumberField
                   className="form-input"
                   style={{ fontSize: 13, padding: '9px 6px', width: 48, textAlign: 'center' }}
                   title="Max pax"
-                  value={r.maxPax}
-                  onChange={(e) => update(i, { maxPax: parseInt(e.target.value) || 1 })}
+                  min={1}
+                  value={r.maxPax || null}
+                  onChange={(v) => update(i, { maxPax: v ?? 0 })}
                 />
               </div>
               <div style={{ fontSize: 10, color: 'var(--color-text-secondary)', marginTop: 3, textAlign: 'center' }}>
@@ -227,7 +227,7 @@ export const InviteTypeRows: React.FC<InvRowsProps> = ({ rows, setRows }) => {
               value={r.name}
               onChange={(e) => update(i, { name: e.target.value })}
             />
-            <button type="button" className="vip-block-del" onClick={() => remove(i)}>✕</button>
+            <button type="button" className="row-del-btn" aria-label="Delete" onClick={() => remove(i)}>✕</button>
           </div>
         ))
       )}

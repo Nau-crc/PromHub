@@ -2,10 +2,12 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { IonModal, IonContent } from '@ionic/react';
 import type { Guest, Platform, PromEvent } from '@/core/types';
 import { useAppStore } from '@/store/useAppStore';
-import { TODAY } from '@/core/constants';
-import { lateClubEvents, venueById } from '@/features/summary/calculations';
+import { today } from '@/core/constants';
+import { isoDay } from '@/core/utils/date';
+import { eventCapacity, lateClubEvents, venueById } from '@/features/summary/calculations';
 import { SheetHeader } from '@/components/SheetHeader';
 import { PlatformPicker } from '@/components/PlatformPicker';
+import { NumberField } from '@/components/NumberField';
 
 interface Props {
   open: boolean;
@@ -16,14 +18,14 @@ interface Props {
 }
 
 export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEventId }) => {
-  const { venues, events, upsertGuest, removeGuest, nextId } = useAppStore((s) => ({
-    venues: s.venues, events: s.events,
+  const { venues, events, guests, upsertGuest, removeGuest, nextId } = useAppStore((s) => ({
+    venues: s.venues, events: s.events, guests: s.guests,
     upsertGuest: s.upsertGuest, removeGuest: s.removeGuest, nextId: s.nextId,
   }));
 
   const [name, setName] = useState('');
   const [venueId, setVenueId] = useState<number | null>(null);
-  const [pax, setPax] = useState<number>(1);
+  const [pax, setPax] = useState<number | null>(1);
   const [invTypeIds, setInvTypeIds] = useState<string[]>([]);
   const [eventId, setEventId] = useState<number | null>(null);
   const [platform, setPlatform] = useState<Platform>('instagram');
@@ -74,13 +76,14 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
       eventId: eventId ?? null,
       inviteTypeIds: [...invTypeIds],
       inviteTypeNames,
-      pax: Math.max(1, parseInt(String(pax)) || 1),
+      pax: Math.max(1, pax ?? 1),
       clubEventId: goingToClub ? (clubEventId ?? null) : null,
       checked: editing?.checked ?? false,
       influencer,
       igHandle: handle.trim(),
       igPlatform: platform,
-      createdMonth: editing?.createdMonth ?? TODAY.getMonth(),
+      createdMonth: editing?.createdMonth ?? today().getMonth(),
+      createdAt: editing?.createdAt ?? isoDay(today()),
     };
 
     upsertGuest(entry);
@@ -105,9 +108,9 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
             </div>
             <div className="form-group">
               <label className="form-label">Pax</label>
-              <input
-                className="form-input" type="number" min={1}
-                value={pax} onChange={(e) => setPax(parseInt(e.target.value) || 1)}
+              <NumberField
+                className="form-input" min={1}
+                value={pax} onChange={setPax}
               />
             </div>
           </div>
@@ -143,9 +146,13 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
               <div className="event-picker-check">{eventId == null ? '✓' : ''}</div>
             </div>
             {events.map((e) => {
-              const vv = venueById(e.venueId, venues);
-              const days = (e.weekdays || [e.weekday || '?']).join(', ');
+              const vv = e.venueId != null ? venueById(e.venueId, venues) : undefined;
+              const sched = e.isOneTime && e.eventDate
+                ? new Date(e.eventDate + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+                : (e.weekdays || [e.weekday || '?']).join(', ');
+              const cap = eventCapacity(e.id, guests, events);
               const on = eventId === e.id;
+              const overflow = cap.capacity > 0 && (pax ?? 0) > cap.left;
               return (
                 <div
                   key={e.id}
@@ -154,7 +161,15 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
                 >
                   <div className="event-picker-info">
                     <div className="event-picker-name">{e.name}</div>
-                    <div className="event-picker-sub">{days} · {vv ? vv.name : '?'}{e.isLateClub ? ' 🌙' : ''}</div>
+                    <div className="event-picker-sub">
+                      {sched} · {vv ? vv.name : 'No venue'}{e.isLateClub ? ' 🌙' : ''}
+                      {cap.capacity > 0 && ` · ${cap.used}/${cap.capacity} (${cap.left} left)`}
+                    </div>
+                    {on && cap.capacity > 0 && overflow && (
+                      <div style={{ fontSize: 11, color: '#A32D2D', marginTop: 4 }}>
+                        ⚠︎ {pax} pax exceeds the {cap.left} remaining slots.
+                      </div>
+                    )}
                   </div>
                   <div className="event-picker-check">{on ? '✓' : ''}</div>
                 </div>
@@ -189,7 +204,7 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
                 <div className="event-picker-check">{clubEventId == null ? '✓' : ''}</div>
               </div>
               {lateEvents.map((e) => {
-                const vv = venueById(e.venueId, venues);
+                const vv = e.venueId != null ? venueById(e.venueId, venues) : undefined;
                 const on = clubEventId === e.id;
                 const days = (e.weekdays || [e.weekday || '?']).join(', ');
                 return (

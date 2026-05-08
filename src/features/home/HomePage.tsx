@@ -2,7 +2,7 @@ import React from 'react';
 import { IonPage, IonContent, IonHeader, IonToolbar, IonButtons, IonMenuButton } from '@ionic/react';
 import { useAppStore } from '@/store/useAppStore';
 import { useUIStore } from '@/store/useUIStore';
-import { TODAY } from '@/core/constants';
+import { today } from '@/core/constants';
 import { fmtDateLong } from '@/core/utils/date';
 import { EventCard } from '@/components/EventCard';
 import { EmptyBox } from '@/components/EmptyBox';
@@ -19,7 +19,7 @@ export const HomePage: React.FC = () => {
           <div style={{ padding: '4px 16px 0' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
-                <div className="page-title">{fmtDateLong(TODAY)}</div>
+                <div className="page-title">{fmtDateLong(today())}</div>
                 <div className="page-sub">Today's events</div>
               </div>
               <button

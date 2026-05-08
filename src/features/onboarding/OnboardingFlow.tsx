@@ -194,6 +194,9 @@ const EventStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
       isPrivate: isPriv,
       isLateClub: isLate,
       invitedGuests: [],
+      isOneTime: false,
+      eventDate: null,
+      capacity: null,
     });
     onNext();
   };

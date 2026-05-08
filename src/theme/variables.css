@@ -129,14 +129,17 @@ body { font-family: var(--font-sans); }
 .phone-row .form-select { width: auto; min-width: 110px; flex-shrink: 0; }
 .phone-row .form-input { flex: 1; }
 
-.ts-block { background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 10px 10px 8px; margin-bottom: 10px; position: relative; }
-.ts-block-name { width: 100%; padding: 9px 10px; font-size: 13px; border: 0.5px solid var(--color-border-secondary); border-radius: var(--border-radius-md); background: var(--color-background-primary); color: var(--color-text-primary); margin-bottom: 8px; }
+/* Stacked "card" rows have a top-row that holds the name input + delete X.
+   The X is a flex sibling so it never overlaps the input regardless of height. */
+.ts-block, .vip-block { background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 10px; margin-bottom: 10px; }
+.ts-block-head, .vip-block-head { display: flex; gap: 8px; align-items: stretch; margin-bottom: 8px; }
+.ts-block-head .ts-block-name, .vip-block-head .vip-block-name { flex: 1; margin-bottom: 0; padding-right: 12px; }
+.ts-block-name, .vip-block-name { width: 100%; padding: 9px 10px; font-size: 13px; border: 0.5px solid var(--color-border-secondary); border-radius: var(--border-radius-md); background: var(--color-background-primary); color: var(--color-text-primary); margin-bottom: 8px; }
 .ts-block-row { display: grid; grid-template-columns: 1fr 1fr 80px; gap: 6px; align-items: center; }
-.ts-block-del, .vip-block-del { position: absolute; top: 8px; right: 8px; width: 26px; height: 26px; background: transparent; border: 0.5px solid var(--color-border-secondary); border-radius: 6px; color: #A32D2D; cursor: pointer; font-size: 12px; display: flex; align-items: center; justify-content: center; }
+.row-del-btn { flex: 0 0 38px; width: 38px; min-height: 38px; background: var(--color-background-primary); border: 0.5px solid var(--color-border-secondary); border-radius: var(--border-radius-md); color: #A32D2D; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; }
+.row-del-btn:active { background: #FBEAF0; }
 .ts-label, .vip-sub-label { font-size: 11px; color: var(--color-text-secondary); margin-bottom: 3px; }
 
-.vip-block { background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 10px 10px 8px; margin-bottom: 10px; position: relative; }
-.vip-block-name { width: 100%; padding: 9px 10px; font-size: 13px; border: 0.5px solid var(--color-border-secondary); border-radius: var(--border-radius-md); background: var(--color-background-primary); color: var(--color-text-primary); margin-bottom: 8px; }
 .vip-block-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
 
 .pax-stepper { display: flex; align-items: center; gap: 0; border: 0.5px solid var(--color-border-secondary); border-radius: var(--border-radius-md); overflow: hidden; background: var(--color-background-primary); }
@@ -170,8 +173,8 @@ body { font-family: var(--font-sans); }
 .comm-breakdown { background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 10px 14px; margin-top: 10px; font-size: 12px; line-height: 1.8; color: var(--color-text-secondary); }
 .comm-breakdown b { color: var(--color-text-primary); }
 
-.inv-row { display: grid; grid-template-columns: 1fr 32px; gap: 6px; align-items: center; margin-bottom: 8px; }
-.inv-row input { padding: 9px 10px; font-size: 13px; border: 0.5px solid var(--color-border-secondary); border-radius: var(--border-radius-md); background: var(--color-background-primary); color: var(--color-text-primary); width: 100%; }
+.inv-row { display: flex; gap: 6px; align-items: stretch; margin-bottom: 8px; }
+.inv-row input { padding: 9px 10px; font-size: 13px; border: 0.5px solid var(--color-border-secondary); border-radius: var(--border-radius-md); background: var(--color-background-primary); color: var(--color-text-primary); flex: 1; min-width: 0; }
 
 /* ─── Sum tabs ─────────────────────────────────────────────── */
 .sum-tabs { display: flex; border-bottom: 0.5px solid var(--color-border-tertiary); padding: 0 16px; background: var(--color-background-primary); }

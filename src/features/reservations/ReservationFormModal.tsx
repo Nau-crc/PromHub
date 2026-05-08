@@ -7,8 +7,11 @@ import {
   getVipOptionsForPax, getVipPrice, venueById, venueVipSlotsLeft,
 } from '@/features/summary/calculations';
 import { round2 } from '@/core/utils/format';
+import { isoDay } from '@/core/utils/date';
+import { today } from '@/core/constants';
 import { SheetHeader } from '@/components/SheetHeader';
 import { PlatformPicker } from '@/components/PlatformPicker';
+import { NumberField } from '@/components/NumberField';
 
 interface Props {
   open: boolean;
@@ -27,16 +30,16 @@ export const ReservationFormModal: React.FC<Props> = ({ open, onClose, editing, 
   const [phoneCode, setPhoneCode] = useState('+34');
   const [phoneNum, setPhoneNum] = useState('');
   const [venueId, setVenueId] = useState<number | null>(null);
-  const [pax, setPax] = useState<number | ''>('');
+  const [pax, setPax] = useState<number | null>(null);
   const [vipType, setVipType] = useState<string>('');
   const [slotId, setSlotId] = useState<string>('');
   const [eventId, setEventId] = useState<number | null>(null);
-  const [commissionPct, setCommissionPct] = useState<number>(10);
+  const [commissionPct, setCommissionPct] = useState<number | null>(10);
   const [fromInvite, setFromInvite] = useState(false);
   const [inviterPlatform, setInviterPlatform] = useState<Platform>('instagram');
   const [inviterHandle, setInviterHandle] = useState('');
   const [commissionEarner, setCommissionEarner] = useState('');
-  const [womanPct, setWomanPct] = useState<number>(50);
+  const [womanPct, setWomanPct] = useState<number | null>(50);
 
   // Hydrate when (re)opening
   useEffect(() => {
@@ -45,7 +48,7 @@ export const ReservationFormModal: React.FC<Props> = ({ open, onClose, editing, 
     setPhoneCode(editing?.phoneCode ?? '+34');
     setPhoneNum(editing?.phoneNum ?? '');
     setVenueId(editing?.venueId ?? venues[0]?.id ?? null);
-    setPax(editing?.pax ?? '');
+    setPax(editing?.pax ?? null);
     setVipType(editing?.vipType ?? '');
     setSlotId(editing?.slotId ?? '');
     setEventId(editing ? editing.eventId : (seedEventId ?? null));
@@ -58,7 +61,7 @@ export const ReservationFormModal: React.FC<Props> = ({ open, onClose, editing, 
   }, [open, editing, seedEventId, venues]);
 
   const v = venueId != null ? venueById(venueId, venues) : undefined;
-  const paxN = typeof pax === 'number' ? pax : (parseInt(String(pax)) || 0);
+  const paxN = pax ?? 0;
   const vipOpts = useMemo(
     () => (venueId != null ? getVipOptionsForPax(venueId, paxN, venues) : []),
     [venueId, paxN, venues],
@@ -86,8 +89,10 @@ export const ReservationFormModal: React.FC<Props> = ({ open, onClose, editing, 
 
   // ── Live commission preview (mirrors `previewComm` byte-for-byte) ──
   const price = venueId != null ? getVipPrice(venueId, vipType, venues) : 0;
-  const promoter = round2(price * (commissionPct || 0) / 100);
-  const woman = fromInvite ? round2(promoter * (womanPct || 0) / 100) : 0;
+  const commissionPctN = commissionPct ?? 0;
+  const womanPctN = womanPct ?? 0;
+  const promoter = round2(price * commissionPctN / 100);
+  const woman = fromInvite ? round2(promoter * womanPctN / 100) : 0;
   const net = round2(promoter - woman);
 
   const save = () => {
@@ -103,13 +108,14 @@ export const ReservationFormModal: React.FC<Props> = ({ open, onClose, editing, 
       eventId: eventId ?? null,
       vipType,
       slotId,
-      pax: typeof pax === 'number' ? pax : (parseInt(String(pax)) || 2),
+      pax: pax ?? 2,
       fromInvite,
       inviterHandle: fromInvite ? inviterHandle.trim() : '',
       inviterPlatform,
-      commissionPct: parseFloat(String(commissionPct)) || 0,
-      womanPct: fromInvite ? (parseFloat(String(womanPct)) || 0) : 0,
+      commissionPct: commissionPctN,
+      womanPct: fromInvite ? womanPctN : 0,
       commissionEarner: fromInvite ? commissionEarner.trim() : '',
+      createdAt: editing?.createdAt ?? isoDay(today()),
     };
     upsertReservation(entry);
     onClose();
@@ -149,10 +155,9 @@ export const ReservationFormModal: React.FC<Props> = ({ open, onClose, editing, 
             </div>
             <div className="form-group">
               <label className="form-label">Pax</label>
-              <input
-                className="form-input" type="number" min={1} placeholder="# people"
-                value={pax}
-                onChange={(e) => setPax(e.target.value === '' ? '' : (parseInt(e.target.value) || 0))}
+              <NumberField
+                className="form-input" min={1} placeholder="# people"
+                value={pax} onChange={setPax}
               />
             </div>
           </div>
@@ -196,10 +201,9 @@ export const ReservationFormModal: React.FC<Props> = ({ open, onClose, editing, 
 
           <div className="form-group">
             <label className="form-label">Your commission %</label>
-            <input
-              className="form-input" type="number" min={0} max={100}
-              value={commissionPct}
-              onChange={(e) => setCommissionPct(parseFloat(e.target.value) || 0)}
+            <NumberField
+              className="form-input" min={0} max={100} decimal
+              value={commissionPct} onChange={setCommissionPct}
             />
           </div>
 
@@ -226,9 +230,9 @@ export const ReservationFormModal: React.FC<Props> = ({ open, onClose, editing, 
               </div>
               <div className="form-group">
                 <label className="form-label">Their % of your commission</label>
-                <input
-                  className="form-input" type="number" min={0} max={100}
-                  value={womanPct} onChange={(e) => setWomanPct(parseFloat(e.target.value) || 0)}
+                <NumberField
+                  className="form-input" min={0} max={100} decimal
+                  value={womanPct} onChange={setWomanPct}
                 />
               </div>
             </>
@@ -242,10 +246,10 @@ export const ReservationFormModal: React.FC<Props> = ({ open, onClose, editing, 
             ) : (
               <>
                 Table price: <b>€{price}</b> · {paxN || 1} pax<br />
-                Your commission ({commissionPct}%): <b style={{ color: '#3B6D11' }}>€{promoter}</b>
-                {fromInvite && womanPct > 0 && (
+                Your commission ({commissionPctN}%): <b style={{ color: '#3B6D11' }}>€{promoter}</b>
+                {fromInvite && womanPctN > 0 && (
                   <>
-                    <br />{(commissionEarner || 'Inviter')}'s cut ({womanPct}%): <b style={{ color: '#F97316' }}>€{woman}</b>
+                    <br />{(commissionEarner || 'Inviter')}'s cut ({womanPctN}%): <b style={{ color: '#F97316' }}>€{woman}</b>
                     <br />Net to you: <b style={{ color: '#3B6D11' }}>€{net}</b>
                   </>
                 )}

@@ -14,8 +14,9 @@ export const MONTHS_SHORT = [
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
 ];
 
-// Anchor "today" — matches the MVP. In production replace with `new Date()`.
-export const TODAY = new Date(2026, 3, 27);
+// Always recompute "today" on demand so a long-lived session that crosses
+// midnight stays accurate. Use `today()` instead of caching at module-load time.
+export const today = (): Date => new Date();
 
 export interface CountryCode { flag: string; code: string }
 

@@ -1,14 +1,17 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { IonPage, IonContent, IonHeader, IonToolbar, IonButtons, IonMenuButton } from '@ionic/react';
 import { useAppStore } from '@/store/useAppStore';
 import { useUIStore } from '@/store/useUIStore';
 import {
   commCalc, summarizeToday, summarizeYearlyGuestsByMonth,
-  summarizeInfluencers, summarizeVipCapacity, venueName,
+  summarizeYearlyReservationsByMonth, summarizeInfluencers,
+  summarizeVipCapacity, venueName, digestForDay, digestForMonth,
 } from './calculations';
-import { round2 } from '@/core/utils/format';
-import { MONTHS_FULL, MONTHS_SHORT, DAYS_SHORT, TODAY } from '@/core/constants';
-import { SocialBadge } from '@/components/SocialBadge';
+import { round2, initials } from '@/core/utils/format';
+import { isoDay } from '@/core/utils/date';
+import { today } from '@/core/constants';
+import { MONTHS_FULL, MONTHS_SHORT, DAYS_SHORT } from '@/core/constants';
+import { SocialBadge, StarBadge } from '@/components/SocialBadge';
 import { CapacityBar } from '@/components/CapacityBar';
 import { EmptyBox } from '@/components/EmptyBox';
 
@@ -48,15 +51,46 @@ const TodayPanel: React.FC<{ onJumpInfluencers: () => void }> = ({ onJumpInfluen
   const { guests, reservations, venues } = useAppStore((s) => ({
     guests: s.guests, reservations: s.reservations, venues: s.venues,
   }));
-  if (!guests.length && !reservations.length) {
+  const open = useUIStore((s) => s.open);
+  const todayKey = isoDay(today());
+  const todayGuests = guests.filter((g) => g.createdAt === todayKey);
+  const todayRes = reservations.filter((r) => r.createdAt === todayKey);
+
+  if (!todayGuests.length && !todayRes.length) {
     return <><div className="spacer" /><EmptyBox>Nothing logged yet today.</EmptyBox><div className="spacer" /></>;
   }
-  const summary = summarizeToday(guests, reservations, venues);
+  // Use the day-scoped data instead of the all-time snapshot
+  const summary = summarizeToday(todayGuests, todayRes, venues);
   const vipCap = summarizeVipCapacity(venues, reservations);
 
   return (
     <>
       <div className="spacer" />
+
+      {/* ── Today's guests list (NEW) ───────────────────────── */}
+      {todayGuests.length > 0 && (
+        <div className="summary-block">
+          <div className="summary-head">Today's guests ({todayGuests.reduce((a, g) => a + g.pax, 0)} pax)</div>
+          {todayGuests.map((g) => (
+            <div key={g.id} className="list-row" onClick={() => open('guestDetail', { id: g.id })}>
+              <div className={g.checked ? 'arrived-dot' : 'pending-dot'} />
+              <div className="list-avatar">{initials(g.name)}</div>
+              <div className="list-main">
+                <div className="list-name">
+                  <StarBadge on={g.influencer} />
+                  <span>{g.name}</span>
+                </div>
+                <div className="list-sub">
+                  {venueName(g.venueId, venues)} · {(g.inviteTypeNames || []).join(', ') || 'No type'} · {g.pax} pax
+                </div>
+              </div>
+              <div className="list-right-sub" style={{ color: g.checked ? '#0F6E56' : undefined }}>
+                {g.checked ? 'Arrived' : 'Pending'}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="summary-block">
         <div className="summary-head">Guests by invitation type</div>
@@ -98,7 +132,7 @@ const TodayPanel: React.FC<{ onJumpInfluencers: () => void }> = ({ onJumpInfluen
 
       <div className="summary-block">
         <div className="summary-head">Reservations & commissions</div>
-        {reservations.length ? reservations.map((r) => {
+        {todayRes.length ? todayRes.map((r) => {
           const c = commCalc(r, venues);
           const net = round2(c.promoter - c.woman);
           return (
@@ -127,24 +161,8 @@ const TodayPanel: React.FC<{ onJumpInfluencers: () => void }> = ({ onJumpInfluen
         }) : (
           <div style={{ padding: 14, fontSize: 13, color: 'var(--color-text-secondary)' }}>No reservations</div>
         )}
-        {reservations.length > 0 && (
-          <div style={{
-            padding: '10px 14px', borderTop: '0.5px solid var(--color-border-tertiary)',
-            display: 'flex', flexDirection: 'column', gap: 4,
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-              <span style={{ color: 'var(--color-text-secondary)' }}>Total earnings</span>
-              <span style={{ color: '#3B6D11', fontWeight: 500 }}>€{summary.totP}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-              <span style={{ color: 'var(--color-text-secondary)' }}>To pay via invitation</span>
-              <span style={{ color: '#F97316', fontWeight: 500 }}>€{summary.totW}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 500, marginTop: 2 }}>
-              <span>Net earnings</span>
-              <span style={{ color: '#3B6D11' }}>€{summary.net}</span>
-            </div>
-          </div>
+        {todayRes.length > 0 && (
+          <TotalsBlock totP={summary.totP} totW={summary.totW} net={summary.net} />
         )}
       </div>
 
@@ -153,9 +171,14 @@ const TodayPanel: React.FC<{ onJumpInfluencers: () => void }> = ({ onJumpInfluen
   );
 };
 
-// ── Monthly panel (calendar) ────────────────────────────────
+// ── Monthly panel ──────────────────────────────────────────
 const MonthlyPanel: React.FC = () => {
-  const [calMonth, setCalMonth] = useState(() => new Date(TODAY.getFullYear(), TODAY.getMonth(), 1));
+  const { guests, reservations, venues } = useAppStore((s) => ({
+    guests: s.guests, reservations: s.reservations, venues: s.venues,
+  }));
+  // Always start in the actual current month
+  const now = today();
+  const [calMonth, setCalMonth] = useState(() => new Date(now.getFullYear(), now.getMonth(), 1));
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
   const year = calMonth.getFullYear();
@@ -174,6 +197,17 @@ const MonthlyPanel: React.FC = () => {
     setSelectedDay(null);
   };
 
+  // Pre-compute which days have any activity (dot indicator)
+  const activityDays = useMemo(() => {
+    const set = new Set<string>();
+    guests.forEach((g) => g.createdAt && set.add(g.createdAt));
+    reservations.forEach((r) => r.createdAt && set.add(r.createdAt));
+    return set;
+  }, [guests, reservations]);
+
+  const dayDigest = selectedDay ? digestForDay(selectedDay, guests, reservations, venues) : null;
+  const monthDigest = digestForMonth(year, month, guests, reservations, venues);
+
   return (
     <>
       <div className="cal-nav">
@@ -188,6 +222,7 @@ const MonthlyPanel: React.FC = () => {
         {days.map((d, i) => {
           if (!d.day) return <div key={i} />;
           const isSelected = d.key === selectedDay;
+          const hasActivity = d.key ? activityDays.has(d.key) : false;
           return (
             <div
               key={i}
@@ -195,56 +230,162 @@ const MonthlyPanel: React.FC = () => {
               onClick={() => setSelectedDay(isSelected ? null : d.key!)}
             >
               {d.day}
+              {hasActivity && !isSelected && (
+                <span style={{
+                  position: 'absolute', bottom: 3, left: '50%', transform: 'translateX(-50%)',
+                  width: 4, height: 4, borderRadius: '50%', background: '#F97316',
+                }} />
+              )}
             </div>
           );
         })}
       </div>
-      <div style={{ padding: '12px 16px', fontSize: 12, color: 'var(--color-text-secondary)', textAlign: 'center' }}>
-        Tap any day to see details.
+
+      {/* Day detail */}
+      {selectedDay && dayDigest && (
+        <div className="summary-block" style={{ marginTop: 8 }}>
+          <div className="summary-head">{formatLongDay(selectedDay)}</div>
+          {!dayDigest.guests.length && !dayDigest.reservations.length ? (
+            <div style={{ padding: '14px', fontSize: 13, color: 'var(--color-text-secondary)' }}>
+              Nothing logged that day.
+            </div>
+          ) : (
+            <>
+              {dayDigest.guests.length > 0 && (
+                <div style={{ padding: '8px 14px', borderBottom: '0.5px solid var(--color-border-tertiary)' }}>
+                  <div className="dk" style={{ marginBottom: 6 }}>Guests</div>
+                  {dayDigest.guests.map((g) => (
+                    <div key={g.id} style={{ fontSize: 13, padding: '3px 0' }}>
+                      <StarBadge on={g.influencer} /> {g.name} · {g.pax} pax
+                      <span style={{ color: 'var(--color-text-secondary)', fontSize: 11 }}> ({venueName(g.venueId, venues)})</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {dayDigest.reservations.length > 0 && (
+                <div style={{ padding: '8px 14px', borderBottom: '0.5px solid var(--color-border-tertiary)' }}>
+                  <div className="dk" style={{ marginBottom: 6 }}>Reservations</div>
+                  {dayDigest.reservations.map((r) => {
+                    const c = commCalc(r, venues);
+                    return (
+                      <div key={r.id} style={{ fontSize: 13, padding: '3px 0' }}>
+                        {r.name} · {r.vipType} · {r.pax} pax
+                        <span style={{ color: '#3B6D11' }}> +€{c.promoter}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              <TotalsBlock totP={dayDigest.totP} totW={dayDigest.totW} net={dayDigest.net} />
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Monthly totals */}
+      <div className="summary-block">
+        <div className="summary-head">{MONTHS_FULL[month]} totals</div>
+        <div className="detail-kv" style={{ padding: '8px 14px' }}>
+          <span className="dk">Guests (pax)</span><span className="dv">{monthDigest.guestPax}</span>
+        </div>
+        <div className="detail-kv" style={{ padding: '8px 14px' }}>
+          <span className="dk">Reservations</span><span className="dv">{monthDigest.reservations.length}</span>
+        </div>
+        <TotalsBlock totP={monthDigest.totP} totW={monthDigest.totW} net={monthDigest.net} />
       </div>
+
+      {Object.keys(monthDigest.vipTablesByType).length > 0 && (
+        <div className="summary-block">
+          <div className="summary-head">VIP tables sold this month</div>
+          {Object.entries(monthDigest.vipTablesByType)
+            .sort((a, b) => b[1] - a[1])
+            .map(([key, count]) => (
+              <div key={key} className="detail-kv" style={{ padding: '8px 14px' }}>
+                <span className="dk">{key}</span>
+                <span className="dv">{count}</span>
+              </div>
+            ))}
+        </div>
+      )}
+
       <div className="spacer" />
     </>
   );
 };
 
+const formatLongDay = (iso: string) =>
+  new Date(iso + 'T00:00:00').toLocaleDateString(undefined, {
+    weekday: 'long', month: 'long', day: 'numeric',
+  });
+
+// ── Reusable totals block ──────────────────────────────────
+const TotalsBlock: React.FC<{ totP: number; totW: number; net: number }> = ({ totP, totW, net }) => (
+  <div style={{
+    padding: '10px 14px', borderTop: '0.5px solid var(--color-border-tertiary)',
+    display: 'flex', flexDirection: 'column', gap: 4,
+  }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+      <span style={{ color: 'var(--color-text-secondary)' }}>Total earnings</span>
+      <span style={{ color: '#3B6D11', fontWeight: 500 }}>€{totP}</span>
+    </div>
+    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+      <span style={{ color: 'var(--color-text-secondary)' }}>To pay via invitation</span>
+      <span style={{ color: '#F97316', fontWeight: 500 }}>€{totW}</span>
+    </div>
+    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 500, marginTop: 2 }}>
+      <span>Net earnings</span>
+      <span style={{ color: '#3B6D11' }}>€{net}</span>
+    </div>
+  </div>
+);
+
 // ── Yearly panel ───────────────────────────────────────────
 const YearlyPanel: React.FC = () => {
-  const guests = useAppStore((s) => s.guests);
-  const mc = summarizeYearlyGuestsByMonth(guests);
-  const max = Math.max(...mc, 1);
+  const { guests, reservations } = useAppStore((s) => ({
+    guests: s.guests, reservations: s.reservations,
+  }));
+  const guestsByMonth = summarizeYearlyGuestsByMonth(guests);
+  const resByMonth = summarizeYearlyReservationsByMonth(reservations);
+  const year = today().getFullYear();
 
   return (
     <>
       <div className="spacer" />
-      <div className="summary-block">
-        <div className="summary-head">{TODAY.getFullYear()} — Guests per month</div>
-        <div style={{ padding: '16px 16px 8px' }}>
-          <div className="year-bars">
-            {mc.map((v, i) => {
-              const h = Math.max(4, Math.round((v / max) * 80));
-              return (
-                <div
-                  key={i}
-                  className="year-bar"
-                  style={{
-                    height: h,
-                    background: v === 0 ? 'var(--color-background-secondary)' : '#F97316',
-                    borderRadius: '3px 3px 0 0',
-                  }}
-                />
-              );
-            })}
-          </div>
-          <div className="year-bar-label">
-            {MONTHS_SHORT.map((m) => <div key={m} className="year-bar-lbl">{m}</div>)}
-          </div>
-        </div>
-        <div style={{ padding: '0 14px 14px', fontSize: 12, color: 'var(--color-text-secondary)' }}>
-          Data populates as you add guests.
-        </div>
-      </div>
+      <YearlyChart title={`${year} — Guests per month`} data={guestsByMonth} barColor="#F97316" />
+      <YearlyChart title={`${year} — Reservations per month`} data={resByMonth} barColor="#3B6D11" />
       <div className="spacer" />
     </>
+  );
+};
+
+const YearlyChart: React.FC<{ title: string; data: number[]; barColor: string }> = ({ title, data, barColor }) => {
+  const max = Math.max(...data, 1);
+  return (
+    <div className="summary-block">
+      <div className="summary-head">{title}</div>
+      <div style={{ padding: '16px 16px 8px' }}>
+        <div className="year-bars">
+          {data.map((v, i) => {
+            const h = Math.max(4, Math.round((v / max) * 80));
+            return (
+              <div
+                key={i}
+                className="year-bar"
+                style={{
+                  height: h,
+                  background: v === 0 ? 'var(--color-background-secondary)' : barColor,
+                  borderRadius: '3px 3px 0 0',
+                }}
+                title={`${MONTHS_SHORT[i]}: ${v}`}
+              />
+            );
+          })}
+        </div>
+        <div className="year-bar-label">
+          {MONTHS_SHORT.map((m) => <div key={m} className="year-bar-lbl">{m}</div>)}
+        </div>
+      </div>
+    </div>
   );
 };
 
@@ -284,4 +425,3 @@ const InfluencersPanel: React.FC = () => {
     </>
   );
 };
-

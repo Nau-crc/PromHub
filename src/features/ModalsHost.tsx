@@ -20,6 +20,29 @@ export const ModalsHost: React.FC = () => {
     events: s.events, guests: s.guests, reservations: s.reservations, venues: s.venues,
   }));
 
+  // ── Safe-close ────────────────────────────────────────────
+  // When transitioning from one modal to another (e.g. event detail
+  // → addGuest), Ionic still fires `onDidDismiss` for the old modal
+  // *after* the new mode is already set. A naive `close()` there
+  // would wipe `mode = null` and immediately dismiss the new modal.
+  //
+  // `safeClose(myMode)` only clears the global mode if WE are still
+  // the active modal. Otherwise the dismissal was caused by the user
+  // navigating to another modal — leave state alone.
+  const safeClose = (myModes: NonNullable<typeof mode>[]) => () => {
+    const current = useUIStore.getState().mode;
+    if (current && myModes.includes(current)) close();
+  };
+
+  // Cross-modal navigation: tear down the current modal, wait for the
+  // exit animation, then open the next one. Mirrors the MVP's
+  // `closeSheet(); setTimeout(()=>openSheet(...), 50)` pattern.
+  const TRANSITION_MS = 320;
+  const transitionTo = (nextMode: NonNullable<typeof mode>, p: typeof payload = {}) => {
+    close();
+    setTimeout(() => open(nextMode, p), TRANSITION_MS);
+  };
+
   const editingEvent = mode === 'editEvent' && payload.id != null
     ? events.find((e) => e.id === payload.id) ?? null
     : null;
@@ -37,45 +60,45 @@ export const ModalsHost: React.FC = () => {
     <>
       <EventFormModal
         open={mode === 'addEvent' || mode === 'editEvent'}
-        onClose={close}
+        onClose={safeClose(['addEvent', 'editEvent'])}
         editing={editingEvent}
-        onRequestNewVenue={() => open('addVenue')}
+        onRequestNewVenue={() => transitionTo('addVenue')}
       />
       <EventDetailModal
         open={mode === 'eventDetail'}
-        onClose={close}
+        onClose={safeClose(['eventDetail'])}
         eventId={mode === 'eventDetail' ? payload.id ?? null : null}
-        onEdit={(id) => open('editEvent', { id })}
-        onAddGuest={(eventId) => open('addGuest', { eventId })}
-        onAddRes={(eventId) => open('addRes', { eventId })}
+        onEdit={(id) => transitionTo('editEvent', { id })}
+        onAddGuest={(eventId) => transitionTo('addGuest', { eventId })}
+        onAddRes={(eventId) => transitionTo('addRes', { eventId })}
       />
       <GuestFormModal
         open={mode === 'addGuest' || mode === 'editGuest'}
-        onClose={close}
+        onClose={safeClose(['addGuest', 'editGuest'])}
         editing={editingGuest}
         seedEventId={mode === 'addGuest' ? payload.eventId : undefined}
       />
       <GuestDetailModal
         open={mode === 'guestDetail'}
-        onClose={close}
+        onClose={safeClose(['guestDetail'])}
         guestId={mode === 'guestDetail' ? payload.id ?? null : null}
-        onEdit={(id) => open('editGuest', { id })}
+        onEdit={(id) => transitionTo('editGuest', { id })}
       />
       <ReservationFormModal
         open={mode === 'addRes' || mode === 'editRes'}
-        onClose={close}
+        onClose={safeClose(['addRes', 'editRes'])}
         editing={editingRes}
         seedEventId={mode === 'addRes' ? payload.eventId : undefined}
       />
       <ReservationDetailModal
         open={mode === 'resDetail'}
-        onClose={close}
+        onClose={safeClose(['resDetail'])}
         reservationId={mode === 'resDetail' ? payload.id ?? null : null}
-        onEdit={(id) => open('editRes', { id })}
+        onEdit={(id) => transitionTo('editRes', { id })}
       />
       <VenueFormModal
         open={mode === 'addVenue' || mode === 'editVenue'}
-        onClose={close}
+        onClose={safeClose(['addVenue', 'editVenue'])}
         editing={editingVenue}
       />
     </>

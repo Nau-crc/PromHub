@@ -104,6 +104,28 @@ export function getVipOptionsForPax(venueId: number, pax: number, venues: Venue[
 export const lateClubEvents = (events: PromEvent[]): PromEvent[] =>
   events.filter((e) => e.isLateClub);
 
+// ── Event capacity helpers ─────────────────────────────────
+export interface EventCapacity {
+  used: number;       // pax already invited
+  capacity: number;   // declared capacity, 0 = unlimited
+  left: number;       // remaining slots; Infinity if unlimited
+  pct: number;        // 0..100, 0 if unlimited
+  fillClass: '' | 'warn' | 'full';
+}
+
+export function eventCapacity(eventId: number, guests: Guest[], events: PromEvent[]): EventCapacity {
+  const e = events.find((x) => x.id === eventId);
+  const used = guests.filter((g) => g.eventId === eventId).reduce((a, g) => a + g.pax, 0);
+  const capacity = e?.capacity ?? 0;
+  if (!capacity) {
+    return { used, capacity: 0, left: Infinity, pct: 0, fillClass: '' };
+  }
+  const left = Math.max(0, capacity - used);
+  const pct = Math.min(100, Math.round((used / capacity) * 100));
+  const fillClass = pct >= 100 ? 'full' : pct >= 75 ? 'warn' : '';
+  return { used, capacity, left, pct, fillClass };
+}
+
 // ── Aggregations used by Summary panels ─────────────────────
 
 // Today: totals across all reservations
@@ -149,6 +171,87 @@ export function summarizeYearlyGuestsByMonth(guests: Guest[]): number[] {
     if (g.createdMonth != null) mc[g.createdMonth]++;
   });
   return mc;
+}
+
+// Yearly: month counts of reservations by createdAt month
+export function summarizeYearlyReservationsByMonth(reservations: Reservation[]): number[] {
+  const mc = new Array(12).fill(0);
+  reservations.forEach((r) => {
+    if (!r.createdAt) return;
+    const m = parseInt(r.createdAt.slice(5, 7), 10) - 1;
+    if (!Number.isNaN(m) && m >= 0 && m < 12) mc[m]++;
+  });
+  return mc;
+}
+
+// ── Daily / Monthly aggregations ───────────────────────────
+export interface DayDigest {
+  guests: Guest[];
+  reservations: Reservation[];
+  totP: number;
+  totW: number;
+  net: number;
+}
+export function digestForDay(
+  isoKey: string,
+  guests: Guest[],
+  reservations: Reservation[],
+  venues: Venue[],
+): DayDigest {
+  const dayGuests = guests.filter((g) => g.createdAt === isoKey);
+  const dayRes = reservations.filter((r) => r.createdAt === isoKey);
+  let totP = 0;
+  let totW = 0;
+  for (const r of dayRes) {
+    const { promoter, woman } = commCalc(r, venues);
+    totP += promoter;
+    totW += woman;
+  }
+  return {
+    guests: dayGuests,
+    reservations: dayRes,
+    totP: round2(totP),
+    totW: round2(totW),
+    net: round2(totP - totW),
+  };
+}
+
+// All ISO dates of a calendar month (year, monthIndex 0..11)
+export interface MonthDigest {
+  totP: number;
+  totW: number;
+  net: number;
+  guestPax: number;
+  reservations: Reservation[];
+  vipTablesByType: Record<string, number>;  // "Venue · VIP type" → count
+}
+export function digestForMonth(
+  year: number,
+  month: number,
+  guests: Guest[],
+  reservations: Reservation[],
+  venues: Venue[],
+): MonthDigest {
+  const prefix = `${year}-${String(month + 1).padStart(2, '0')}-`;
+  const monthRes = reservations.filter((r) => r.createdAt?.startsWith(prefix));
+  const monthGuests = guests.filter((g) => g.createdAt?.startsWith(prefix));
+  let totP = 0, totW = 0;
+  const vipTablesByType: Record<string, number> = {};
+  for (const r of monthRes) {
+    const { promoter, woman } = commCalc(r, venues);
+    totP += promoter;
+    totW += woman;
+    const key = `${venueName(r.venueId, venues)} · ${r.vipType || '—'}`;
+    vipTablesByType[key] = (vipTablesByType[key] || 0) + 1;
+  }
+  return {
+    totP: round2(totP),
+    totW: round2(totW),
+    net: round2(totP - totW),
+    guestPax: monthGuests.reduce((a, g) => a + g.pax, 0),
+    reservations: monthRes,
+    vipTablesByType,
+  };
 }
 
 // Influencers: sorted unique by visit count

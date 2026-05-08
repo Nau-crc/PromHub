@@ -7,7 +7,7 @@ import {
 } from '@ionic/react';
 import { IonReactRouter } from '@ionic/react-router';
 import {
-  homeOutline, peopleOutline, listOutline, ellipsisHorizontal,
+  homeOutline, peopleOutline, listOutline,
   calendarOutline, businessOutline, statsChartOutline, addOutline,
 } from 'ionicons/icons';
 
@@ -117,10 +117,6 @@ const Tabs: React.FC = () => (
       <IonTabButton tab="reservations" href="/reservations">
         <IonIcon icon={listOutline} />
         <IonLabel>Reservations</IonLabel>
-      </IonTabButton>
-      <IonTabButton tab="more" href="/events">
-        <IonIcon icon={ellipsisHorizontal} />
-        <IonLabel>More</IonLabel>
       </IonTabButton>
     </IonTabBar>
   </IonTabs>
