@@ -52,6 +52,13 @@ interface AppState extends AppDataSnapshot {
 //  code can assume the new shape without null checks everywhere.
 // ─────────────────────────────────────────────────────────────
 function migrateSnapshot(snap: AppDataSnapshot): AppDataSnapshot {
+  const venues = (snap.venues || []).map((v) => ({
+    ...v,
+    // Phone fields were added later — default to empty so the form can
+    // bind to them without optional-chaining everywhere.
+    phoneCode: v.phoneCode ?? '',
+    phoneNum: v.phoneNum ?? '',
+  }));
   const events = (snap.events || []).map((e) => ({
     ...e,
     isOneTime: e.isOneTime ?? false,
@@ -96,7 +103,7 @@ function migrateSnapshot(snap: AppDataSnapshot): AppDataSnapshot {
       ?? (r.slotId ? slotById.get(r.slotId)?.startTime ?? '20:00' : '20:00');
     return { ...r, eventDate, createdAt: r.createdAt || '', time, slotId: r.slotId ?? '' };
   });
-  return { ...snap, events, guests, reservations };
+  return { ...snap, venues, events, guests, reservations };
 }
 
 const emptyState: AppDataSnapshot = {

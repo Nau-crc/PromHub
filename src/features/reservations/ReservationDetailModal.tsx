@@ -1,10 +1,12 @@
 import React from 'react';
-import { IonModal, IonContent } from '@ionic/react';
+import { IonModal, IonContent, IonIcon } from '@ionic/react';
+import { logoWhatsapp } from 'ionicons/icons';
 import { useAppStore } from '@/store/useAppStore';
 import { useConfirm } from '@/store/useConfirmStore';
 import { initials } from '@/core/utils/format';
-import { commCalc, venueName, netToYou } from '@/features/summary/calculations';
+import { commCalc, venueById, venueName, netToYou } from '@/features/summary/calculations';
 import { SocialBadge } from '@/components/SocialBadge';
+import { sendViaWhatsApp } from '@/services/messaging';
 
 interface Props {
   open: boolean;
@@ -21,6 +23,38 @@ export const ReservationDetailModal: React.FC<Props> = ({ open, onClose, reserva
   const r = reservationId != null ? reservations.find((x) => x.id === reservationId) : null;
   if (!r) return <IonModal isOpen={open} onDidDismiss={onClose}><IonContent /></IonModal>;
   const c = commCalc(r, venues);
+  const v = venueById(r.venueId, venues);
+  const venueHasPhone = !!(v?.phoneCode && v?.phoneNum);
+
+  // Build the WhatsApp message the promoter sends to the venue.
+  // Uses plain text labels (no emoji) so it renders identically on
+  // every WhatsApp client regardless of emoji-font support. WhatsApp
+  // formats *…* as bold and `—` is preserved as-is.
+  const buildWhatsAppMessage = (): string => {
+    const dateLabel = r.eventDate
+      ? new Date(r.eventDate + 'T00:00:00').toLocaleDateString(undefined, {
+          weekday: 'long', day: 'numeric', month: 'long',
+        })
+      : '—';
+    const lines = [
+      `*New reservation — ${v?.name ?? 'the venue'}*`,
+      '',
+      `Name:  ${r.name}`,
+      r.phoneNum ? `Phone: ${r.phoneCode} ${r.phoneNum}` : '',
+      `When:  ${dateLabel}${r.time ? ` · ${r.time}` : ''}`,
+      `Table: ${r.vipType || '—'}${c.price ? ` · €${c.price}` : ''}`,
+      `Pax:   ${r.pax}`,
+    ].filter(Boolean);
+    return lines.join('\n');
+  };
+
+  const onWhatsApp = () => {
+    if (!v) return;
+    sendViaWhatsApp(
+      { phoneCode: v.phoneCode ?? '', phoneNum: v.phoneNum ?? '' },
+      buildWhatsAppMessage(),
+    );
+  };
 
   return (
     <IonModal isOpen={open} onDidDismiss={onClose} initialBreakpoint={1} breakpoints={[0, 1]}>
@@ -81,7 +115,28 @@ export const ReservationDetailModal: React.FC<Props> = ({ open, onClose, reserva
               </div>
             </>
           )}
-          <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
+          {venueHasPhone ? (
+            <button
+              type="button"
+              onClick={onWhatsApp}
+              style={{
+                width: '100%', marginTop: 16, padding: 12,
+                background: '#25D366', color: '#fff',
+                border: 'none', borderRadius: 'var(--border-radius-md)',
+                fontSize: 14, fontWeight: 600, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              }}
+            >
+              <IonIcon icon={logoWhatsapp} style={{ fontSize: 18 }} />
+              Send to {v!.name} on WhatsApp
+            </button>
+          ) : v ? (
+            <div className="info-box" style={{ marginTop: 16 }}>
+              Add a phone number to <b>{v.name}</b> to send reservations via WhatsApp.
+            </div>
+          ) : null}
+
+          <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
             <button
               className="btn-secondary"
               onClick={async () => {

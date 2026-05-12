@@ -14,6 +14,10 @@ import '@ionic/react/css/text-transformation.css';
 import '@ionic/react/css/flex-utils.css';
 import '@ionic/react/css/display.css';
 
+// Register every Ionicon we use so the SVGs are bundled inline
+// (Vite doesn't ship the lazy /svg/<name>.svg files by default).
+import './icons';
+
 // Theme last so its overrides win
 import './theme/variables.css';
 

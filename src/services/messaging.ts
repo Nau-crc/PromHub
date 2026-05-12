@@ -99,3 +99,33 @@ function isLikelyNative(): boolean {
   const ua = navigator.userAgent || '';
   return /Android|iPhone|iPad|iPod|Capacitor/i.test(ua);
 }
+
+// ─────────────────────────────────────────────────────────────
+//  WhatsApp dispatch — wa.me deep link.
+//
+//  `wa.me/<digits>?text=<urlencoded>` opens WhatsApp on the
+//  conversation with the given international number, pre-filled
+//  with the message text. The user still has to tap Send, which
+//  is exactly what we want (and what WhatsApp's TOS requires).
+//
+//  Both `phoneCode` and `phoneNum` may contain spaces / dashes;
+//  we strip everything that isn't a digit. The country code's
+//  leading "+" is also dropped for the URL.
+// ─────────────────────────────────────────────────────────────
+export interface WhatsAppRecipient {
+  phoneCode: string;
+  phoneNum: string;
+}
+
+export function sendViaWhatsApp(to: WhatsAppRecipient, message: string): boolean {
+  const code = (to.phoneCode || '').replace(/\D+/g, '');
+  const num = (to.phoneNum || '').replace(/\D+/g, '');
+  if (!code || !num) return false;
+  const url = `https://wa.me/${code}${num}?text=${encodeURIComponent(message)}`;
+  try {
+    window.open(url, '_blank', 'noopener,noreferrer');
+  } catch {
+    window.location.href = url;
+  }
+  return true;
+}

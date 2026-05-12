@@ -30,7 +30,8 @@
 
   --border-radius-md: 10px;
   --border-radius-lg: 14px;
-  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
+               'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
 
   /* Ionic theme overrides — orange brand */
   --ion-color-primary: var(--color-primary);
@@ -367,6 +368,17 @@ ion-content { --background: var(--color-background-tertiary); }
 ion-toolbar { --background: var(--color-background-primary); --border-color: var(--color-border-tertiary); }
 ion-modal { --background: var(--color-background-primary); }
 ion-modal::part(content) { background: var(--color-background-primary); }
+
+/* ── Icon visibility safeguards ────────────────────────────
+   ion-icon is a web component whose intrinsic size is set via
+   font-size. Some Vite builds end up with 0px before the SVG
+   loads — these rules guarantee a visible default that the
+   component then refines once the SVG is mounted. */
+ion-icon { font-size: 1.2em; display: inline-block; }
+ion-tab-button ion-icon { font-size: 24px; }
+ion-item ion-icon { font-size: 20px; }
+/* Inherit the tab text colour so the icon picks up active/orange state. */
+ion-tab-button.tab-selected ion-icon { color: var(--color-primary); }
 
 /* Confirm dialog (IonAlert) — destructive variant */
 .confirm-destructive { color: var(--color-danger) !important; font-weight: 600 !important; }

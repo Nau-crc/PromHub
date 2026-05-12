@@ -31,6 +31,9 @@ export interface Venue {
   timeslots: Timeslot[];
   vipTypes: VipType[];
   inviteTypes: InviteType[];
+  /** Optional venue contact for WhatsApp dispatch of reservations. */
+  phoneCode?: string;
+  phoneNum?: string;
 }
 
 export interface PromEvent {
