@@ -24,7 +24,7 @@ import {
   // Theme toggle
   sunnyOutline, moonOutline, contrastOutline,
   // Action buttons
-  logoWhatsapp,
+  logoWhatsapp, shareSocialOutline,
 } from 'ionicons/icons';
 
 addIcons({
@@ -39,4 +39,5 @@ addIcons({
   'moon-outline': moonOutline,
   'contrast-outline': contrastOutline,
   'logo-whatsapp': logoWhatsapp,
+  'share-social-outline': shareSocialOutline,
 });

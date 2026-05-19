@@ -59,6 +59,10 @@ export interface PromEvent {
   seasonStart: string | null;
   /** Season end (ISO yyyy-mm-dd). Recurring only. null = open-ended future. */
   seasonEnd: string | null;
+  /** Public-share token (UUID v4). When set, the event has a public
+   *  registration link at /register/<token> backed by Vercel KV.
+   *  Null until the promoter taps "Share registration link". */
+  shareToken: string | null;
 }
 
 export interface Guest {
@@ -82,6 +86,12 @@ export interface Guest {
   /** Specific occurrence date of the linked event (yyyy-mm-dd).
    *  null when the guest is not tied to any event. */
   eventDate: string | null;
+  /** When the guest was imported from a public registration form,
+   *  this holds the submission's UUID so we can dedup imports. */
+  submissionId?: string;
+  /** Free-form notes — used today by the public form so guests can
+   *  add dietary/allergy/+1 info. Optional everywhere else. */
+  notes?: string;
 }
 
 export interface Reservation {

@@ -347,3 +347,69 @@ useUIStore.getState().open('addRes', { eventId: 3 });
 - Reemplazar `alert/confirm` nativos por `IonAlert` / `IonToast`.
 - Añadir tests unitarios sobre `calculations.ts` (las fórmulas son determinísticas y testeables).
 - Sustituir el calendar mock del Monthly panel con datos reales por día.
+
+---
+
+## Public guest-registration link
+
+Each event can expose a public link (`/register/<token>`) where guests
+fill in their own details. Submissions are stored in **Vercel KV** with
+an automatic TTL of `eventDate + 24h`, then auto-purge — no cleanup job
+needed.
+
+### Setup (one-time, on Vercel)
+
+1. In the Vercel dashboard open the project → **Storage** → **Create
+   Database** → **KV (Redis)**. Pick the free tier.
+2. Click **Connect Project** and Vercel injects four env vars
+   automatically: `KV_REST_API_URL`, `KV_REST_API_TOKEN`,
+   `KV_REST_API_READ_ONLY_TOKEN`, `KV_URL`.
+3. Redeploy. Nothing else needed — the `@vercel/kv` SDK reads those
+   env vars on its own.
+
+### Architecture
+
+- **API endpoints** (Vercel Serverless Functions in `/api/`):
+  - `POST /api/event` — promoter publishes event metadata
+  - `GET  /api/event?token=X` — public, fetches metadata for the form
+  - `POST /api/registration` — public, submits a sign-up
+  - `GET  /api/registration?token=X` — promoter lists submissions
+
+- **KV keys**:
+  - `event:<token>` — event metadata, TTL `eventDate + 24h`
+  - `registration:<token>:<subId>` — one per submission, same TTL
+  - `event:<token>:submissions` — set of submission IDs for listing
+
+- **Frontend**:
+  - `SharePanel` inside the event-detail modal: generates the link,
+    copies / shares it, pulls submissions on demand.
+  - Public route `/register/:token` (in `src/features/public/`) renders
+    outside the app shell — no drawer, no onboarding, no auth.
+
+### Local dev with the backend
+
+The serverless `/api/*` functions don't run under `npm run dev` (Vite
+alone). To exercise them locally, install Vercel CLI and use:
+
+```bash
+npm i -g vercel
+vercel link                  # one-time, attach to your Vercel project
+vercel env pull .env.local   # pulls KV_REST_API_* into the project
+vercel dev                   # runs Vite + the API functions together
+```
+
+Without `vercel dev` the share button will fail when it tries to POST
+to `/api/event` — that's expected; the rest of the app works fine.
+
+### Trade-offs declared
+
+- **Same token reads & writes**: anyone with the link could `GET
+  /api/registration?token=X` and see submissions. Acceptable while
+  the data is just name + Instagram. If we need to harden, split into
+  a public `writeToken` and a private `readSecret` and require the
+  latter as a header on GET.
+- **No rate-limiting**: fine while sharing with friends; before going
+  wider, add a captcha or cap per-IP via Vercel Edge middleware.
+- **Dedupe on import** uses the submission UUID. If you delete an
+  imported guest in the app, a re-sync will not re-import that same
+  submission. To force re-import, clear local data.

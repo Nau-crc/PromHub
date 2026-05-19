@@ -240,6 +240,7 @@ const EventStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
       capacity: capacity && capacity > 0 ? capacity : null,
       seasonStart: !isOneTime && seasonStart ? seasonStart : null,
       seasonEnd: !isOneTime && seasonEnd ? seasonEnd : null,
+      shareToken: null,
     });
     onNext();
   };

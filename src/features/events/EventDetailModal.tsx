@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { IonModal, IonContent } from '@ionic/react';
+import { IonModal, IonContent, IonIcon } from '@ionic/react';
+import { shareSocialOutline } from 'ionicons/icons';
 import { useAppStore } from '@/store/useAppStore';
 import {
   eventCapacity, venueById, commCalc,
@@ -14,6 +15,9 @@ import { StarBadge, SocialBadge } from '@/components/SocialBadge';
 import { CapacityBar } from '@/components/CapacityBar';
 import { CopyButton } from '@/components/CopyButton';
 import { SheetHeader } from '@/components/SheetHeader';
+import {
+  publishEvent, listSubmissions, buildShareUrl,
+} from '@/services/shareApi';
 
 interface Props {
   open: boolean;
@@ -25,12 +29,17 @@ interface Props {
 }
 
 export const EventDetailModal: React.FC<Props> = ({ open, onClose, eventId, onEdit, onAddGuest, onAddRes }) => {
-  const { events, venues, guests, reservations, togglePrivateInvite } = useAppStore((s) => ({
+  const {
+    events, venues, guests, reservations,
+    togglePrivateInvite, upsertEvent, importSubmissionsAsGuests,
+  } = useAppStore((s) => ({
     events: s.events,
     venues: s.venues,
     guests: s.guests,
     reservations: s.reservations,
     togglePrivateInvite: s.togglePrivateInvite,
+    upsertEvent: s.upsertEvent,
+    importSubmissionsAsGuests: s.importSubmissionsAsGuests,
   }));
   const e = eventId != null ? events.find((x) => x.id === eventId) : null;
 
@@ -269,7 +278,16 @@ export const EventDetailModal: React.FC<Props> = ({ open, onClose, eventId, onEd
             </>
           )}
 
-          <div style={{ display: 'flex', gap: 8 }}>
+          <SharePanel
+            event={e}
+            onPublish={(updatedEvent) => upsertEvent(updatedEvent)}
+            onSync={async (token) => {
+              const { submissions } = await listSubmissions(token);
+              return importSubmissionsAsGuests(e.id, submissions);
+            }}
+          />
+
+          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
             <button className="btn-secondary" style={{ flex: 1 }} onClick={() => onAddGuest(e.id)}>+ Guest</button>
             <button className="btn-primary" style={{ flex: 1 }} onClick={() => onAddRes(e.id)}>+ Reservation</button>
           </div>
@@ -285,3 +303,149 @@ const SectionHead: React.FC<{ children: React.ReactNode }> = ({ children }) => (
     textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 8,
   }}>{children}</div>
 );
+
+// ─────────────────────────────────────────────────────────────
+//  SharePanel — generate a public registration link and sync
+//  submissions back into the local guests list. Lives inside the
+//  event detail because the link is event-scoped.
+// ─────────────────────────────────────────────────────────────
+interface SharePanelProps {
+  event: import('@/core/types').PromEvent;
+  onPublish: (e: import('@/core/types').PromEvent) => void;
+  onSync: (token: string) => Promise<number>;
+}
+
+const SharePanel: React.FC<SharePanelProps> = ({ event, onPublish, onSync }) => {
+  const venues = useAppStore((s) => s.venues);
+  const [working, setWorking] = useState(false);
+  const [feedback, setFeedback] = useState<string | null>(null);
+
+  const showFeedback = (msg: string) => {
+    setFeedback(msg);
+    setTimeout(() => setFeedback(null), 3500);
+  };
+
+  // Generate (or refresh) the public link.
+  // Even if a token already exists we re-POST the metadata so the
+  // backend always has the latest name/date — useful when the
+  // promoter edits the event after first publishing.
+  const generate = async () => {
+    setWorking(true);
+    try {
+      const token = event.shareToken ?? crypto.randomUUID();
+      const venueName = event.venueId != null
+        ? venues.find((v) => v.id === event.venueId)?.name ?? null
+        : null;
+      await publishEvent({
+        token,
+        name: event.name,
+        eventDate: event.eventDate,
+        venueName,
+        capacity: event.capacity,
+      });
+      onPublish({ ...event, shareToken: token });
+      showFeedback('Link ready ✓');
+    } catch (err) {
+      showFeedback(`Couldn't publish: ${(err as Error).message}`);
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  const copyLink = async () => {
+    if (!event.shareToken) return;
+    const url = buildShareUrl(event.shareToken);
+    try {
+      await navigator.clipboard.writeText(url);
+      showFeedback('Link copied');
+    } catch {
+      showFeedback(url);
+    }
+  };
+
+  const shareNative = async () => {
+    if (!event.shareToken) return;
+    const url = buildShareUrl(event.shareToken);
+    const text = `Sign up for ${event.name}: ${url}`;
+    if (navigator.share) {
+      try { await navigator.share({ title: event.name, text, url }); }
+      catch { /* user cancelled */ }
+    } else {
+      await navigator.clipboard.writeText(text);
+      showFeedback('Copied to clipboard');
+    }
+  };
+
+  const sync = async () => {
+    if (!event.shareToken) return;
+    setWorking(true);
+    try {
+      const added = await onSync(event.shareToken);
+      showFeedback(added > 0 ? `Imported ${added} new sign-ups` : 'No new sign-ups');
+    } catch (err) {
+      showFeedback(`Sync failed: ${(err as Error).message}`);
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  return (
+    <div style={{
+      marginTop: 14, padding: '12px 14px',
+      background: 'var(--color-background-secondary)',
+      borderRadius: 'var(--border-radius-md)',
+      border: '0.5px solid var(--color-border-tertiary)',
+    }}>
+      <SectionHead>Public registration link</SectionHead>
+      <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 10, lineHeight: 1.5 }}>
+        Share a link so guests can fill in their own details. Submissions
+        auto-import into this event when you tap "Pull sign-ups".
+      </div>
+
+      {!event.shareToken ? (
+        <button
+          type="button"
+          className="btn-primary"
+          style={{ width: '100%', padding: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+          onClick={generate}
+          disabled={working}
+        >
+          <IonIcon icon={shareSocialOutline} style={{ fontSize: 16 }} />
+          {working ? 'Generating…' : 'Create registration link'}
+        </button>
+      ) : (
+        <>
+          <div style={{
+            background: 'var(--color-background-primary)',
+            border: '0.5px solid var(--color-border-tertiary)',
+            borderRadius: 'var(--border-radius-md)',
+            padding: '8px 10px',
+            fontSize: 11, color: 'var(--color-text-primary)',
+            wordBreak: 'break-all',
+            marginBottom: 8,
+          }}>
+            {buildShareUrl(event.shareToken)}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+            <button className="btn-secondary" onClick={copyLink}>Copy</button>
+            <button className="btn-secondary" onClick={shareNative}>Share</button>
+            <button
+              className="btn-primary"
+              style={{ gridColumn: '1 / -1' }}
+              onClick={sync}
+              disabled={working}
+            >
+              {working ? 'Pulling…' : 'Pull sign-ups'}
+            </button>
+          </div>
+        </>
+      )}
+
+      {feedback && (
+        <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 8 }}>
+          {feedback}
+        </div>
+      )}
+    </div>
+  );
+};

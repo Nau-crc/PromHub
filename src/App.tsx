@@ -18,6 +18,8 @@ import { ReservationsPage } from '@/features/reservations/ReservationsPage';
 import { EventsPage } from '@/features/events/EventsPage';
 import { VenuesPage } from '@/features/venues/VenuesPage';
 import { SummaryPage } from '@/features/summary/SummaryPage';
+import { PublicRegistrationPage } from '@/features/public/PublicRegistrationPage';
+import { Switch, useLocation } from 'react-router-dom';
 
 import { ModalsHost } from '@/features/ModalsHost';
 import { ConfirmHost } from '@/components/ConfirmHost';
@@ -223,15 +225,39 @@ const App: React.FC = () => {
   return (
     <IonApp>
       <IonReactRouter>
-        <IonSplitPane contentId="main">
-          <Drawer />
-          <Tabs />
-        </IonSplitPane>
-        <ModalsHost />
-        <ConfirmHost />
-        <OnboardingFlow open={!onboarded} onDone={() => setOnboarded(true)} />
+        <AppRouter onboarded={onboarded} onOnboard={() => setOnboarded(true)} />
       </IonReactRouter>
     </IonApp>
+  );
+};
+
+// Top-level router. The /register/:token path bypasses the entire
+// promoter shell (no drawer, no tabs, no onboarding) so a public
+// guest can fill the form on a device that has never opened the app.
+const AppRouter: React.FC<{ onboarded: boolean; onOnboard: () => void }> = ({
+  onboarded, onOnboard,
+}) => {
+  const location = useLocation();
+  const isPublicRoute = location.pathname.startsWith('/register/');
+
+  if (isPublicRoute) {
+    return (
+      <Switch>
+        <Route exact path="/register/:token" component={PublicRegistrationPage} />
+      </Switch>
+    );
+  }
+
+  return (
+    <>
+      <IonSplitPane contentId="main">
+        <Drawer />
+        <Tabs />
+      </IonSplitPane>
+      <ModalsHost />
+      <ConfirmHost />
+      <OnboardingFlow open={!onboarded} onDone={onOnboard} />
+    </>
   );
 };
 

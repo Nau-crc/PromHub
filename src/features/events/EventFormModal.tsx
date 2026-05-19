@@ -137,6 +137,8 @@ export const EventFormModal: React.FC<Props> = ({ open, onClose, editing, onRequ
       capacity: capacity && capacity > 0 ? capacity : null,
       seasonStart: !isOneTime && seasonStart ? seasonStart : null,
       seasonEnd: !isOneTime && seasonEnd ? seasonEnd : null,
+      // Preserved across edits — generated on-demand from event detail.
+      shareToken: editing?.shareToken ?? null,
     };
     upsertEvent(entry);
     onClose();

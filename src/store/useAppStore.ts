@@ -3,6 +3,17 @@ import type { AppDataSnapshot, Venue, PromEvent, Guest, Reservation } from '@/co
 import { storage } from '@/services/storage';
 import { STORAGE_KEYS } from '@/core/constants';
 
+// Minimal shape of a public-form submission, kept local to the store
+// so we don't introduce a circular import with services/shareApi.
+export interface PublicSubmission {
+  id: string;
+  name: string;
+  pax: number;
+  igHandle: string;
+  igPlatform: 'instagram' | 'tiktok';
+  notes: string;
+}
+
 // Local helpers — kept here to avoid an import cycle with calculations.ts
 const isoDayLocal = (d: Date): string =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -40,6 +51,9 @@ interface AppState extends AppDataSnapshot {
   upsertReservation: (r: Reservation) => void;
   removeReservation: (id: number) => void;
 
+  // public-form sync
+  importSubmissionsAsGuests: (eventId: number, submissions: PublicSubmission[]) => number;
+
   // ID generation
   nextId: (kind: 'venue' | 'event' | 'guest' | 'res' | 'ts' | 'vip' | 'inv') => number | string;
 }
@@ -66,6 +80,7 @@ function migrateSnapshot(snap: AppDataSnapshot): AppDataSnapshot {
     capacity: e.capacity ?? null,
     seasonStart: e.seasonStart ?? null,
     seasonEnd: e.seasonEnd ?? null,
+    shareToken: e.shareToken ?? null,
     weekdays: e.weekdays ?? (e.weekday ? [e.weekday] : []),
     invitedGuests: e.invitedGuests ?? [],
   }));
@@ -286,5 +301,55 @@ export const useAppStore = create<AppState>((set, get) => ({
   removeReservation: (id) => {
     set((s) => ({ reservations: s.reservations.filter((x) => x.id !== id) }));
     get().persist();
+  },
+
+  /**
+   * Import public-registration submissions into the local guests list.
+   * Deduplicates by `submissionId` (skipping any already-imported), and
+   * returns the count of newly-added guests so the caller can show a
+   * toast like "3 new sign-ups".
+   */
+  importSubmissionsAsGuests: (eventId, submissions) => {
+    const state = get();
+    const event = state.events.find((e) => e.id === eventId);
+    if (!event) return 0;
+    const known = new Set(
+      state.guests.filter((g) => g.submissionId).map((g) => g.submissionId as string),
+    );
+    const fresh = submissions.filter((s) => !known.has(s.id));
+    if (!fresh.length) return 0;
+
+    // Mint a new guest record for each fresh submission. The user-facing
+    // event-occurrence date defaults to the event's eventDate (one-time)
+    // or stays blank for recurring — the promoter can edit later.
+    const todayIso = isoDayLocal(new Date());
+    let nextId = state.nextGuestId;
+    const newGuests: Guest[] = fresh.map((s) => ({
+      id: nextId++,
+      name: s.name,
+      venueId: event.venueId ?? 0,
+      eventId,
+      inviteTypeIds: [],
+      inviteTypeNames: [],
+      pax: s.pax,
+      clubEventId: null,
+      checked: false,
+      cancelled: false,
+      influencer: false,
+      igHandle: s.igHandle,
+      igPlatform: s.igPlatform,
+      createdMonth: new Date().getMonth(),
+      createdAt: todayIso,
+      eventDate: event.isOneTime ? event.eventDate : null,
+      submissionId: s.id,
+      notes: s.notes || undefined,
+    }));
+
+    set({
+      guests: [...state.guests, ...newGuests],
+      nextGuestId: nextId,
+    });
+    get().persist();
+    return newGuests.length;
   },
 }));
