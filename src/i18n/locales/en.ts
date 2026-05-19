@@ -1,7 +1,12 @@
 // English — fallback locale. Keep this file authoritative: every key
 // declared here MUST also exist in es.ts / ca.ts (i18next falls back
 // here when a key is missing).
-export default {
+//
+// Note: do NOT use `as const` here. We export the value with `string`
+// types (not literal types) so es.ts / ca.ts can provide their own
+// translations while still being structurally typed against this
+// object's shape (via `LocaleStrings = typeof en`).
+const en = {
   // ── Common actions / verbs ─────────────────────────────────
   actions: {
     save: 'Save',
@@ -114,6 +119,11 @@ export default {
     doneTitle: "You're all set!",
     doneCta: 'Open PromHub →',
   },
-} as const;
+};
 
-export type LocaleStrings = typeof import('./en').default;
+// Derives the shape from the English bundle so es.ts / ca.ts get a
+// compile-time error if a key is missing, but values remain plain
+// `string` so each locale supplies its own translation.
+export type LocaleStrings = typeof en;
+
+export default en;
