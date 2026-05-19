@@ -4,6 +4,7 @@ import {
   eventPath, expiresAtForEvent, isExpired,
   type EventMeta,
 } from './_blob';
+import { withErrorBoundary, parseBody } from './_handler';
 
 // ─────────────────────────────────────────────────────────────
 //  /api/event
@@ -18,14 +19,22 @@ import {
 //  drop expired blobs lazily on the next read.
 // ─────────────────────────────────────────────────────────────
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(204).end();
 
+  // Fail fast and loud if the Blob token isn't configured — otherwise the
+  // SDK throws a cryptic "Vercel Blob: No token found" deep inside put().
+  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    return res.status(500).json({
+      error: 'BLOB_READ_WRITE_TOKEN missing — connect a Blob store to this project',
+    });
+  }
+
   if (req.method === 'POST') {
-    const body = (req.body ?? {}) as Partial<EventMeta>;
+    const body = parseBody<EventMeta>(req.body);
     if (!body.token || !body.name) {
       return res.status(400).json({ error: 'token and name are required' });
     }
@@ -69,4 +78,4 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   return res.status(405).json({ error: 'method not allowed' });
-}
+});

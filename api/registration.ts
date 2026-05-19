@@ -5,6 +5,7 @@ import {
   isExpired,
   type EventMeta, type Submission,
 } from './_blob';
+import { withErrorBoundary, parseBody } from './_handler';
 
 // ─────────────────────────────────────────────────────────────
 //  /api/registration
@@ -30,14 +31,20 @@ const MAX_NOTES = 280;
 const MAX_PAX = 20;
 const MAX_SUBMISSIONS_LIST = 500;
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(204).end();
 
+  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    return res.status(500).json({
+      error: 'BLOB_READ_WRITE_TOKEN missing — connect a Blob store to this project',
+    });
+  }
+
   if (req.method === 'POST') {
-    const body = (req.body ?? {}) as Partial<Submission>;
+    const body = parseBody<Submission>(req.body);
     const token = body.token;
     if (!token) return res.status(400).json({ error: 'token is required' });
 
@@ -108,4 +115,4 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   return res.status(405).json({ error: 'method not allowed' });
-}
+});
