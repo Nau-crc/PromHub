@@ -3,6 +3,7 @@ import {
   IonPage, IonContent, IonHeader, IonToolbar, IonButtons, IonMenuButton,
   IonList, IonItem, IonItemSliding, IonItemOptions, IonItemOption,
 } from '@ionic/react';
+import { useTranslation } from 'react-i18next';
 import { useAppStore } from '@/store/useAppStore';
 import { useUIStore } from '@/store/useUIStore';
 import { useConfirm } from '@/store/useConfirmStore';
@@ -19,6 +20,7 @@ export const GuestsPage: React.FC = () => {
   }));
   const open = useUIStore((s) => s.open);
   const confirm = useConfirm();
+  const { t } = useTranslation();
   const [activeVenue, setActiveVenue] = useState<'all' | number>('all');
 
   const filtered = activeVenue === 'all' ? guests : guests.filter((g) => g.venueId === activeVenue);
@@ -73,15 +75,15 @@ export const GuestsPage: React.FC = () => {
           <IonButtons slot="start"><IonMenuButton /></IonButtons>
           <div style={{ padding: '4px 16px 0' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div className="page-title">Guest list</div>
+              <div className="page-title">{t('guests.title')}</div>
               <button
                 className="btn-primary"
                 style={{ fontSize: 12, padding: '8px 14px' }}
                 onClick={() => open('addGuest')}
-              >+ Add</button>
+              >{t('guests.addBtn')}</button>
             </div>
             <div style={{ overflowX: 'auto', display: 'flex', gap: 6, marginTop: 10, paddingBottom: 10 }}>
-              <button className={`tog-btn ${activeVenue === 'all' ? 'on' : ''}`} onClick={() => setActiveVenue('all')}>All</button>
+              <button className={`tog-btn ${activeVenue === 'all' ? 'on' : ''}`} onClick={() => setActiveVenue('all')}>{t('guests.venueAll')}</button>
               {venues.map((v) => (
                 <button
                   key={v.id}
@@ -91,7 +93,7 @@ export const GuestsPage: React.FC = () => {
               ))}
             </div>
             <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', paddingBottom: 6 }}>
-              ← swipe to mark arrived &nbsp;·&nbsp; swipe → to cancel
+              {t('guests.swipeHint')}
             </div>
           </div>
         </IonToolbar>
@@ -130,7 +132,7 @@ export const GuestsPage: React.FC = () => {
                         setTimeout(() => ion?.close(), 1000);
                       }}
                     >
-                      {isArrived ? 'Mark pending' : '✓ Arrived'}
+                      {isArrived ? t('guests.markPending') : t('guests.markArrived')}
                     </IonItemOption>
                   </IonItemOptions>
 
@@ -157,7 +159,7 @@ export const GuestsPage: React.FC = () => {
                       </div>
                       <div className="list-right">
                         <div className={`list-right-sub state-label state-label--${rowState}`}>
-                          {isArrived ? 'Arrived' : isCancelled ? 'Cancelled' : 'Pending'}
+                          {isArrived ? t('guests.arrived') : isCancelled ? t('guests.cancelled') : t('guests.pending')}
                         </div>
                         {g.clubEventId && (
                           <Pill tone="purple" style={{ fontSize: 10, marginTop: 3, display: 'inline-block' }}>
@@ -191,7 +193,7 @@ export const GuestsPage: React.FC = () => {
                         setTimeout(() => ion?.close(), 1000);
                       }}
                     >
-                      {isCancelled ? 'Restore' : '✕ Cancel'}
+                      {isCancelled ? t('guests.restore') : t('guests.cancelInvite')}
                     </IonItemOption>
                   </IonItemOptions>
                 </IonItemSliding>
@@ -200,8 +202,8 @@ export const GuestsPage: React.FC = () => {
           </IonList>
         ) : (
           <EmptyBox>
-            No guests yet.<br />
-            Tap <b>+ Add</b> to add your first guest.
+            {t('guests.empty')}<br />
+            <span dangerouslySetInnerHTML={{ __html: t('guests.emptySub') }} />
           </EmptyBox>
         )}
         <div className="spacer" />

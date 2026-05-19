@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { IonPage, IonContent, IonHeader, IonToolbar, IonButtons, IonMenuButton } from '@ionic/react';
+import { useTranslation } from 'react-i18next';
 import { useAppStore } from '@/store/useAppStore';
 import { useUIStore } from '@/store/useUIStore';
 import { today } from '@/core/constants';
@@ -11,6 +12,7 @@ import { EmptyBox } from '@/components/EmptyBox';
 export const HomePage: React.FC = () => {
   const events = useAppStore((s) => s.events);
   const open = useUIStore((s) => s.open);
+  const { t } = useTranslation();
 
   // Today's events: one-time matching today, OR recurring whose
   // weekday + season covers today.
@@ -29,14 +31,14 @@ export const HomePage: React.FC = () => {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
                 <div className="page-title">{fmtDateLong(today())}</div>
-                <div className="page-sub">Today's events</div>
+                <div className="page-sub">{t('home.subtitle')}</div>
               </div>
               <button
                 className="btn-primary"
                 style={{ fontSize: 12, padding: '8px 14px' }}
                 onClick={() => open('addEvent')}
               >
-                + Event
+                {t('home.addBtn')}
               </button>
             </div>
           </div>
@@ -48,8 +50,8 @@ export const HomePage: React.FC = () => {
           <EventCard key={e.id} event={e} occurrenceDate={todayKey} onClick={() => open('eventDetail', { id: e.id })} />
         )) : (
           <EmptyBox>
-            No events today.<br />
-            All scheduled events will show here on their date.
+            {t('home.empty')}<br />
+            {t('home.emptySub')}
           </EmptyBox>
         )}
         <div className="spacer" />

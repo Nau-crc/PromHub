@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { IonModal, IonContent } from '@ionic/react';
+import { useTranslation } from 'react-i18next';
 import { useAppStore } from '@/store/useAppStore';
 import { isoDay, todayWeekday } from '@/core/utils/date';
 import { today } from '@/core/constants';
@@ -59,45 +60,49 @@ export const OnboardingFlow: React.FC<{ open: boolean; onDone: () => void }> = (
 };
 
 // ── Step 0: Welcome ────────────────────────────────────────
-const WelcomeStep: React.FC<{ onNext: () => void }> = ({ onNext }) => (
-  <>
-    <div style={{
-      margin: '32px auto 20px', width: 84, height: 84, background: '#1a1a1a',
-      borderRadius: 20, display: 'flex', flexDirection: 'column',
-      alignItems: 'center', justifyContent: 'center',
-      boxShadow: '0 8px 32px rgba(249,115,22,.25)',
-    }}>
-      <div style={{ background: '#F97316', borderRadius: 8, padding: '4px 10px', marginBottom: 5 }}>
-        <span style={{ fontWeight: 800, fontSize: 16, color: '#1a1a1a' }}>Prom</span>
-      </div>
-      <span style={{ fontWeight: 700, fontSize: 20, color: '#fff' }}>Hub</span>
-    </div>
-    <div className="onboard-title">Welcome to PromHub</div>
-    <div className="onboard-sub">All-in-one logistics for Barcelona's night promoters.</div>
-    <div style={{
-      background: 'var(--color-background-secondary)',
-      borderRadius: 'var(--border-radius-lg)',
-      padding: '4px 0',
-      marginBottom: 8,
-    }}>
-      {[
-        { icon: '♀', title: 'Guest lists', sub: 'Custom invite types, influencer tracking, club access' },
-        { icon: '▤', title: 'Reservations', sub: 'VIP tables per pax range, table capacity, commissions' },
-        { icon: '◈', title: 'Events', sub: 'Recurring on multiple days, custom timeslots' },
-        { icon: '◉', title: 'Summary', sub: 'Daily, monthly & yearly earnings' },
-      ].map((f) => (
-        <div className="onboard-feature" key={f.title}>
-          <div className="onboard-feature-icon">{f.icon}</div>
-          <div>
-            <div className="onboard-feature-title">{f.title}</div>
-            <div className="onboard-feature-sub">{f.sub}</div>
-          </div>
+const WelcomeStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
+  const { t } = useTranslation();
+  const features = [
+    { icon: '♀', titleKey: 'onboarding.feature.guestsTitle',       subKey: 'onboarding.feature.guestsSub' },
+    { icon: '▤', titleKey: 'onboarding.feature.reservationsTitle', subKey: 'onboarding.feature.reservationsSub' },
+    { icon: '◈', titleKey: 'onboarding.feature.eventsTitle',       subKey: 'onboarding.feature.eventsSub' },
+    { icon: '◉', titleKey: 'onboarding.feature.summaryTitle',      subKey: 'onboarding.feature.summarySub' },
+  ];
+  return (
+    <>
+      <div style={{
+        margin: '32px auto 20px', width: 84, height: 84, background: '#1a1a1a',
+        borderRadius: 20, display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        boxShadow: '0 8px 32px rgba(249,115,22,.25)',
+      }}>
+        <div style={{ background: '#F97316', borderRadius: 8, padding: '4px 10px', marginBottom: 5 }}>
+          <span style={{ fontWeight: 800, fontSize: 16, color: '#1a1a1a' }}>Prom</span>
         </div>
-      ))}
-    </div>
-    <button className="onboard-btn" onClick={onNext}>Let's get started →</button>
-  </>
-);
+        <span style={{ fontWeight: 700, fontSize: 20, color: '#fff' }}>Hub</span>
+      </div>
+      <div className="onboard-title">{t('onboarding.welcome')}</div>
+      <div className="onboard-sub">{t('onboarding.welcomeSub')}</div>
+      <div style={{
+        background: 'var(--color-background-secondary)',
+        borderRadius: 'var(--border-radius-lg)',
+        padding: '4px 0',
+        marginBottom: 8,
+      }}>
+        {features.map((f) => (
+          <div className="onboard-feature" key={f.titleKey}>
+            <div className="onboard-feature-icon">{f.icon}</div>
+            <div>
+              <div className="onboard-feature-title">{t(f.titleKey)}</div>
+              <div className="onboard-feature-sub">{t(f.subKey)}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+      <button className="onboard-btn" onClick={onNext}>{t('onboarding.cta')}</button>
+    </>
+  );
+};
 
 // ── Step 1: Venue ──────────────────────────────────────────
 const VenueStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
@@ -347,15 +352,17 @@ const EventStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
 //  Visual key for every color/dot/border the app uses. Promoters
 //  who skim the UI fast will benefit from seeing these once up
 //  front so they don't wonder what each marker means.
-const LegendStep: React.FC<{ onNext: () => void }> = ({ onNext }) => (
+const LegendStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
+  const { t } = useTranslation();
+  return (
   <>
     <div style={{ marginTop: 24 }} />
-    <div className="onboard-step-label">Quick reference</div>
+    <div className="onboard-step-label">{t('onboarding.legendTitle')}</div>
     <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 6 }}>
-      Color & icon legend
+      {t('onboarding.legendTitle')}
     </div>
     <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 16, lineHeight: 1.5 }}>
-      A quick reference so you can read the app at a glance.
+      {t('onboarding.legendSub')}
     </div>
 
     <LegendSection title="Event cards">
@@ -423,9 +430,10 @@ const LegendStep: React.FC<{ onNext: () => void }> = ({ onNext }) => (
       </div>
     </LegendSection>
 
-    <button className="onboard-btn" onClick={onNext}>Got it →</button>
+    <button className="onboard-btn" onClick={onNext}>{t('onboarding.legendGot')}</button>
   </>
-);
+  );
+};
 
 const LegendSection: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
   <div style={{
@@ -454,18 +462,14 @@ const LegendRow: React.FC<{ sample: React.ReactNode; label: string; sub: string 
 
 // ── Step 4: Done ──────────────────────────────────────────
 const DoneStep: React.FC<{ onFinish: () => void }> = ({ onFinish }) => {
-  const { venues, events } = useAppStore((s) => ({ venues: s.venues, events: s.events }));
-  const sub = venues.length
-    ? `Your venue${events.length ? ' and event are' : ' is'} ready.`
-    : '';
+  const { t } = useTranslation();
   return (
     <>
       <div style={{
         margin: '32px auto 20px', width: 76, height: 76, background: '#EAF3DE',
         borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 38,
       }}>✓</div>
-      <div className="onboard-title">You're all set!</div>
-      <div className="onboard-sub">{sub} Start adding guests and reservations.</div>
+      <div className="onboard-title">{t('onboarding.doneTitle')}</div>
       <div style={{
         background: 'var(--color-background-secondary)', borderRadius: 'var(--border-radius-md)',
         padding: '12px 14px', marginTop: 16,
@@ -480,7 +484,7 @@ const DoneStep: React.FC<{ onFinish: () => void }> = ({ onFinish }) => {
           ◉ &nbsp;See earnings → <b>More → Summary</b>
         </div>
       </div>
-      <button className="onboard-btn" onClick={onFinish}>Open PromHub →</button>
+      <button className="onboard-btn" onClick={onFinish}>{t('onboarding.doneCta')}</button>
     </>
   );
 };

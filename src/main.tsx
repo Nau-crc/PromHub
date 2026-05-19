@@ -18,6 +18,10 @@ import '@ionic/react/css/display.css';
 // (Vite doesn't ship the lazy /svg/<name>.svg files by default).
 import './icons';
 
+// Initialize i18next before the first render so components that read
+// from `useTranslation()` get the right strings on mount.
+import './i18n';
+
 // Theme last so its overrides win
 import './theme/variables.css';
 

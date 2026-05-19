@@ -1,5 +1,6 @@
 import React from 'react';
 import { IonPage, IonContent, IonHeader, IonToolbar, IonButtons, IonMenuButton } from '@ionic/react';
+import { useTranslation } from 'react-i18next';
 import { useAppStore } from '@/store/useAppStore';
 import { useUIStore } from '@/store/useUIStore';
 import { useConfirm } from '@/store/useConfirmStore';
@@ -13,6 +14,7 @@ export const VenuesPage: React.FC = () => {
   }));
   const open = useUIStore((s) => s.open);
   const confirm = useConfirm();
+  const { t } = useTranslation();
 
   const onDelete = async (id: number, name: string) => {
     const ok = await confirm({
@@ -31,12 +33,12 @@ export const VenuesPage: React.FC = () => {
           <IonButtons slot="start"><IonMenuButton /></IonButtons>
           <div style={{ padding: '4px 16px 0' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div className="page-title">Venues</div>
+              <div className="page-title">{t('venues.title')}</div>
               <button
                 className="btn-primary"
                 style={{ fontSize: 12, padding: '8px 14px' }}
                 onClick={() => open('addVenue')}
-              >+ Add</button>
+              >{t('venues.addBtn')}</button>
             </div>
           </div>
         </IonToolbar>
@@ -80,8 +82,8 @@ export const VenuesPage: React.FC = () => {
           </div>
         ) : (
           <EmptyBox>
-            No venues yet.<br />
-            Tap <b>+ Add</b> to add your first venue.
+            {t('venues.empty')}<br />
+            <span dangerouslySetInnerHTML={{ __html: t('venues.emptySub') }} />
           </EmptyBox>
         )}
         <div className="spacer" />

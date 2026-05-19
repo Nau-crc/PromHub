@@ -1,0 +1,113 @@
+import type { LocaleStrings } from './en';
+
+const es: LocaleStrings = {
+  actions: {
+    save: 'Guardar',
+    cancel: 'Cancelar',
+    delete: 'Eliminar',
+    edit: 'Editar',
+    add: 'Añadir',
+    close: 'Cerrar',
+    confirm: 'Confirmar',
+    done: 'Listo',
+    back: 'Atrás',
+    continue: 'Continuar',
+    skip: 'Saltar por ahora',
+    copy: 'Copiar',
+    copied: 'Copiado',
+    sendOnWhatsApp: 'Enviar por WhatsApp',
+  },
+
+  nav: {
+    home: 'Inicio',
+    guests: 'Invitadas',
+    reservations: 'Reservas',
+  },
+
+  drawer: {
+    manage: 'Gestionar',
+    quickAdd: 'Añadir rápido',
+    events: 'Eventos',
+    venues: 'Locales',
+    summary: 'Resumen',
+    newEvent: 'Nuevo evento',
+    newVenue: 'Nuevo local',
+    appearance: 'Apariencia',
+    language: 'Idioma',
+    light: 'Claro',
+    dark: 'Oscuro',
+    auto: 'Automático',
+  },
+
+  home: {
+    subtitle: 'Eventos de hoy',
+    addBtn: '+ Evento',
+    empty: 'Hoy no hay eventos.',
+    emptySub: 'Los eventos programados aparecerán aquí en su fecha.',
+  },
+  guests: {
+    title: 'Lista de invitadas',
+    addBtn: '+ Añadir',
+    venueAll: 'Todos',
+    swipeHint: '← desliza para marcar llegada  ·  desliza → para cancelar',
+    empty: 'Aún no hay invitadas.',
+    emptySub: 'Pulsa <b>+ Añadir</b> para crear la primera.',
+    arrived: 'Llegó',
+    pending: 'Pendiente',
+    cancelled: 'Cancelada',
+    markArrived: '✓ Llegó',
+    markPending: 'Marcar pendiente',
+    cancelInvite: '✕ Cancelar',
+    restore: 'Restaurar',
+  },
+  reservations: {
+    title: 'Reservas',
+    addBtn: '+ Añadir',
+    empty: 'Aún no hay reservas.',
+    emptySub: 'Pulsa <b>+ Añadir</b> para registrar una mesa VIP.',
+  },
+  events: {
+    title: 'Eventos',
+    addBtn: '+ Añadir',
+    filterUpcoming: 'Próximos',
+    filterPast: 'Pasados',
+    filterAll: 'Todos',
+    emptyView: 'No hay eventos en esta vista.',
+  },
+  venues: {
+    title: 'Locales',
+    addBtn: '+ Añadir',
+    empty: 'Aún no hay locales.',
+    emptySub: 'Pulsa <b>+ Añadir</b> para crear el primero.',
+  },
+  summary: {
+    title: 'Resumen',
+    today: 'Hoy',
+    monthly: 'Mensual',
+    yearly: 'Anual',
+    influencers: 'Influencers',
+  },
+
+  onboarding: {
+    welcome: 'Bienvenida a PromHub',
+    welcomeSub: 'Logística todo-en-uno para promotoras de noche en Barcelona.',
+    cta: '¡Empecemos! →',
+    feature: {
+      guestsTitle: 'Listas de invitadas',
+      guestsSub: 'Tipos de invitación, influencers, acceso a club',
+      reservationsTitle: 'Reservas',
+      reservationsSub: 'Mesas VIP por pax, capacidad, comisiones',
+      eventsTitle: 'Eventos',
+      eventsSub: 'Recurrentes en varios días, franjas horarias',
+      summaryTitle: 'Resumen',
+      summarySub: 'Ganancias diarias, mensuales y anuales',
+    },
+    legendTitle: 'Leyenda de colores e iconos',
+    legendSub: 'Referencia rápida para leer la app de un vistazo.',
+    legendGot: 'Entendido →',
+    doneTitle: '¡Todo listo!',
+    doneCta: 'Abrir PromHub →',
+  },
+};
+
+export default es;

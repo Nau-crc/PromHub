@@ -1,0 +1,113 @@
+import type { LocaleStrings } from './en';
+
+const ca: LocaleStrings = {
+  actions: {
+    save: 'Desar',
+    cancel: 'Cancel·lar',
+    delete: 'Eliminar',
+    edit: 'Editar',
+    add: 'Afegir',
+    close: 'Tancar',
+    confirm: 'Confirmar',
+    done: 'Fet',
+    back: 'Enrere',
+    continue: 'Continuar',
+    skip: 'Saltar per ara',
+    copy: 'Copiar',
+    copied: 'Copiat',
+    sendOnWhatsApp: 'Enviar per WhatsApp',
+  },
+
+  nav: {
+    home: 'Inici',
+    guests: 'Convidades',
+    reservations: 'Reserves',
+  },
+
+  drawer: {
+    manage: 'Gestionar',
+    quickAdd: 'Afegir ràpid',
+    events: 'Esdeveniments',
+    venues: 'Locals',
+    summary: 'Resum',
+    newEvent: 'Nou esdeveniment',
+    newVenue: 'Nou local',
+    appearance: 'Aparença',
+    language: 'Idioma',
+    light: 'Clar',
+    dark: 'Fosc',
+    auto: 'Automàtic',
+  },
+
+  home: {
+    subtitle: "Esdeveniments d'avui",
+    addBtn: '+ Esdeveniment',
+    empty: 'Avui no hi ha esdeveniments.',
+    emptySub: 'Els esdeveniments programats apareixeran aquí en la seva data.',
+  },
+  guests: {
+    title: 'Llista de convidades',
+    addBtn: '+ Afegir',
+    venueAll: 'Tots',
+    swipeHint: '← llisca per marcar arribada  ·  llisca → per cancel·lar',
+    empty: 'Encara no hi ha convidades.',
+    emptySub: 'Toca <b>+ Afegir</b> per crear la primera.',
+    arrived: 'Arribada',
+    pending: 'Pendent',
+    cancelled: 'Cancel·lada',
+    markArrived: '✓ Arribada',
+    markPending: 'Marcar pendent',
+    cancelInvite: '✕ Cancel·lar',
+    restore: 'Restaurar',
+  },
+  reservations: {
+    title: 'Reserves',
+    addBtn: '+ Afegir',
+    empty: 'Encara no hi ha reserves.',
+    emptySub: 'Toca <b>+ Afegir</b> per registrar una taula VIP.',
+  },
+  events: {
+    title: 'Esdeveniments',
+    addBtn: '+ Afegir',
+    filterUpcoming: 'Pròxims',
+    filterPast: 'Passats',
+    filterAll: 'Tots',
+    emptyView: "No hi ha esdeveniments en aquesta vista.",
+  },
+  venues: {
+    title: 'Locals',
+    addBtn: '+ Afegir',
+    empty: 'Encara no hi ha locals.',
+    emptySub: 'Toca <b>+ Afegir</b> per crear el primer.',
+  },
+  summary: {
+    title: 'Resum',
+    today: 'Avui',
+    monthly: 'Mensual',
+    yearly: 'Anual',
+    influencers: 'Influencers',
+  },
+
+  onboarding: {
+    welcome: 'Benvinguda a PromHub',
+    welcomeSub: 'Logística tot-en-un per a promotores de nit a Barcelona.',
+    cta: 'Comencem! →',
+    feature: {
+      guestsTitle: 'Llistes de convidades',
+      guestsSub: "Tipus d'invitació, influencers, accés al club",
+      reservationsTitle: 'Reserves',
+      reservationsSub: 'Taules VIP per pax, capacitat, comissions',
+      eventsTitle: 'Esdeveniments',
+      eventsSub: 'Recurrents en diversos dies, franges horàries',
+      summaryTitle: 'Resum',
+      summarySub: 'Guanys diaris, mensuals i anuals',
+    },
+    legendTitle: "Llegenda de colors i icones",
+    legendSub: "Referència ràpida per llegir l'app d'una ullada.",
+    legendGot: 'Entesos →',
+    doneTitle: 'Tot llest!',
+    doneCta: 'Obrir PromHub →',
+  },
+};
+
+export default ca;

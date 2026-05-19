@@ -1,5 +1,6 @@
 import React from 'react';
 import { IonPage, IonContent, IonHeader, IonToolbar, IonButtons, IonMenuButton } from '@ionic/react';
+import { useTranslation } from 'react-i18next';
 import { useAppStore } from '@/store/useAppStore';
 import { useUIStore } from '@/store/useUIStore';
 import { initials } from '@/core/utils/format';
@@ -12,6 +13,7 @@ export const ReservationsPage: React.FC = () => {
     reservations: s.reservations, venues: s.venues,
   }));
   const open = useUIStore((s) => s.open);
+  const { t } = useTranslation();
 
   return (
     <IonPage>
@@ -20,12 +22,12 @@ export const ReservationsPage: React.FC = () => {
           <IonButtons slot="start"><IonMenuButton /></IonButtons>
           <div style={{ padding: '4px 16px 0' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div className="page-title">Reservations</div>
+              <div className="page-title">{t('reservations.title')}</div>
               <button
                 className="btn-primary"
                 style={{ fontSize: 12, padding: '8px 14px' }}
                 onClick={() => open('addRes')}
-              >+ Add</button>
+              >{t('reservations.addBtn')}</button>
             </div>
           </div>
         </IonToolbar>
@@ -66,8 +68,8 @@ export const ReservationsPage: React.FC = () => {
           </div>
         ) : (
           <EmptyBox>
-            No reservations yet.<br />
-            Tap <b>+ Add</b> to log a VIP table.
+            {t('reservations.empty')}<br />
+            <span dangerouslySetInnerHTML={{ __html: t('reservations.emptySub') }} />
           </EmptyBox>
         )}
         <div className="spacer" />

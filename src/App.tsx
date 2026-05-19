@@ -25,15 +25,18 @@ import { OnboardingFlow } from '@/features/onboarding/OnboardingFlow';
 import { useAppStore } from '@/store/useAppStore';
 import { useUIStore } from '@/store/useUIStore';
 import { useThemeStore, type ThemeChoice } from '@/store/useThemeStore';
+import { useLocaleStore, type LocaleChoice } from '@/store/useLocaleStore';
+import { useTranslation } from 'react-i18next';
 
 setupIonicReact({ mode: 'ios' });
 
 const ThemeToggle: React.FC = () => {
+  const { t } = useTranslation();
   const { choice, set } = useThemeStore((s) => ({ choice: s.choice, set: s.set }));
-  const opts: { value: ThemeChoice; icon: string; label: string }[] = [
-    { value: 'light', icon: sunnyOutline, label: 'Light' },
-    { value: 'dark', icon: moonOutline, label: 'Dark' },
-    { value: 'system', icon: contrastOutline, label: 'Auto' },
+  const opts: { value: ThemeChoice; icon: string; labelKey: string }[] = [
+    { value: 'light', icon: sunnyOutline, labelKey: 'drawer.light' },
+    { value: 'dark', icon: moonOutline, labelKey: 'drawer.dark' },
+    { value: 'system', icon: contrastOutline, labelKey: 'drawer.auto' },
   ];
   return (
     <div style={{
@@ -43,7 +46,7 @@ const ThemeToggle: React.FC = () => {
       <div style={{
         fontSize: 11, fontWeight: 500, color: 'var(--color-text-secondary)',
         textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 8,
-      }}>Appearance</div>
+      }}>{t('drawer.appearance')}</div>
       <div style={{ display: 'flex', gap: 6 }}>
         {opts.map((o) => (
           <button
@@ -54,6 +57,44 @@ const ThemeToggle: React.FC = () => {
             onClick={() => set(o.value)}
           >
             <IonIcon icon={o.icon} style={{ fontSize: 14 }} />
+            {t(o.labelKey)}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// Language picker — sits below ThemeToggle in the drawer footer.
+// 'Auto' follows the OS/browser language at startup; explicit values
+// override and persist via Capacitor Preferences.
+const LanguageToggle: React.FC = () => {
+  const { t } = useTranslation();
+  const { choice, set } = useLocaleStore((s) => ({ choice: s.choice, set: s.set }));
+  const opts: { value: LocaleChoice; label: string }[] = [
+    { value: 'auto', label: t('drawer.auto') },
+    { value: 'en', label: 'EN' },
+    { value: 'es', label: 'ES' },
+    { value: 'ca', label: 'CA' },
+  ];
+  return (
+    <div style={{
+      borderTop: '0.5px solid var(--color-border-tertiary)',
+      padding: '12px 16px',
+    }}>
+      <div style={{
+        fontSize: 11, fontWeight: 500, color: 'var(--color-text-secondary)',
+        textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 8,
+      }}>{t('drawer.language')}</div>
+      <div style={{ display: 'flex', gap: 6 }}>
+        {opts.map((o) => (
+          <button
+            key={o.value}
+            type="button"
+            className={`tog-btn ${choice === o.value ? 'on' : ''}`}
+            style={{ flex: 1 }}
+            onClick={() => set(o.value)}
+          >
             {o.label}
           </button>
         ))}
@@ -64,6 +105,7 @@ const ThemeToggle: React.FC = () => {
 
 const Drawer: React.FC = () => {
   const open = useUIStore((s) => s.open);
+  const { t } = useTranslation();
   return (
     <IonMenu contentId="main" type="overlay">
       <IonHeader>
@@ -83,83 +125,84 @@ const Drawer: React.FC = () => {
       </IonHeader>
       <IonContent>
         <div style={{ padding: '14px 20px 4px', fontSize: 11, fontWeight: 500, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '.06em' }}>
-          Manage
+          {t('drawer.manage')}
         </div>
         <IonList lines="full">
           <IonMenuToggle autoHide={false}>
             <IonItem button routerLink="/events" detail>
               <IonIcon slot="start" icon={calendarOutline} />
               <IonLabel>
-                <h3>Events</h3>
-                <p>Recurring nights & schedule</p>
+                <h3>{t('drawer.events')}</h3>
               </IonLabel>
             </IonItem>
             <IonItem button routerLink="/venues" detail>
               <IonIcon slot="start" icon={businessOutline} />
               <IonLabel>
-                <h3>Venues</h3>
-                <p>Places, timeslots, VIP & invite types</p>
+                <h3>{t('drawer.venues')}</h3>
               </IonLabel>
             </IonItem>
             <IonItem button routerLink="/summary" detail>
               <IonIcon slot="start" icon={statsChartOutline} />
               <IonLabel>
-                <h3>Summary</h3>
-                <p>Earnings, charts & influencers</p>
+                <h3>{t('drawer.summary')}</h3>
               </IonLabel>
             </IonItem>
           </IonMenuToggle>
         </IonList>
 
         <div style={{ padding: '14px 20px 4px', fontSize: 11, fontWeight: 500, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '.06em' }}>
-          Quick add
+          {t('drawer.quickAdd')}
         </div>
         <IonList lines="full">
           <IonMenuToggle autoHide={false}>
             <IonItem button onClick={() => open('addEvent')}>
               <IonIcon slot="start" icon={addOutline} color="primary" />
-              <IonLabel><h3>New event</h3></IonLabel>
+              <IonLabel><h3>{t('drawer.newEvent')}</h3></IonLabel>
             </IonItem>
             <IonItem button onClick={() => open('addVenue')}>
               <IonIcon slot="start" icon={addOutline} color="primary" />
-              <IonLabel><h3>New venue</h3></IonLabel>
+              <IonLabel><h3>{t('drawer.newVenue')}</h3></IonLabel>
             </IonItem>
           </IonMenuToggle>
         </IonList>
 
         <ThemeToggle />
+        <LanguageToggle />
       </IonContent>
     </IonMenu>
   );
 };
 
-const Tabs: React.FC = () => (
-  <IonTabs>
-    <IonRouterOutlet id="main">
-      <Route exact path="/home" component={HomePage} />
-      <Route exact path="/guests" component={GuestsPage} />
-      <Route exact path="/reservations" component={ReservationsPage} />
-      <Route exact path="/events" component={EventsPage} />
-      <Route exact path="/venues" component={VenuesPage} />
-      <Route exact path="/summary" component={SummaryPage} />
-      <Route exact path="/"><Redirect to="/home" /></Route>
-    </IonRouterOutlet>
-    <IonTabBar slot="bottom">
-      <IonTabButton tab="home" href="/home">
-        <IonIcon icon={homeOutline} />
-        <IonLabel>Home</IonLabel>
-      </IonTabButton>
-      <IonTabButton tab="guests" href="/guests">
-        <IonIcon icon={peopleOutline} />
-        <IonLabel>Guests</IonLabel>
-      </IonTabButton>
-      <IonTabButton tab="reservations" href="/reservations">
-        <IonIcon icon={listOutline} />
-        <IonLabel>Reservations</IonLabel>
-      </IonTabButton>
-    </IonTabBar>
-  </IonTabs>
-);
+const Tabs: React.FC = () => {
+  const { t } = useTranslation();
+  return (
+    <IonTabs>
+      <IonRouterOutlet id="main">
+        <Route exact path="/home" component={HomePage} />
+        <Route exact path="/guests" component={GuestsPage} />
+        <Route exact path="/reservations" component={ReservationsPage} />
+        <Route exact path="/events" component={EventsPage} />
+        <Route exact path="/venues" component={VenuesPage} />
+        <Route exact path="/summary" component={SummaryPage} />
+        <Route exact path="/"><Redirect to="/home" /></Route>
+      </IonRouterOutlet>
+      <IonTabBar slot="bottom">
+        <IonTabButton tab="home" href="/home">
+          <IonIcon icon={homeOutline} />
+          <IonLabel>{t('nav.home')}</IonLabel>
+        </IonTabButton>
+        <IonTabButton tab="guests" href="/guests">
+          <IonIcon icon={peopleOutline} />
+          <IonLabel>{t('nav.guests')}</IonLabel>
+        </IonTabButton>
+        <IonTabButton tab="reservations" href="/reservations">
+          <IonIcon icon={listOutline} />
+          <IonLabel>{t('nav.reservations')}</IonLabel>
+        </IonTabButton>
+      </IonTabBar>
+    </IonTabs>
+  );
+};
 
 const App: React.FC = () => {
   const { hydrated, onboarded, load, setOnboarded } = useAppStore((s) => ({
@@ -167,8 +210,13 @@ const App: React.FC = () => {
     load: s.load, setOnboarded: s.setOnboarded,
   }));
   const loadTheme = useThemeStore((s) => s.load);
+  const loadLocale = useLocaleStore((s) => s.load);
 
-  useEffect(() => { load(); loadTheme(); }, [load, loadTheme]);
+  useEffect(() => {
+    load();
+    loadTheme();
+    loadLocale();
+  }, [load, loadTheme, loadLocale]);
 
   if (!hydrated) return <IonApp />;
 

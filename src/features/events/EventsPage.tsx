@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { IonPage, IonContent, IonHeader, IonToolbar, IonButtons, IonMenuButton } from '@ionic/react';
+import { useTranslation } from 'react-i18next';
 import { useAppStore } from '@/store/useAppStore';
 import { useUIStore } from '@/store/useUIStore';
 import { today } from '@/core/constants';
@@ -13,6 +14,7 @@ type EventFilter = 'upcoming' | 'past' | 'all';
 export const EventsPage: React.FC = () => {
   const events = useAppStore((s) => s.events);
   const open = useUIStore((s) => s.open);
+  const { t } = useTranslation();
   const [filter, setFilter] = useState<EventFilter>('upcoming');
 
   const todayKey = isoDay(today());
@@ -57,17 +59,17 @@ export const EventsPage: React.FC = () => {
           <IonButtons slot="start"><IonMenuButton /></IonButtons>
           <div style={{ padding: '4px 16px 0' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div className="page-title">Events</div>
+              <div className="page-title">{t('events.title')}</div>
               <button
                 className="btn-primary"
                 style={{ fontSize: 12, padding: '8px 14px' }}
                 onClick={() => open('addEvent')}
-              >+ Add</button>
+              >{t('events.addBtn')}</button>
             </div>
             <div style={{ display: 'flex', gap: 6, marginTop: 10, paddingBottom: 10 }}>
-              <button className={`tog-btn ${filter === 'upcoming' ? 'on' : ''}`} onClick={() => setFilter('upcoming')}>Upcoming</button>
-              <button className={`tog-btn ${filter === 'past' ? 'on' : ''}`} onClick={() => setFilter('past')}>Past</button>
-              <button className={`tog-btn ${filter === 'all' ? 'on' : ''}`} onClick={() => setFilter('all')}>All</button>
+              <button className={`tog-btn ${filter === 'upcoming' ? 'on' : ''}`} onClick={() => setFilter('upcoming')}>{t('events.filterUpcoming')}</button>
+              <button className={`tog-btn ${filter === 'past' ? 'on' : ''}`} onClick={() => setFilter('past')}>{t('events.filterPast')}</button>
+              <button className={`tog-btn ${filter === 'all' ? 'on' : ''}`} onClick={() => setFilter('all')}>{t('events.filterAll')}</button>
             </div>
           </div>
         </IonToolbar>
@@ -77,7 +79,7 @@ export const EventsPage: React.FC = () => {
         {sorted.length ? sorted.map((e) => (
           <EventCard key={e.id} event={e} onClick={() => open('eventDetail', { id: e.id })} />
         )) : (
-          <EmptyBox>No events in this view.</EmptyBox>
+          <EmptyBox>{t('events.emptyView')}</EmptyBox>
         )}
         <div className="spacer" />
       </IonContent>

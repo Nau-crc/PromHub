@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { IonPage, IonContent, IonHeader, IonToolbar, IonButtons, IonMenuButton } from '@ionic/react';
+import { useTranslation } from 'react-i18next';
 import { useAppStore } from '@/store/useAppStore';
 import { useUIStore } from '@/store/useUIStore';
 import {
@@ -19,6 +20,7 @@ type Tab = 'today' | 'monthly' | 'yearly' | 'influencers';
 
 export const SummaryPage: React.FC = () => {
   const [tab, setTab] = useState<Tab>('today');
+  const { t } = useTranslation();
 
   return (
     <IonPage>
@@ -26,13 +28,13 @@ export const SummaryPage: React.FC = () => {
         <IonToolbar>
           <IonButtons slot="start"><IonMenuButton /></IonButtons>
           <div style={{ padding: '4px 16px 0' }}>
-            <div className="page-title" style={{ marginBottom: 10 }}>Summary</div>
+            <div className="page-title" style={{ marginBottom: 10 }}>{t('summary.title')}</div>
           </div>
           <div className="sum-tabs">
-            <div className={`sum-tab ${tab === 'today' ? 'active' : ''}`} onClick={() => setTab('today')}>Today</div>
-            <div className={`sum-tab ${tab === 'monthly' ? 'active' : ''}`} onClick={() => setTab('monthly')}>Monthly</div>
-            <div className={`sum-tab ${tab === 'yearly' ? 'active' : ''}`} onClick={() => setTab('yearly')}>Yearly</div>
-            <div className={`sum-tab ${tab === 'influencers' ? 'active' : ''}`} onClick={() => setTab('influencers')}>Influencers</div>
+            <div className={`sum-tab ${tab === 'today' ? 'active' : ''}`} onClick={() => setTab('today')}>{t('summary.today')}</div>
+            <div className={`sum-tab ${tab === 'monthly' ? 'active' : ''}`} onClick={() => setTab('monthly')}>{t('summary.monthly')}</div>
+            <div className={`sum-tab ${tab === 'yearly' ? 'active' : ''}`} onClick={() => setTab('yearly')}>{t('summary.yearly')}</div>
+            <div className={`sum-tab ${tab === 'influencers' ? 'active' : ''}`} onClick={() => setTab('influencers')}>{t('summary.influencers')}</div>
           </div>
         </IonToolbar>
       </IonHeader>
