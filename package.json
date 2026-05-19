@@ -23,7 +23,7 @@
     "@capacitor/keyboard": "^6.0.2",
     "@capacitor/preferences": "^6.0.2",
     "@capacitor/status-bar": "^6.0.1",
-    "@vercel/kv": "^3.0.0",
+    "@vercel/blob": "^0.27.0",
     "@ionic/react": "^8.3.1",
     "@ionic/react-router": "^8.3.1",
     "i18next": "^23.15.1",

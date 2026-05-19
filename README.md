@@ -353,19 +353,24 @@ useUIStore.getState().open('addRes', { eventId: 3 });
 ## Public guest-registration link
 
 Each event can expose a public link (`/register/<token>`) where guests
-fill in their own details. Submissions are stored in **Vercel KV** with
-an automatic TTL of `eventDate + 24h`, then auto-purge — no cleanup job
-needed.
+fill in their own details. Submissions are stored in **Vercel Blob**
+with an embedded expiry of `eventDate + 24h`. Expired blobs are deleted
+lazily on the next read of the same token (good enough for our volume —
+storage is cheap and reads always check `expiresAt` before returning).
+
+> **Why Blob and not KV (Redis):** Vercel's KV / Redis offering moved
+> behind a paid plan. Vercel Blob is on the free tier (1 GB storage,
+> 10 GB bandwidth/month) which is plenty for this use case — each
+> event + submission is a few hundred bytes of JSON.
 
 ### Setup (one-time, on Vercel)
 
 1. In the Vercel dashboard open the project → **Storage** → **Create
-   Database** → **KV (Redis)**. Pick the free tier.
-2. Click **Connect Project** and Vercel injects four env vars
-   automatically: `KV_REST_API_URL`, `KV_REST_API_TOKEN`,
-   `KV_REST_API_READ_ONLY_TOKEN`, `KV_URL`.
-3. Redeploy. Nothing else needed — the `@vercel/kv` SDK reads those
-   env vars on its own.
+   Database** → **Blob**. Free tier.
+2. Click **Connect Project** and Vercel injects `BLOB_READ_WRITE_TOKEN`
+   automatically.
+3. Redeploy. Nothing else needed — the `@vercel/blob` SDK reads the env
+   var on its own.
 
 ### Architecture
 
@@ -375,10 +380,11 @@ needed.
   - `POST /api/registration` — public, submits a sign-up
   - `GET  /api/registration?token=X` — promoter lists submissions
 
-- **KV keys**:
-  - `event:<token>` — event metadata, TTL `eventDate + 24h`
-  - `registration:<token>:<subId>` — one per submission, same TTL
-  - `event:<token>:submissions` — set of submission IDs for listing
+- **Blob paths**:
+  - `events/<token>.json` — event metadata (overwritten on each publish)
+  - `registrations/<token>/<subId>.json` — one blob per submission
+  - Every JSON document carries an `expiresAt` ISO instant; reads
+    return 404 (and delete the blob) once it passes.
 
 - **Frontend**:
   - `SharePanel` inside the event-detail modal: generates the link,
@@ -400,6 +406,9 @@ vercel dev                   # runs Vite + the API functions together
 
 Without `vercel dev` the share button will fail when it tries to POST
 to `/api/event` — that's expected; the rest of the app works fine.
+
+(In `.env.local` you only need `BLOB_READ_WRITE_TOKEN` for the Blob
+SDK — `vercel env pull` brings it down automatically.)
 
 ### Trade-offs declared
 
