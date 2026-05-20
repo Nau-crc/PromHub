@@ -11,6 +11,8 @@ import { SheetHeader } from '@/components/SheetHeader';
 import { NumberField } from '@/components/NumberField';
 import { Calendar } from '@/components/Calendar';
 import { SelectField } from '@/components/SelectField';
+import { safeUuid } from '@/core/utils/format';
+import { publishEvent } from '@/services/shareApi';
 
 interface Props {
   open: boolean;
@@ -100,7 +102,7 @@ export const EventFormModal: React.FC<Props> = ({ open, onClose, editing, onRequ
   const toggleSlot = (id: string) =>
     setSlotIds((arr) => (arr.includes(id) ? arr.filter((x) => x !== id) : [...arr, id]));
 
-  const save = () => {
+  const save = async () => {
     const trimmed = name.trim();
     if (!trimmed) { alert('Event name is required.'); return; }
 
@@ -120,6 +122,10 @@ export const EventFormModal: React.FC<Props> = ({ open, onClose, editing, onRequ
       return;
     }
 
+    // Every event gets a public-share token at creation time. Existing
+    // events keep their token; new ones get a fresh UUID v4.
+    const shareToken = editing?.shareToken ?? safeUuid();
+
     const entry: PromEvent = {
       id: editing?.id ?? (nextId('event') as number),
       name: trimmed,
@@ -137,9 +143,28 @@ export const EventFormModal: React.FC<Props> = ({ open, onClose, editing, onRequ
       capacity: capacity && capacity > 0 ? capacity : null,
       seasonStart: !isOneTime && seasonStart ? seasonStart : null,
       seasonEnd: !isOneTime && seasonEnd ? seasonEnd : null,
-      // Preserved across edits — generated on-demand from event detail.
-      shareToken: editing?.shareToken ?? null,
+      shareToken,
     };
+
+    // Best-effort publish so the public registration form works
+    // immediately. If it fails (backend down, env var missing, offline)
+    // we still save locally — SharePanel exposes a "Refresh" action
+    // that retries the publish later.
+    const venueName = venueId != null
+      ? venues.find((v) => v.id === venueId)?.name ?? null
+      : null;
+    try {
+      await publishEvent({
+        token: shareToken,
+        name: trimmed,
+        eventDate: entry.eventDate,
+        venueName,
+        capacity: entry.capacity,
+      });
+    } catch (err) {
+      console.warn('[event] could not publish share link, saved locally only:', err);
+    }
+
     upsertEvent(entry);
     onClose();
   };

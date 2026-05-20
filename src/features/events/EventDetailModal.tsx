@@ -8,7 +8,7 @@ import {
 } from '@/features/summary/calculations';
 import { Pill, SlotPill } from '@/components/Pill';
 import { Avatar } from '@/components/Avatar';
-import { initials } from '@/core/utils/format';
+import { initials, safeUuid } from '@/core/utils/format';
 import { isoDay } from '@/core/utils/date';
 import { today } from '@/core/constants';
 import { StarBadge, SocialBadge } from '@/components/SocialBadge';
@@ -325,24 +325,31 @@ const SharePanel: React.FC<SharePanelProps> = ({ event, onPublish, onSync }) => 
     setTimeout(() => setFeedback(null), 3500);
   };
 
-  // Generate (or refresh) the public link.
-  // Even if a token already exists we re-POST the metadata so the
-  // backend always has the latest name/date — useful when the
-  // promoter edits the event after first publishing.
+  // Publish (or re-publish) the event metadata to the backend. Used:
+  //  - As the "Generate link" action for legacy events that pre-date
+  //    auto-token creation (no shareToken yet)
+  //  - As a recovery path inside `pullSignups` when the backend has
+  //    forgotten this event (404). Idempotent on the backend side
+  //    thanks to `allowOverwrite: true`.
+  const republish = async (token: string): Promise<boolean> => {
+    const venueName = event.venueId != null
+      ? venues.find((v) => v.id === event.venueId)?.name ?? null
+      : null;
+    await publishEvent({
+      token,
+      name: event.name,
+      eventDate: event.eventDate,
+      venueName,
+      capacity: event.capacity,
+    });
+    return true;
+  };
+
   const generate = async () => {
     setWorking(true);
     try {
-      const token = event.shareToken ?? crypto.randomUUID();
-      const venueName = event.venueId != null
-        ? venues.find((v) => v.id === event.venueId)?.name ?? null
-        : null;
-      await publishEvent({
-        token,
-        name: event.name,
-        eventDate: event.eventDate,
-        venueName,
-        capacity: event.capacity,
-      });
+      const token = event.shareToken ?? safeUuid();
+      await republish(token);
       onPublish({ ...event, shareToken: token });
       showFeedback('Link ready ✓');
     } catch (err) {
@@ -357,7 +364,7 @@ const SharePanel: React.FC<SharePanelProps> = ({ event, onPublish, onSync }) => 
     const url = buildShareUrl(event.shareToken);
     try {
       await navigator.clipboard.writeText(url);
-      showFeedback('Link copied');
+      showFeedback('Link copied ✓');
     } catch {
       showFeedback(url);
     }
@@ -376,33 +383,39 @@ const SharePanel: React.FC<SharePanelProps> = ({ event, onPublish, onSync }) => 
     }
   };
 
-  const sync = async () => {
+  // Pulls submissions AND re-publishes the event metadata in case the
+  // backend lost it (e.g. the event was created while the backend was
+  // down, or its TTL just elapsed and we want it back).
+  const pullSignups = async () => {
     if (!event.shareToken) return;
     setWorking(true);
     try {
+      await republish(event.shareToken);  // ensure backend knows the event
       const added = await onSync(event.shareToken);
       showFeedback(added > 0 ? `Imported ${added} new sign-ups` : 'No new sign-ups');
     } catch (err) {
-      showFeedback(`Sync failed: ${(err as Error).message}`);
+      showFeedback(`Couldn't refresh: ${(err as Error).message}`);
     } finally {
       setWorking(false);
     }
   };
 
-  return (
-    <div style={{
-      marginTop: 14, padding: '12px 14px',
-      background: 'var(--color-background-secondary)',
-      borderRadius: 'var(--border-radius-md)',
-      border: '0.5px solid var(--color-border-tertiary)',
-    }}>
-      <SectionHead>Public registration link</SectionHead>
-      <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 10, lineHeight: 1.5 }}>
-        Share a link so guests can fill in their own details. Submissions
-        auto-import into this event when you tap "Pull sign-ups".
-      </div>
-
-      {!event.shareToken ? (
+  // ── Render ─────────────────────────────────────────────────
+  // Legacy events without a token (created before auto-gen): show
+  // the "Generate link" CTA. Everything else: render the prominent
+  // link card with copy/share/refresh actions.
+  if (!event.shareToken) {
+    return (
+      <div style={{
+        marginTop: 14, padding: '12px 14px',
+        background: 'var(--color-background-secondary)',
+        borderRadius: 'var(--border-radius-md)',
+        border: '0.5px solid var(--color-border-tertiary)',
+      }}>
+        <SectionHead>Public registration link</SectionHead>
+        <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 10, lineHeight: 1.5 }}>
+          Generate a public link so guests can sign up themselves.
+        </div>
         <button
           type="button"
           className="btn-primary"
@@ -413,36 +426,79 @@ const SharePanel: React.FC<SharePanelProps> = ({ event, onPublish, onSync }) => 
           <IonIcon icon={shareSocialOutline} style={{ fontSize: 16 }} />
           {working ? 'Generating…' : 'Create registration link'}
         </button>
-      ) : (
-        <>
-          <div style={{
-            background: 'var(--color-background-primary)',
-            border: '0.5px solid var(--color-border-tertiary)',
-            borderRadius: 'var(--border-radius-md)',
-            padding: '8px 10px',
-            fontSize: 11, color: 'var(--color-text-primary)',
-            wordBreak: 'break-all',
-            marginBottom: 8,
-          }}>
-            {buildShareUrl(event.shareToken)}
+        {feedback && (
+          <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 8 }}>
+            {feedback}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-            <button className="btn-secondary" onClick={copyLink}>Copy</button>
-            <button className="btn-secondary" onClick={shareNative}>Share</button>
-            <button
-              className="btn-primary"
-              style={{ gridColumn: '1 / -1' }}
-              onClick={sync}
-              disabled={working}
-            >
-              {working ? 'Pulling…' : 'Pull sign-ups'}
-            </button>
-          </div>
-        </>
-      )}
+        )}
+      </div>
+    );
+  }
+
+  const url = buildShareUrl(event.shareToken);
+  return (
+    <div style={{
+      marginTop: 14, padding: '14px 14px',
+      background: 'var(--color-background-primary)',
+      borderRadius: 'var(--border-radius-lg)',
+      border: '1px solid var(--color-primary)',
+    }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10,
+      }}>
+        <IonIcon icon={shareSocialOutline} style={{ fontSize: 18, color: 'var(--color-primary)' }} />
+        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>
+          Registration link
+        </div>
+      </div>
+      <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 10, lineHeight: 1.5 }}>
+        Share this so guests fill in their own details. Submissions appear
+        here when you tap "Refresh".
+      </div>
+
+      <div style={{
+        background: 'var(--color-background-secondary)',
+        border: '0.5px solid var(--color-border-tertiary)',
+        borderRadius: 'var(--border-radius-md)',
+        padding: '10px 12px',
+        fontSize: 12, color: 'var(--color-text-primary)',
+        wordBreak: 'break-all',
+        marginBottom: 10,
+        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+      }}>
+        {url}
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+        <button
+          className="btn-primary"
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+          onClick={copyLink}
+        >
+          📋 Copy
+        </button>
+        <button
+          className="btn-primary"
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+          onClick={shareNative}
+        >
+          <IonIcon icon={shareSocialOutline} style={{ fontSize: 14 }} /> Share
+        </button>
+        <button
+          className="btn-secondary"
+          style={{ gridColumn: '1 / -1' }}
+          onClick={pullSignups}
+          disabled={working}
+        >
+          {working ? 'Refreshing…' : '↻ Refresh sign-ups'}
+        </button>
+      </div>
 
       {feedback && (
-        <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 8 }}>
+        <div style={{
+          fontSize: 11, color: 'var(--color-text-secondary)',
+          marginTop: 8, textAlign: 'center',
+        }}>
           {feedback}
         </div>
       )}
