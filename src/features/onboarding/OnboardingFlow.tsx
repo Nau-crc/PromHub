@@ -106,7 +106,7 @@ const WelcomeStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
 
 // ── Step 1: Venue ──────────────────────────────────────────
 const VenueStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
-  const { upsertVenue, nextId } = useAppStore((s) => ({ upsertVenue: s.upsertVenue, nextId: s.nextId }));
+  const upsertVenue = useAppStore((s) => s.upsertVenue);
   const [name, setName] = useState('');
   const [guestCap, setGuestCap] = useState<number | ''>('');
   const [tsRows, setTsRows] = useState<Timeslot[]>([
@@ -121,7 +121,7 @@ const VenueStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
     { id: 'inv-seed-2', name: 'Cocktails only' },
   ]);
 
-  const save = () => {
+  const save = async () => {
     if (!name.trim()) { alert('Enter a venue name.'); return; }
     const newTs = tsRows.filter((r) => r.name.trim()).map((r) => ({ ...r, name: r.name.trim() }));
     const newVip = vipRows.filter((r) => r.name.trim()).map((r) => ({
@@ -132,8 +132,7 @@ const VenueStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
       tableCapacity: r.tableCapacity || 0,
     }));
     const newInv = invRows.filter((r) => r.name.trim()).map((r) => ({ ...r, name: r.name.trim() }));
-    upsertVenue({
-      id: nextId('venue') as number,
+    await upsertVenue({
       name: name.trim(),
       guestCapacity: typeof guestCap === 'number' ? guestCap : (parseInt(String(guestCap)) || 0),
       timeslots: newTs,
@@ -179,8 +178,8 @@ const VenueStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
 
 // ── Step 2: Event ─────────────────────────────────────────
 const EventStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
-  const { venues, upsertEvent, nextId } = useAppStore((s) => ({
-    venues: s.venues, upsertEvent: s.upsertEvent, nextId: s.nextId,
+  const { venues, upsertEvent } = useAppStore((s) => ({
+    venues: s.venues, upsertEvent: s.upsertEvent,
   }));
   const noVenues = venues.length === 0;
   const [name, setName] = useState('');
@@ -210,7 +209,7 @@ const EventStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
   const toggleSlot = (id: string) =>
     setSlotIds((arr) => (arr.includes(id) ? arr.filter((x) => x !== id) : [...arr, id]));
 
-  const save = () => {
+  const save = async () => {
     if (noVenues) { onNext(); return; }
     if (!name.trim()) { onNext(); return; }
     if (!slotIds.length) { alert('Select at least one timeslot.'); return; }
@@ -223,8 +222,7 @@ const EventStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
         return;
       }
     }
-    upsertEvent({
-      id: nextId('event') as number,
+    await upsertEvent({
       name: name.trim(),
       venueId: venueId!,
       weekdays: isOneTime ? [] : [...days],

@@ -26,9 +26,9 @@ interface Props {
 }
 
 export const ReservationFormModal: React.FC<Props> = ({ open, onClose, editing, seedEventId }) => {
-  const { venues, events, reservations, upsertReservation, removeReservation, nextId } = useAppStore((s) => ({
+  const { venues, events, reservations, upsertReservation, removeReservation } = useAppStore((s) => ({
     venues: s.venues, events: s.events, reservations: s.reservations,
-    upsertReservation: s.upsertReservation, removeReservation: s.removeReservation, nextId: s.nextId,
+    upsertReservation: s.upsertReservation, removeReservation: s.removeReservation,
   }));
   const confirm = useConfirm();
 
@@ -165,7 +165,7 @@ export const ReservationFormModal: React.FC<Props> = ({ open, onClose, editing, 
   const phoneDigits = onlyDigits(phoneNum);
   const phoneOk = !phoneDigits || isValidPhone(phoneCode, phoneDigits);
 
-  const save = () => {
+  const save = async () => {
     const trimmed = name.trim();
     if (!trimmed) { alert('Contact name is required.'); return; }
     if (venueId == null) { alert('Pick a venue.'); return; }
@@ -176,8 +176,8 @@ export const ReservationFormModal: React.FC<Props> = ({ open, onClose, editing, 
       alert(`Phone number doesn't match the format for ${phoneCode}.`);
       return;
     }
-    const entry: Reservation = {
-      id: editing?.id ?? (nextId('res') as number),
+    const entry = {
+      ...(editing?.id != null ? { id: editing.id } : {}),
       name: trimmed,
       phoneCode,
       phoneNum: phoneNum.trim(),
@@ -202,7 +202,7 @@ export const ReservationFormModal: React.FC<Props> = ({ open, onClose, editing, 
         return night?.events[0]?.id ?? null;
       })(),
     };
-    upsertReservation(entry);
+    await upsertReservation(entry as Reservation | Omit<Reservation, 'id'>);
     onClose();
   };
 

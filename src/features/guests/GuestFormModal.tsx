@@ -25,9 +25,9 @@ interface Props {
 }
 
 export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEventId }) => {
-  const { venues, events, guests, upsertGuest, removeGuest, nextId } = useAppStore((s) => ({
+  const { venues, events, guests, upsertGuest, removeGuest } = useAppStore((s) => ({
     venues: s.venues, events: s.events, guests: s.guests,
-    upsertGuest: s.upsertGuest, removeGuest: s.removeGuest, nextId: s.nextId,
+    upsertGuest: s.upsertGuest, removeGuest: s.removeGuest,
   }));
   const confirm = useConfirm();
 
@@ -126,8 +126,8 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
     const inviteTypeNames = invTypeIds
       .map((id) => (v?.inviteTypes || []).find((x) => x.id === id)?.name || '')
       .filter(Boolean);
-    const entry: Guest = {
-      id: editing?.id ?? (nextId('guest') as number),
+    const entry = {
+      ...(editing?.id != null ? { id: editing.id } : {}),
       name: trimmed,
       venueId,
       eventId: eventId ?? null,
@@ -144,7 +144,7 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
       eventDate: selectedEvent ? (eventDate || null) : null,
     };
 
-    upsertGuest(entry);
+    await upsertGuest(entry as Guest | Omit<Guest, 'id'>);
 
     // ── Double trigger: send the linked event's description over IG/TT ──
     // Only on creation (not edit), and only if we have a handle + an event

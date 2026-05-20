@@ -2,9 +2,35 @@ import { create } from 'zustand';
 import type { AppDataSnapshot, Venue, PromEvent, Guest, Reservation } from '@/core/types';
 import { storage } from '@/services/storage';
 import { STORAGE_KEYS } from '@/core/constants';
+import { api } from '@/services/apiClient';
 
-// Minimal shape of a public-form submission, kept local to the store
-// so we don't introduce a circular import with services/shareApi.
+// ─────────────────────────────────────────────────────────────
+//  App store after the backend migration.
+//
+//  Conceptual model:
+//    - The Neon database is the source of truth.
+//    - This Zustand store is a *session cache* of what we've
+//      fetched. Hydration calls api.listAll() once at startup.
+//    - Every mutation goes through the API; on success we patch
+//      the local cache to keep the UI in sync. There's no
+//      Capacitor Preferences persistence anymore — that's the
+//      job of the database.
+//
+//  First-run migration:
+//    The app may have local data from before the backend existed
+//    (Capacitor Preferences under STORAGE_KEYS.state). On
+//    hydration we detect this, POST the snapshot to /api/v1/sync
+//    once, then drop the local key.
+//
+//  Offline behaviour (declared limitation):
+//    Mutations require a network round-trip. If you save with no
+//    connectivity, the call throws and the UI shows the error.
+//    A future iteration could add an outbox queue.
+// ─────────────────────────────────────────────────────────────
+
+const MIGRATION_FLAG_KEY = 'promhub.migrated.v1';
+
+// Local shape carried over from the public-form sync helper.
 export interface PublicSubmission {
   id: string;
   name: string;
@@ -14,155 +40,132 @@ export interface PublicSubmission {
   notes: string;
 }
 
-// Local helpers — kept here to avoid an import cycle with calculations.ts
-const isoDayLocal = (d: Date): string =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-const isEventPastSync = (e: PromEvent, todayIso: string): boolean => {
-  if (e.isOneTime) return !!e.eventDate && e.eventDate < todayIso;
-  return !!e.seasonEnd && e.seasonEnd < todayIso;
-};
+// Strings inside a Venue's JSONB (timeslots, vipTypes, inviteTypes)
+// still need stable identifiers — they don't go to a SERIAL column,
+// they're keys within the JSON document. We mint short prefixed IDs
+// here so React keys stay stable across re-renders.
+let _localCounter = 1_000;
+const mintLocalId = (prefix: 'ts' | 'vip' | 'inv'): string =>
+  `${prefix}${_localCounter++}`;
 
-interface AppState extends AppDataSnapshot {
-  // hydration / onboarding
+interface AppState {
+  // data
+  venues: Venue[];
+  events: PromEvent[];
+  guests: Guest[];
+  reservations: Reservation[];
+
+  // ui meta
   hydrated: boolean;
   onboarded: boolean;
+  syncing: boolean;
+  syncError: string | null;
 
-  // hydration
+  // lifecycle
   load: () => Promise<void>;
-  persist: () => Promise<void>;
   setOnboarded: (v: boolean) => Promise<void>;
 
+  /** Local-only ID for sub-rows inside a venue (timeslots / vip / invite types). */
+  nextId: (kind: 'ts' | 'vip' | 'inv') => string;
+
   // venues
-  upsertVenue: (v: Venue) => void;
-  removeVenue: (id: number) => void;
+  upsertVenue: (v: Venue | Omit<Venue, 'id'>) => Promise<Venue>;
+  removeVenue: (id: number) => Promise<void>;
 
   // events
-  upsertEvent: (e: PromEvent) => void;
-  removeEvent: (id: number) => void;
-  togglePrivateInvite: (eventId: number, guestName: string) => void;
+  upsertEvent: (e: PromEvent | Omit<PromEvent, 'id'>) => Promise<PromEvent>;
+  removeEvent: (id: number) => Promise<void>;
+  togglePrivateInvite: (eventId: number, guestName: string) => Promise<void>;
 
   // guests
-  upsertGuest: (g: Guest) => void;
-  removeGuest: (id: number) => void;
-  toggleArrived: (id: number) => void;
-  toggleCancelled: (id: number) => void;
+  upsertGuest: (g: Guest | Omit<Guest, 'id'>) => Promise<Guest>;
+  removeGuest: (id: number) => Promise<void>;
+  toggleArrived: (id: number) => Promise<void>;
+  toggleCancelled: (id: number) => Promise<void>;
 
   // reservations
-  upsertReservation: (r: Reservation) => void;
-  removeReservation: (id: number) => void;
+  upsertReservation: (r: Reservation | Omit<Reservation, 'id'>) => Promise<Reservation>;
+  removeReservation: (id: number) => Promise<void>;
 
   // public-form sync
-  importSubmissionsAsGuests: (eventId: number, submissions: PublicSubmission[]) => number;
-
-  // ID generation
-  nextId: (kind: 'venue' | 'event' | 'guest' | 'res' | 'ts' | 'vip' | 'inv') => number | string;
+  importSubmissionsAsGuests: (eventId: number, submissions: PublicSubmission[]) => Promise<number>;
 }
 
-// ─────────────────────────────────────────────────────────────
-//  Forward-compatible migration. Records persisted by older
-//  versions of the app may be missing fields added later
-//  (createdAt, eventDate, isOneTime, capacity, season ranges).
-//  We fill them in with sensible defaults so the rest of the
-//  code can assume the new shape without null checks everywhere.
-// ─────────────────────────────────────────────────────────────
-function migrateSnapshot(snap: AppDataSnapshot): AppDataSnapshot {
-  const venues = (snap.venues || []).map((v) => ({
-    ...v,
-    // Phone fields were added later — default to empty so the form can
-    // bind to them without optional-chaining everywhere.
-    phoneCode: v.phoneCode ?? '',
-    phoneNum: v.phoneNum ?? '',
-  }));
-  const events = (snap.events || []).map((e) => ({
-    ...e,
-    isOneTime: e.isOneTime ?? false,
-    eventDate: e.eventDate ?? null,
-    capacity: e.capacity ?? null,
-    seasonStart: e.seasonStart ?? null,
-    seasonEnd: e.seasonEnd ?? null,
-    shareToken: e.shareToken ?? null,
-    weekdays: e.weekdays ?? (e.weekday ? [e.weekday] : []),
-    invitedGuests: e.invitedGuests ?? [],
-  }));
-  const eventById = new Map(events.map((e) => [e.id, e]));
-  // Backfill `eventDate` on old guests/reservations:
-  //  - linked to a one-time event → use that event's date
-  //  - linked to a recurring event → use createdAt as best-effort guess
-  //  - unlinked → null
-  const guests = (snap.guests || []).map((g) => {
-    if (g.eventDate !== undefined && g.eventDate !== null) return g;
-    let eventDate: string | null = null;
-    if (g.eventId != null) {
-      const ev = eventById.get(g.eventId);
-      eventDate = ev?.isOneTime ? ev.eventDate : (g.createdAt || null);
-    }
-    return { ...g, eventDate, createdAt: g.createdAt || '' };
-  });
-  // Build a venue→timeslot lookup so we can resolve old slotIds to a start time
-  const slotById = new Map<string, { startTime: string }>();
-  for (const v of (snap.venues || [])) {
-    for (const t of (v.timeslots || [])) slotById.set(t.id, { startTime: t.startTime });
-  }
-  const reservations = (snap.reservations || []).map((r) => {
-    let eventDate = r.eventDate;
-    if (eventDate == null) {
-      if (r.eventId != null) {
-        const ev = eventById.get(r.eventId);
-        eventDate = ev?.isOneTime ? (ev.eventDate ?? null) : (r.createdAt || null);
-      } else {
-        eventDate = null;
-      }
-    }
-    // Backfill time: prefer existing, else slot's start time, else 20:00
-    const time = r.time
-      ?? (r.slotId ? slotById.get(r.slotId)?.startTime ?? '20:00' : '20:00');
-    return { ...r, eventDate, createdAt: r.createdAt || '', time, slotId: r.slotId ?? '' };
-  });
-  return { ...snap, venues, events, guests, reservations };
+const hasServerId = (x: { id?: number }): x is { id: number } =>
+  typeof x.id === 'number' && Number.isFinite(x.id);
+
+// Helper: read the legacy local snapshot (if any) so we can migrate it.
+async function readLegacySnapshot(): Promise<AppDataSnapshot | null> {
+  const snap = await storage.get<AppDataSnapshot>(STORAGE_KEYS.state);
+  if (!snap) return null;
+  // Migrate fields that older versions may be missing — same logic
+  // we used when the store was Preferences-backed.
+  return {
+    ...snap,
+    events: (snap.events ?? []).map((e) => ({
+      ...e,
+      isOneTime: e.isOneTime ?? false,
+      eventDate: e.eventDate ?? null,
+      capacity: e.capacity ?? null,
+      seasonStart: e.seasonStart ?? null,
+      seasonEnd: e.seasonEnd ?? null,
+      shareToken: e.shareToken ?? null,
+      weekdays: e.weekdays ?? (e.weekday ? [e.weekday] : []),
+      invitedGuests: e.invitedGuests ?? [],
+    })),
+    guests: snap.guests ?? [],
+    reservations: snap.reservations ?? [],
+    venues: snap.venues ?? [],
+  };
 }
 
-const emptyState: AppDataSnapshot = {
+export const useAppStore = create<AppState>((set, get) => ({
   venues: [],
   events: [],
   guests: [],
   reservations: [],
-  nextVenueId: 1,
-  nextEventId: 1,
-  nextGuestId: 1,
-  nextResId: 1,
-  nextTsId: 100,
-  nextVipId: 200,
-  invTypeNextId: 300,
-};
-
-export const useAppStore = create<AppState>((set, get) => ({
-  ...emptyState,
   hydrated: false,
   onboarded: false,
+  syncing: false,
+  syncError: null,
 
   load: async () => {
-    const snap = await storage.get<AppDataSnapshot>(STORAGE_KEYS.state);
-    const onboarded = (await storage.get<boolean>(STORAGE_KEYS.onboarded)) ?? false;
-    const hydrated = snap ? migrateSnapshot(snap) : emptyState;
-    set({ ...hydrated, hydrated: true, onboarded });
-  },
+    set({ syncing: true, syncError: null });
+    try {
+      // Onboarded flag stays local — it's a UI preference, not data.
+      const onboarded = (await storage.get<boolean>(STORAGE_KEYS.onboarded)) ?? false;
 
-  persist: async () => {
-    const s = get();
-    const snap: AppDataSnapshot = {
-      venues: s.venues,
-      events: s.events,
-      guests: s.guests,
-      reservations: s.reservations,
-      nextVenueId: s.nextVenueId,
-      nextEventId: s.nextEventId,
-      nextGuestId: s.nextGuestId,
-      nextResId: s.nextResId,
-      nextTsId: s.nextTsId,
-      nextVipId: s.nextVipId,
-      invTypeNextId: s.invTypeNextId,
-    };
-    await storage.set(STORAGE_KEYS.state, snap);
+      // One-time legacy migration: if we still have an old snapshot in
+      // Preferences and have NOT marked it migrated, push it up.
+      const migrated = (await storage.get<boolean>(MIGRATION_FLAG_KEY)) ?? false;
+      if (!migrated) {
+        const legacy = await readLegacySnapshot();
+        if (legacy && (legacy.venues.length || legacy.events.length || legacy.guests.length || legacy.reservations.length)) {
+          try {
+            await api.syncSnapshot(legacy);
+            console.info('[store] migrated local snapshot to backend');
+          } catch (err) {
+            console.warn('[store] snapshot migration failed; will keep local snapshot for next try:', err);
+            // Don't drop the local snapshot if migration failed.
+            set({ syncing: false, syncError: (err as Error).message, hydrated: true, onboarded });
+            return;
+          }
+        }
+        await storage.set(MIGRATION_FLAG_KEY, true);
+        // Old key is no longer authoritative — keep it as a one-shot
+        // backup until we're confident, then remove.
+        await storage.remove(STORAGE_KEYS.state);
+      }
+
+      const all = await api.listAll();
+      set({ ...all, hydrated: true, onboarded, syncing: false });
+    } catch (err) {
+      set({
+        hydrated: true,
+        syncing: false,
+        syncError: (err as Error).message,
+      });
+    }
   },
 
   setOnboarded: async (v) => {
@@ -170,186 +173,163 @@ export const useAppStore = create<AppState>((set, get) => ({
     await storage.set(STORAGE_KEYS.onboarded, v);
   },
 
-  nextId: (kind) => {
-    const s = get();
-    if (kind === 'venue') { set({ nextVenueId: s.nextVenueId + 1 }); return s.nextVenueId; }
-    if (kind === 'event') { set({ nextEventId: s.nextEventId + 1 }); return s.nextEventId; }
-    if (kind === 'guest') { set({ nextGuestId: s.nextGuestId + 1 }); return s.nextGuestId; }
-    if (kind === 'res')   { set({ nextResId:   s.nextResId   + 1 }); return s.nextResId; }
-    if (kind === 'ts')    { set({ nextTsId:    s.nextTsId    + 1 }); return 'ts' + s.nextTsId; }
-    if (kind === 'vip')   { set({ nextVipId:   s.nextVipId   + 1 }); return 'vip' + s.nextVipId; }
-    /* inv */              { set({ invTypeNextId: s.invTypeNextId + 1 }); return 'inv' + s.invTypeNextId; }
-  },
+  nextId: (kind) => mintLocalId(kind),
 
-  upsertVenue: (v) => {
+  // ── Venues ──────────────────────────────────────────────
+  upsertVenue: async (v) => {
+    const row = hasServerId(v)
+      ? await api.updateVenue(v.id, v)
+      : await api.createVenue(v);
     set((s) => {
-      const i = s.venues.findIndex((x) => x.id === v.id);
-      const venues = i >= 0 ? s.venues.map((x) => x.id === v.id ? v : x) : [...s.venues, v];
+      const idx = s.venues.findIndex((x) => x.id === row.id);
+      const venues = idx >= 0
+        ? s.venues.map((x) => x.id === row.id ? row : x)
+        : [...s.venues, row];
       return { venues };
     });
-    get().persist();
+    return row;
   },
 
-  removeVenue: (id) => {
-    // Cascade: when a venue is deleted, drop FUTURE events at it
-    // (and their guests/reservations). Past events stay for history.
-    set((s) => {
-      const todayIso = isoDayLocal(new Date());
-      const futureEventIds = new Set(
-        s.events
-          .filter((e) => e.venueId === id && !isEventPastSync(e, todayIso))
-          .map((e) => e.id),
-      );
-      const events = s.events.filter((e) => !futureEventIds.has(e.id));
-      const guests = s.guests.filter((g) => g.eventId == null || !futureEventIds.has(g.eventId));
-      // Reservations belong to a venue, not an event. Drop only future reservations at this venue.
-      const reservations = s.reservations.filter((r) => {
-        if (r.venueId !== id) return true;
-        if (!r.eventDate) return false; // no date → assume current → drop
-        return r.eventDate < todayIso;  // past reservation → keep
-      });
-      return {
-        venues: s.venues.filter((x) => x.id !== id),
-        events,
-        guests,
-        reservations,
-      };
-    });
-    get().persist();
+  removeVenue: async (id) => {
+    await api.deleteVenue(id);
+    // Server cascade dropped events/guests/reservations attached to
+    // future occurrences; refetch the lot so the cache stays honest.
+    const all = await api.listAll();
+    set({ ...all });
   },
 
-  upsertEvent: (e) => {
+  // ── Events ──────────────────────────────────────────────
+  upsertEvent: async (e) => {
+    const row = hasServerId(e)
+      ? await api.updateEvent(e.id, e)
+      : await api.createEvent(e);
     set((s) => {
-      const i = s.events.findIndex((x) => x.id === e.id);
-      const events = i >= 0 ? s.events.map((x) => x.id === e.id ? e : x) : [...s.events, e];
+      const idx = s.events.findIndex((x) => x.id === row.id);
+      const events = idx >= 0
+        ? s.events.map((x) => x.id === row.id ? row : x)
+        : [...s.events, row];
       return { events };
     });
-    get().persist();
+    return row;
   },
 
-  removeEvent: (id) => {
-    // Cascade: removing an event drops the guests linked to it.
-    // Reservations are NOT linked to events (per the data model),
-    // so they're untouched.
+  removeEvent: async (id) => {
+    await api.deleteEvent(id);
+    const all = await api.listAll();   // refetch — guests cascaded
+    set({ ...all });
+  },
+
+  togglePrivateInvite: async (eventId, guestName) => {
+    const ev = get().events.find((e) => e.id === eventId);
+    if (!ev) return;
+    const arr = ev.invitedGuests || [];
+    const i = arr.indexOf(guestName);
+    const invitedGuests = i >= 0
+      ? arr.filter((_, idx) => idx !== i)
+      : [...arr, guestName];
+    const row = await api.updateEvent(eventId, { invitedGuests });
     set((s) => ({
-      events: s.events.filter((x) => x.id !== id),
-      guests: s.guests.filter((g) => g.eventId !== id),
+      events: s.events.map((x) => x.id === eventId ? row : x),
     }));
-    get().persist();
   },
 
-  togglePrivateInvite: (eventId, guestName) => {
-    set((s) => ({
-      events: s.events.map((e) => {
-        if (e.id !== eventId) return e;
-        const arr = e.invitedGuests || [];
-        const i = arr.indexOf(guestName);
-        const invitedGuests = i >= 0
-          ? arr.filter((_, idx) => idx !== i)
-          : [...arr, guestName];
-        return { ...e, invitedGuests };
-      }),
-    }));
-    get().persist();
-  },
-
-  upsertGuest: (g) => {
+  // ── Guests ──────────────────────────────────────────────
+  upsertGuest: async (g) => {
+    const row = hasServerId(g)
+      ? await api.updateGuest(g.id, g)
+      : await api.createGuest(g);
     set((s) => {
-      const i = s.guests.findIndex((x) => x.id === g.id);
-      const guests = i >= 0 ? s.guests.map((x) => x.id === g.id ? g : x) : [...s.guests, g];
+      const idx = s.guests.findIndex((x) => x.id === row.id);
+      const guests = idx >= 0
+        ? s.guests.map((x) => x.id === row.id ? row : x)
+        : [...s.guests, row];
       return { guests };
     });
-    get().persist();
+    return row;
   },
 
-  removeGuest: (id) => {
+  removeGuest: async (id) => {
+    await api.deleteGuest(id);
     set((s) => ({ guests: s.guests.filter((x) => x.id !== id) }));
-    get().persist();
   },
 
-  toggleArrived: (id) => {
-    set((s) => ({
-      guests: s.guests.map((g) =>
-        g.id === id
-          ? { ...g, checked: !g.checked, cancelled: false }   // arriving un-cancels
-          : g),
-    }));
-    get().persist();
+  toggleArrived: async (id) => {
+    const g = get().guests.find((x) => x.id === id);
+    if (!g) return;
+    const row = await api.updateGuest(id, {
+      checked: !g.checked,
+      cancelled: false,
+    });
+    set((s) => ({ guests: s.guests.map((x) => x.id === id ? row : x) }));
   },
 
-  toggleCancelled: (id) => {
-    set((s) => ({
-      guests: s.guests.map((g) =>
-        g.id === id
-          ? { ...g, cancelled: !g.cancelled, checked: false } // cancelling clears arrived
-          : g),
-    }));
-    get().persist();
+  toggleCancelled: async (id) => {
+    const g = get().guests.find((x) => x.id === id);
+    if (!g) return;
+    const row = await api.updateGuest(id, {
+      cancelled: !g.cancelled,
+      checked: false,
+    });
+    set((s) => ({ guests: s.guests.map((x) => x.id === id ? row : x) }));
   },
 
-  upsertReservation: (r) => {
+  // ── Reservations ────────────────────────────────────────
+  upsertReservation: async (r) => {
+    const row = hasServerId(r)
+      ? await api.updateReservation(r.id, r)
+      : await api.createReservation(r);
     set((s) => {
-      const i = s.reservations.findIndex((x) => x.id === r.id);
-      const reservations = i >= 0
-        ? s.reservations.map((x) => x.id === r.id ? r : x)
-        : [...s.reservations, r];
+      const idx = s.reservations.findIndex((x) => x.id === row.id);
+      const reservations = idx >= 0
+        ? s.reservations.map((x) => x.id === row.id ? row : x)
+        : [...s.reservations, row];
       return { reservations };
     });
-    get().persist();
+    return row;
   },
 
-  removeReservation: (id) => {
+  removeReservation: async (id) => {
+    await api.deleteReservation(id);
     set((s) => ({ reservations: s.reservations.filter((x) => x.id !== id) }));
-    get().persist();
   },
 
-  /**
-   * Import public-registration submissions into the local guests list.
-   * Deduplicates by `submissionId` (skipping any already-imported), and
-   * returns the count of newly-added guests so the caller can show a
-   * toast like "3 new sign-ups".
-   */
-  importSubmissionsAsGuests: (eventId, submissions) => {
-    const state = get();
-    const event = state.events.find((e) => e.id === eventId);
+  // ── Public form import (unchanged contract) ─────────────
+  importSubmissionsAsGuests: async (eventId, submissions) => {
+    const event = get().events.find((e) => e.id === eventId);
     if (!event) return 0;
     const known = new Set(
-      state.guests.filter((g) => g.submissionId).map((g) => g.submissionId as string),
+      get().guests.filter((g) => g.submissionId).map((g) => g.submissionId as string),
     );
     const fresh = submissions.filter((s) => !known.has(s.id));
     if (!fresh.length) return 0;
 
-    // Mint a new guest record for each fresh submission. The user-facing
-    // event-occurrence date defaults to the event's eventDate (one-time)
-    // or stays blank for recurring — the promoter can edit later.
-    const todayIso = isoDayLocal(new Date());
-    let nextId = state.nextGuestId;
-    const newGuests: Guest[] = fresh.map((s) => ({
-      id: nextId++,
-      name: s.name,
-      venueId: event.venueId ?? 0,
-      eventId,
-      inviteTypeIds: [],
-      inviteTypeNames: [],
-      pax: s.pax,
-      clubEventId: null,
-      checked: false,
-      cancelled: false,
-      influencer: false,
-      igHandle: s.igHandle,
-      igPlatform: s.igPlatform,
-      createdMonth: new Date().getMonth(),
-      createdAt: todayIso,
-      eventDate: event.isOneTime ? event.eventDate : null,
-      submissionId: s.id,
-      notes: s.notes || undefined,
-    }));
-
-    set({
-      guests: [...state.guests, ...newGuests],
-      nextGuestId: nextId,
-    });
-    get().persist();
-    return newGuests.length;
+    let imported = 0;
+    for (const sub of fresh) {
+      try {
+        await get().upsertGuest({
+          name: sub.name,
+          venueId: event.venueId ?? 0,
+          eventId,
+          inviteTypeIds: [],
+          inviteTypeNames: [],
+          pax: sub.pax,
+          clubEventId: null,
+          checked: false,
+          cancelled: false,
+          influencer: false,
+          igHandle: sub.igHandle,
+          igPlatform: sub.igPlatform,
+          createdMonth: new Date().getMonth(),
+          createdAt: new Date().toISOString().slice(0, 10),
+          eventDate: event.isOneTime ? event.eventDate : null,
+          submissionId: sub.id,
+          notes: sub.notes || undefined,
+        });
+        imported++;
+      } catch (err) {
+        console.warn('[store] failed to import submission', sub.id, err);
+      }
+    }
+    return imported;
   },
 }));

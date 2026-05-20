@@ -25,11 +25,10 @@ const NO_VENUE = '__none__';
 const NEW_VENUE = '__new__';
 
 export const EventFormModal: React.FC<Props> = ({ open, onClose, editing, onRequestNewVenue }) => {
-  const { venues, upsertEvent, removeEvent, nextId } = useAppStore((s) => ({
+  const { venues, upsertEvent, removeEvent } = useAppStore((s) => ({
     venues: s.venues,
     upsertEvent: s.upsertEvent,
     removeEvent: s.removeEvent,
-    nextId: s.nextId,
   }));
   const confirm = useConfirm();
 
@@ -126,8 +125,8 @@ export const EventFormModal: React.FC<Props> = ({ open, onClose, editing, onRequ
     // events keep their token; new ones get a fresh UUID v4.
     const shareToken = editing?.shareToken ?? safeUuid();
 
-    const entry: PromEvent = {
-      id: editing?.id ?? (nextId('event') as number),
+    const entry = {
+      ...(editing?.id != null ? { id: editing.id } : {}),
       name: trimmed,
       venueId,
       weekdays: isOneTime ? [] : [...days],
@@ -165,7 +164,7 @@ export const EventFormModal: React.FC<Props> = ({ open, onClose, editing, onRequ
       console.warn('[event] could not publish share link, saved locally only:', err);
     }
 
-    upsertEvent(entry);
+    await upsertEvent(entry as PromEvent | Omit<PromEvent, 'id'>);
     onClose();
   };
 

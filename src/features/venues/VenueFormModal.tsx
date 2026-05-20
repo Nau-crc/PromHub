@@ -18,8 +18,8 @@ interface Props {
 }
 
 export const VenueFormModal: React.FC<Props> = ({ open, onClose, editing }) => {
-  const { upsertVenue, removeVenue, nextId } = useAppStore((s) => ({
-    upsertVenue: s.upsertVenue, removeVenue: s.removeVenue, nextId: s.nextId,
+  const { upsertVenue, removeVenue } = useAppStore((s) => ({
+    upsertVenue: s.upsertVenue, removeVenue: s.removeVenue,
   }));
   const confirm = useConfirm();
 
@@ -47,7 +47,7 @@ export const VenueFormModal: React.FC<Props> = ({ open, onClose, editing }) => {
   // the country format — same rule as the reservation phone.
   const phoneOk = !phoneDigits || isValidPhone(phoneCode, phoneDigits);
 
-  const save = () => {
+  const save = async () => {
     const trimmed = name.trim();
     if (!trimmed) { alert('Venue name is required.'); return; }
     if (!tsRows.filter((r) => r.name.trim()).length) {
@@ -71,8 +71,11 @@ export const VenueFormModal: React.FC<Props> = ({ open, onClose, editing }) => {
     const newInv = invRows.filter((r) => r.name.trim()).map((r) => ({
       ...r, name: r.name.trim(),
     }));
-    const entry: Venue = {
-      id: editing?.id ?? (nextId('venue') as number),
+    // Top-level entity IDs come from the backend (Postgres SERIAL).
+    // We pass the editing.id only when updating; new venues omit it
+    // and upsertVenue handles the create-vs-update branch.
+    const entry = {
+      ...(editing?.id != null ? { id: editing.id } : {}),
       name: trimmed,
       guestCapacity: typeof guestCap === 'number' ? guestCap : (parseInt(String(guestCap)) || 0),
       timeslots: newTs,
@@ -80,8 +83,8 @@ export const VenueFormModal: React.FC<Props> = ({ open, onClose, editing }) => {
       inviteTypes: newInv,
       phoneCode: phoneDigits ? phoneCode : '',
       phoneNum: phoneDigits ? phoneNum.trim() : '',
-    };
-    upsertVenue(entry);
+    } as Venue | Omit<Venue, 'id'>;
+    await upsertVenue(entry);
     onClose();
   };
 

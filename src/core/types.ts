@@ -123,16 +123,22 @@ export interface Reservation {
   eventDate: string | null;
 }
 
+/**
+ * Legacy on-disk snapshot from when the app was Preferences-backed.
+ * Kept around so the first launch after the backend migration can
+ * read it once, push it to /api/v1/sync, then drop it. The next-id
+ * counters are ignored server-side (Postgres SERIAL assigns IDs).
+ */
 export interface AppDataSnapshot {
   venues: Venue[];
   events: PromEvent[];
   guests: Guest[];
   reservations: Reservation[];
-  nextVenueId: number;
-  nextEventId: number;
-  nextGuestId: number;
-  nextResId: number;
-  nextTsId: number;
-  nextVipId: number;
-  invTypeNextId: number;
+  nextVenueId?: number;
+  nextEventId?: number;
+  nextGuestId?: number;
+  nextResId?: number;
+  nextTsId?: number;
+  nextVipId?: number;
+  invTypeNextId?: number;
 }
