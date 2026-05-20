@@ -91,8 +91,15 @@ interface AppState {
   importSubmissionsAsGuests: (eventId: number, submissions: PublicSubmission[]) => Promise<number>;
 }
 
-const hasServerId = (x: { id?: number }): x is { id: number } =>
-  typeof x.id === 'number' && Number.isFinite(x.id);
+/**
+ * Generic predicate: does this object already carry a server-assigned
+ * numeric id? Stays generic so it accepts both `T` and `Omit<T, 'id'>`
+ * — the call site branches on the result to send a PATCH vs POST.
+ */
+function hasServerId<T>(x: T): x is T & { id: number } {
+  const id = (x as unknown as { id?: unknown })?.id;
+  return typeof id === 'number' && Number.isFinite(id);
+}
 
 // Helper: read the legacy local snapshot (if any) so we can migrate it.
 async function readLegacySnapshot(): Promise<AppDataSnapshot | null> {
