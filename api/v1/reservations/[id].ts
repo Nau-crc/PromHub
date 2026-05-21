@@ -1,43 +1,45 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { and, eq } from 'drizzle-orm';
-import { withErrorBoundary, parseBody } from '../../_handler';
-import { db, schema } from '../../_lib/db';
-import { resolveTenant } from '../../_lib/tenancy';
-import { reservationInputSchema } from '../../_lib/validators';
-import { badRequest, notFound } from '../../_lib/errors';
+import { safe } from '../../_safe';
 
-export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse) => {
-  const tenant = await resolveTenant(req);
-  const id = Number(req.query.id);
-  if (!Number.isFinite(id)) throw badRequest('Invalid id');
+export default safe(async () => {
+  const { and, eq } = await import('drizzle-orm');
+  const { db, schema } = await import('../../_lib/db');
+  const { resolveTenant } = await import('../../_lib/tenancy');
+  const { reservationInputSchema } = await import('../../_lib/validators');
+  const { parseBody } = await import('../../_handler');
+  const { badRequest, notFound } = await import('../../_lib/errors');
 
-  const where = and(
-    eq(schema.reservations.id, id),
-    eq(schema.reservations.tenantId, tenant.id),
-  );
+  return async (req, res) => {
+    const tenant = await resolveTenant(req);
+    const id = Number(req.query.id);
+    if (!Number.isFinite(id)) throw badRequest('Invalid id');
 
-  if (req.method === 'GET') {
-    const [row] = await db.select().from(schema.reservations).where(where).limit(1);
-    if (!row) throw notFound();
-    return res.status(200).json({ reservation: row });
-  }
+    const where = and(
+      eq(schema.reservations.id, id),
+      eq(schema.reservations.tenantId, tenant.id),
+    );
 
-  if (req.method === 'PATCH') {
-    const input = reservationInputSchema.partial().parse(parseBody(req.body));
-    // Numeric → string coercion for PATCH too (only when provided).
-    const patch: Record<string, unknown> = { ...input };
-    if (input.commissionPct !== undefined) patch.commissionPct = String(input.commissionPct);
-    if (input.womanPct !== undefined) patch.womanPct = String(input.womanPct);
-    const [row] = await db.update(schema.reservations).set(patch).where(where).returning();
-    if (!row) throw notFound();
-    return res.status(200).json({ reservation: row });
-  }
+    if (req.method === 'GET') {
+      const [row] = await db.select().from(schema.reservations).where(where).limit(1);
+      if (!row) throw notFound();
+      return res.status(200).json({ reservation: row });
+    }
 
-  if (req.method === 'DELETE') {
-    const [row] = await db.delete(schema.reservations).where(where).returning();
-    if (!row) throw notFound();
-    return res.status(200).json({ ok: true });
-  }
+    if (req.method === 'PATCH') {
+      const input = reservationInputSchema.partial().parse(parseBody(req.body));
+      const patch: Record<string, unknown> = { ...input };
+      if (input.commissionPct !== undefined) patch.commissionPct = String(input.commissionPct);
+      if (input.womanPct !== undefined) patch.womanPct = String(input.womanPct);
+      const [row] = await db.update(schema.reservations).set(patch).where(where).returning();
+      if (!row) throw notFound();
+      return res.status(200).json({ reservation: row });
+    }
 
-  throw badRequest(`Method ${req.method} not allowed`);
+    if (req.method === 'DELETE') {
+      const [row] = await db.delete(schema.reservations).where(where).returning();
+      if (!row) throw notFound();
+      return res.status(200).json({ ok: true });
+    }
+
+    throw badRequest(`Method ${req.method} not allowed`);
+  };
 });
