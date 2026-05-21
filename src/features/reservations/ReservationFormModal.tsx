@@ -202,8 +202,12 @@ export const ReservationFormModal: React.FC<Props> = ({ open, onClose, editing, 
         return night?.events[0]?.id ?? null;
       })(),
     };
-    await upsertReservation(entry as Reservation | Omit<Reservation, 'id'>);
-    onClose();
+    try {
+      await upsertReservation(entry as Reservation | Omit<Reservation, 'id'>);
+      onClose();
+    } catch (err) {
+      alert(`Couldn't save reservation: ${(err as Error).message}`);
+    }
   };
 
   return (

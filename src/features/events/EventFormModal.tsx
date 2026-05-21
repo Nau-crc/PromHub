@@ -164,8 +164,12 @@ export const EventFormModal: React.FC<Props> = ({ open, onClose, editing, onRequ
       console.warn('[event] could not publish share link, saved locally only:', err);
     }
 
-    await upsertEvent(entry as PromEvent | Omit<PromEvent, 'id'>);
-    onClose();
+    try {
+      await upsertEvent(entry as PromEvent | Omit<PromEvent, 'id'>);
+      onClose();
+    } catch (err) {
+      alert(`Couldn't save event: ${(err as Error).message}`);
+    }
   };
 
   return (

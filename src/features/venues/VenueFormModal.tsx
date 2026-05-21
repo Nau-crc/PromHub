@@ -84,8 +84,12 @@ export const VenueFormModal: React.FC<Props> = ({ open, onClose, editing }) => {
       phoneCode: phoneDigits ? phoneCode : '',
       phoneNum: phoneDigits ? phoneNum.trim() : '',
     } as Venue | Omit<Venue, 'id'>;
-    await upsertVenue(entry);
-    onClose();
+    try {
+      await upsertVenue(entry);
+      onClose();
+    } catch (err) {
+      alert(`Couldn't save venue: ${(err as Error).message}`);
+    }
   };
 
   const confirmDelete = async () => {

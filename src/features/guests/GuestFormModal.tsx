@@ -144,7 +144,14 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
       eventDate: selectedEvent ? (eventDate || null) : null,
     };
 
-    await upsertGuest(entry as Guest | Omit<Guest, 'id'>);
+    let saved: Guest;
+    try {
+      saved = await upsertGuest(entry as Guest | Omit<Guest, 'id'>);
+    } catch (err) {
+      alert(`Couldn't save guest: ${(err as Error).message}`);
+      return;
+    }
+    void saved; // (retained for future hooks, e.g. analytics)
 
     // ── Double trigger: send the linked event's description over IG/TT ──
     // Only on creation (not edit), and only if we have a handle + an event

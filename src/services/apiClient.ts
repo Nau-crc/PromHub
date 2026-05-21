@@ -41,10 +41,30 @@ async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
   const text = await res.text();
   const body = text ? (() => { try { return JSON.parse(text); } catch { return text; } })() : null;
   if (!res.ok) {
-    const err = body as { error?: string } | null;
-    throw new ApiError(res.status, err?.error || `HTTP ${res.status}`, body);
+    throw new ApiError(res.status, extractErrorMessage(res, body), body);
   }
   return body as T;
+}
+
+// Build the best possible diagnostic string from whatever the server
+// returned. Vercel's generic FUNCTION_INVOCATION_FAILED page is HTML;
+// our own withErrorBoundary returns `{ error, name, issues? }` JSON.
+// We try in this order: JSON.error → JSON.issues → raw text snippet →
+// HTTP status code as last resort.
+function extractErrorMessage(res: Response, body: unknown): string {
+  if (body && typeof body === 'object') {
+    const obj = body as { error?: string; name?: string; issues?: Array<{ path?: string; message?: string }> };
+    if (obj.error) return obj.error;
+    if (Array.isArray(obj.issues) && obj.issues.length) {
+      return obj.issues.map((i) => `${i.path ?? '?'}: ${i.message ?? 'invalid'}`).join('; ');
+    }
+  }
+  if (typeof body === 'string' && body.trim()) {
+    // Vercel error pages contain useful titles; strip HTML tags and trim.
+    const stripped = body.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    if (stripped) return `HTTP ${res.status} — ${stripped.slice(0, 200)}`;
+  }
+  return `HTTP ${res.status}`;
 }
 
 // ── Normalization: DB row → client type ────────────────────
