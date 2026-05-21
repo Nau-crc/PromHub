@@ -440,15 +440,54 @@ the device tenant UUID and the onboarding flag.
 2. Click **Connect to Project** — Vercel injects `DATABASE_URL`
    (and `POSTGRES_URL`) automatically across all environments.
 3. Locally, pull them: `vercel env pull .env.local`.
-4. Generate and apply the schema:
+4. Generate the initial migration and commit it:
    ```bash
-   npm run db:generate     # writes SQL to api/_lib/migrations
-   npm run db:push         # applies the schema to Neon
+   npm run db:generate          # writes SQL to api/_lib/migrations/
+   git add api/_lib/migrations
+   git commit -m "db: initial migration"
    ```
-   (Use `npm run db:migrate` instead of `db:push` once you commit
-   the generated SQL — `push` is for first-time bootstrap and
-   prototyping.)
 5. Optional dev UI: `npm run db:studio` opens Drizzle Studio.
+
+### Migration pipeline (auto-applied on each deploy)
+
+`vercel.json` `buildCommand` chains `db:migrate:ci` before `vite build`:
+
+```
+npm run db:migrate:ci && npm run build
+```
+
+What `db:migrate:ci` does (`scripts/migrate-ci.mjs`):
+
+| Scenario                              | Behaviour                                   |
+| ------------------------------------- | ------------------------------------------- |
+| On Vercel, env present, has SQL       | Runs `drizzle-kit migrate`, fails build if it errors |
+| On Vercel, env missing                | Aborts the build loudly (`exit 1`)          |
+| On Vercel, no migrations dir yet      | Skips silently (first deploy bootstrap)     |
+| Local `npm run build`, no env         | Skips silently — frontend build still works |
+
+So the workflow is:
+1. Change the schema in `api/_lib/schema.ts`.
+2. `npm run db:generate` → drizzle writes a new diff SQL file under
+   `api/_lib/migrations/` (named `0001_*.sql`, `0002_*.sql`, …).
+3. Commit the SQL files alongside the schema change.
+4. Push → Vercel's build pipeline applies the migrations to that
+   environment's Neon branch automatically. Production deploys hit
+   the prod branch; preview deploys hit the preview branch.
+
+> **Why `migrate` and not `push` in CI:** `db:push` is interactive
+> and destructive on diffs; `db:migrate` reads versioned SQL files
+> and applies them in order. Reproducible, reviewable in PRs.
+
+### Emergency: bypass the pipeline
+
+If a deploy got out of sync (e.g. you renamed a column locally and
+production still has the old one), apply the migrations manually
+against the prod URL once:
+
+```bash
+# Grab the production DATABASE_URL from Vercel → Settings → Env Vars
+DATABASE_URL="postgres://..." npm run db:migrate
+```
 
 ### Architecture
 
