@@ -1,22 +1,27 @@
-import { safe } from '../../_safe';
-
-// /api/v1/venues
-//   GET  — list all venues for the tenant
-//   POST — create a venue
+// /api/v1/venues — GET list, POST create.
 //
-// All heavy modules (Drizzle, Neon, Zod) are lazy-loaded so any
-// init failure surfaces as a JSON 500 with full stack, not
-// FUNCTION_INVOCATION_FAILED.
+// Hand-rolled try/catch instead of `safe()` so we eliminate the
+// wrapper as a possible failure point while debugging deploys.
+// Once we confirm this works, we can collapse back to `safe()`.
 
-export default safe(async () => {
-  const { eq } = await import('drizzle-orm');
-  const { db, schema } = await import('../../_lib/db');
-  const { resolveTenant } = await import('../../_lib/tenancy');
-  const { venueInputSchema } = await import('../../_lib/validators');
-  const { parseBody } = await import('../../_handler');
-  const { badRequest } = await import('../../_lib/errors');
+import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-  return async (req, res) => {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // CORS first, unconditionally — never blocked by a try/catch.
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,DELETE,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Tenant-Id');
+  if (req.method === 'OPTIONS') return res.status(204).end();
+
+  try {
+    // Everything heavy is lazily imported, so any module-load
+    // failure surfaces in the catch below as JSON.
+    const { eq } = await import('drizzle-orm');
+    const { db, schema } = await import('../../_lib/db');
+    const { resolveTenant } = await import('../../_lib/tenancy');
+    const { venueInputSchema } = await import('../../_lib/validators');
+    const { parseBody } = await import('../../_handler');
+
     const tenant = await resolveTenant(req);
 
     if (req.method === 'GET') {
@@ -37,6 +42,18 @@ export default safe(async () => {
       return res.status(201).json({ venue: row });
     }
 
-    throw badRequest(`Method ${req.method} not allowed`);
-  };
-});
+    return res.status(405).json({ error: `Method ${req.method} not allowed` });
+  } catch (err) {
+    console.error('[api/v1/venues]', err);
+    const e = (err ?? {}) as { name?: string; message?: string; status?: number; stack?: string; issues?: unknown };
+    if (e.name === 'ZodError') {
+      return res.status(400).json({ error: 'Validation failed', name: 'ZodError', issues: e.issues });
+    }
+    return res.status(e.status ?? 500).json({
+      error: e.message || 'Internal error',
+      name: e.name || 'Error',
+      status: e.status ?? 500,
+      stack: typeof e.stack === 'string' ? e.stack.split('\n').slice(0, 15) : undefined,
+    });
+  }
+}

@@ -115,8 +115,8 @@ async function probe(label, path, init = {}) {
   }
 }
 
-await probe('GET /api/v1/_ping  (zero-deps sanity check)', '/api/v1/_ping');
-await probe('GET /api/_health   (env presence)', '/api/_health');
+await probe('GET /api/v1/ping  (zero-deps sanity check)', '/api/v1/ping');
+await probe('GET /api/health   (env presence)', '/api/health');
 
 // Force a request that hits the DB so we surface tenants/Neon errors
 const FAKE_TENANT = '11111111-1111-4111-8111-111111111111';
