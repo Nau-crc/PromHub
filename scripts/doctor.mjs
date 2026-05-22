@@ -124,11 +124,8 @@ async function probe(label, path, init = {}) {
 const pingResult = await probe('GET /api/v1/ping (router + zero-deps)', '/api/v1/ping');
 const healthResult = await probe('GET /api/health  (env presence)', '/api/health');
 
-// Force a request that hits the DB so we surface tenant/Neon errors
-const FAKE_TENANT = '11111111-1111-4111-8111-111111111111';
-await probe('GET /api/v1/venues (DB read via router)', '/api/v1/venues', {
-  headers: { 'X-Tenant-Id': FAKE_TENANT },
-});
+// DB read via router — no tenant header needed any more (shared workspace).
+await probe('GET /api/v1/venues (DB read via router)', '/api/v1/venues');
 
 // Deploy-freshness check: compare local HEAD with what's deployed
 const deployedSha = healthResult?.body?.commitSha

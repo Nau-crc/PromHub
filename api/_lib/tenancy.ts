@@ -1,62 +1,42 @@
-import type { VercelRequest } from '@vercel/node';
-import { eq } from 'drizzle-orm';
 import { db, schema } from './db.js';
 
 // ─────────────────────────────────────────────────────────────
-//  Tenancy: resolve a tenant from the X-Tenant-Id header.
+//  Shared workspace (formerly multi-tenancy).
 //
-//  The client (Capacitor app) generates a UUID v4 once on first
-//  launch and stores it in Preferences. Every API call sends it
-//  in `X-Tenant-Id`. The server upserts a tenant row keyed by
-//  this device-id — so multiple devices stay isolated even
-//  without a login.
+//  Decision: every device reads and writes against the same
+//  dataset. The tenant_id column stays in the schema (so we can
+//  re-introduce per-user scoping when real auth lands) but
+//  there's only ever ONE tenant row — `SHARED_TENANT_ID` — and
+//  every query inserts/reads against it.
 //
-//  When real auth ships, the migration is one query:
-//    UPDATE tenants SET user_id = $1 WHERE device_id = $2
+//  Reads don't filter by tenant_id any more — they return whatever
+//  is in the table — so legacy rows that were created under
+//  earlier per-device tenants stay visible too.
 // ─────────────────────────────────────────────────────────────
 
-const UUID_RX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** Fixed UUID used as `tenant_id` for every new row. */
+export const SHARED_TENANT_ID = '00000000-0000-0000-0000-000000000000';
 
-export class UnauthorizedError extends Error {
-  status = 401;
-  constructor(message = 'Missing or invalid X-Tenant-Id') {
-    super(message);
-    this.name = 'UnauthorizedError';
-  }
-}
+const SHARED_TENANT_DEVICE_ID = 'shared';
 
-function readHeader(req: VercelRequest, name: string): string | null {
-  const v = req.headers[name.toLowerCase()];
-  if (Array.isArray(v)) return v[0] ?? null;
-  return (v as string | undefined) ?? null;
-}
+// Cached per cold-start so we only round-trip once.
+let ensured = false;
 
 /**
- * Get-or-create the tenant for this device. Returns the tenant
- * row. Throws UnauthorizedError if the header is missing or
- * malformed.
+ * Idempotently ensure the singleton tenant row exists, so the
+ * foreign-key constraint on every other table is satisfied.
  *
- * Idempotent: running with the same device-id always returns the
- * same row. We do the lookup first to avoid a needless INSERT on
- * every request (the common path).
+ * Safe to call on every request — it's a no-op after the first
+ * successful call.
  */
-export async function resolveTenant(req: VercelRequest) {
-  const deviceId = readHeader(req, 'x-tenant-id');
-  if (!deviceId || !UUID_RX.test(deviceId)) {
-    throw new UnauthorizedError();
-  }
-
-  const existing = await db
-    .select()
-    .from(schema.tenants)
-    .where(eq(schema.tenants.deviceId, deviceId))
-    .limit(1);
-
-  if (existing.length) return existing[0];
-
-  const inserted = await db
+export async function ensureSharedTenant(): Promise<void> {
+  if (ensured) return;
+  await db
     .insert(schema.tenants)
-    .values({ deviceId })
-    .returning();
-  return inserted[0];
+    .values({
+      id: SHARED_TENANT_ID,
+      deviceId: SHARED_TENANT_DEVICE_ID,
+    })
+    .onConflictDoNothing();
+  ensured = true;
 }

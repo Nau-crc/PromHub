@@ -1,5 +1,4 @@
 import type { Venue, PromEvent, Guest, Reservation, AppDataSnapshot } from '@/core/types';
-import { getTenantId } from './tenant';
 
 // ─────────────────────────────────────────────────────────────
 //  Typed REST client for the /api/v1 backend.
@@ -29,12 +28,12 @@ export class ApiError extends Error {
 }
 
 async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const tenantId = await getTenantId();
+  // No tenant header — the backend is a single shared workspace
+  // now. Every device reads/writes the same dataset.
   const res = await fetch(`/api/v1${path}`, {
     ...init,
     headers: {
       'Content-Type': 'application/json',
-      'X-Tenant-Id': tenantId,
       ...(init.headers ?? {}),
     },
   });

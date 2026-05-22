@@ -78,9 +78,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // and TypeScript's compiler emits the path verbatim. Without it
     // you get ERR_MODULE_NOT_FOUND at runtime. The .js refers to
     // the compiled file even though the source is .ts.
-    const { and, eq } = await import('drizzle-orm');
+    const { eq } = await import('drizzle-orm');
     const { db, schema } = await import('../_lib/db.js');
-    const { resolveTenant } = await import('../_lib/tenancy.js');
+    const { ensureSharedTenant, SHARED_TENANT_ID } = await import('../_lib/tenancy.js');
     const {
       venueInputSchema, eventInputSchema, guestInputSchema,
       reservationInputSchema, snapshotSchema,
@@ -88,7 +88,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { parseBody } = await import('../_handler.js');
     const { badRequest, notFound } = await import('../_lib/errors.js');
 
-    const tenant = await resolveTenant(req);
+    // Shared workspace — no per-device scoping any more. Reads
+    // return everything in each table; writes carry the shared
+    // tenant_id so the FK constraint is satisfied.
+    await ensureSharedTenant();
+    const tenantId = SHARED_TENANT_ID;
 
     // ── /api/v1/sync ────────────────────────────────────────
     if (resource === 'sync' && segments.length === 1) {
@@ -103,7 +107,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       for (const v of snap.venues) {
         const { clientId, ...rest } = v;
         const [row] = await db.insert(schema.venues)
-          .values({ ...rest, tenantId: tenant.id })
+          .values({ ...rest, tenantId })
           .returning({ id: schema.venues.id });
         venueMap.set(clientId, row.id);
       }
@@ -111,7 +115,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const { clientId, venueClientId, ...rest } = e;
         const venueId = venueClientId != null ? (venueMap.get(venueClientId) ?? null) : null;
         const [row] = await db.insert(schema.events)
-          .values({ ...rest, venueId, tenantId: tenant.id })
+          .values({ ...rest, venueId, tenantId })
           .returning({ id: schema.events.id });
         eventMap.set(clientId, row.id);
       }
@@ -122,7 +126,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const venueId = venueClientId != null ? (venueMap.get(venueClientId) ?? null) : null;
         const clubEventId = clubEventClientId != null ? (eventMap.get(clubEventClientId) ?? null) : null;
         const [row] = await db.insert(schema.guests)
-          .values({ ...rest, eventId, venueId, clubEventId, tenantId: tenant.id })
+          .values({ ...rest, eventId, venueId, clubEventId, tenantId })
           .returning({ id: schema.guests.id });
         guestMap.set(clientId, row.id);
       }
@@ -133,7 +137,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const eventId = eventClientId != null ? (eventMap.get(eventClientId) ?? null) : null;
         const [row] = await db.insert(schema.reservations)
           .values({
-            ...rest, venueId, eventId, tenantId: tenant.id,
+            ...rest, venueId, eventId, tenantId,
             commissionPct: String(rest.commissionPct),
             womanPct: String(rest.womanPct),
           })
@@ -164,21 +168,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (id === null) {
         if (req.method === 'GET') {
           const rows = await db.select().from(schema.venues)
-            .where(eq(schema.venues.tenantId, tenant.id))
             .orderBy(schema.venues.id);
           return res.status(200).json({ venues: rows });
         }
         if (req.method === 'POST') {
           const input = venueInputSchema.parse(parseBody(req.body));
           const [row] = await db.insert(schema.venues)
-            .values({ ...input, tenantId: tenant.id })
+            .values({ ...input, tenantId })
             .returning();
           return res.status(201).json({ venue: row });
         }
         throw badRequest(`Method ${req.method} not allowed`);
       }
 
-      const where = and(eq(schema.venues.id, id!), eq(schema.venues.tenantId, tenant.id));
+      const where = eq(schema.venues.id, id!);
       if (req.method === 'GET') {
         const [row] = await db.select().from(schema.venues).where(where).limit(1);
         if (!row) throw notFound();
@@ -204,20 +207,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           seasonEnd: schema.events.seasonEnd,
         })
           .from(schema.events)
-          .where(and(
-            eq(schema.events.tenantId, tenant.id),
-            eq(schema.events.venueId, id!),
-          ));
+          .where(eq(schema.events.venueId, id!));
         const futureIds = evs.filter((e) => e.isOneTime
           ? !!e.eventDate && e.eventDate >= todayIso
           : !e.seasonEnd || e.seasonEnd >= todayIso
         ).map((e) => e.id);
 
         if (futureIds.length) {
-          await db.delete(schema.events).where(and(
-            eq(schema.events.tenantId, tenant.id),
-            eq(schema.events.venueId, id!),
-          ));
+          await db.delete(schema.events)
+            .where(eq(schema.events.venueId, id!));
         }
         const [row] = await db.delete(schema.venues).where(where).returning();
         if (!row) throw notFound();
@@ -231,21 +229,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (id === null) {
         if (req.method === 'GET') {
           const rows = await db.select().from(schema.events)
-            .where(eq(schema.events.tenantId, tenant.id))
             .orderBy(schema.events.id);
           return res.status(200).json({ events: rows });
         }
         if (req.method === 'POST') {
           const input = eventInputSchema.parse(parseBody(req.body));
           const [row] = await db.insert(schema.events)
-            .values({ ...input, tenantId: tenant.id })
+            .values({ ...input, tenantId })
             .returning();
           return res.status(201).json({ event: row });
         }
         throw badRequest(`Method ${req.method} not allowed`);
       }
 
-      const where = and(eq(schema.events.id, id!), eq(schema.events.tenantId, tenant.id));
+      const where = eq(schema.events.id, id!);
       if (req.method === 'GET') {
         const [row] = await db.select().from(schema.events).where(where).limit(1);
         if (!row) throw notFound();
@@ -270,31 +267,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (id === null) {
         if (req.method === 'GET') {
           const rows = await db.select().from(schema.guests)
-            .where(eq(schema.guests.tenantId, tenant.id))
             .orderBy(schema.guests.id);
           return res.status(200).json({ guests: rows });
         }
         if (req.method === 'POST') {
           const input = guestInputSchema.parse(parseBody(req.body));
-          // Cross-tenant integrity check on the linked event.
+          // Sanity check: linked event must exist (FK would enforce
+          // this anyway, but a friendlier error is nicer).
           const [evt] = await db.select({ id: schema.events.id })
             .from(schema.events)
-            .where(and(
-              eq(schema.events.id, input.eventId),
-              eq(schema.events.tenantId, tenant.id),
-            ))
+            .where(eq(schema.events.id, input.eventId))
             .limit(1);
-          if (!evt) throw badRequest('Event not found for this tenant');
+          if (!evt) throw badRequest('Event not found');
 
           const [row] = await db.insert(schema.guests)
-            .values({ ...input, tenantId: tenant.id })
+            .values({ ...input, tenantId })
             .returning();
           return res.status(201).json({ guest: row });
         }
         throw badRequest(`Method ${req.method} not allowed`);
       }
 
-      const where = and(eq(schema.guests.id, id!), eq(schema.guests.tenantId, tenant.id));
+      const where = eq(schema.guests.id, id!);
       if (req.method === 'GET') {
         const [row] = await db.select().from(schema.guests).where(where).limit(1);
         if (!row) throw notFound();
@@ -319,7 +313,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (id === null) {
         if (req.method === 'GET') {
           const rows = await db.select().from(schema.reservations)
-            .where(eq(schema.reservations.tenantId, tenant.id))
             .orderBy(schema.reservations.id);
           return res.status(200).json({ reservations: rows });
         }
@@ -327,16 +320,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const input = reservationInputSchema.parse(parseBody(req.body));
           const [venue] = await db.select({ id: schema.venues.id })
             .from(schema.venues)
-            .where(and(
-              eq(schema.venues.id, input.venueId),
-              eq(schema.venues.tenantId, tenant.id),
-            ))
+            .where(eq(schema.venues.id, input.venueId))
             .limit(1);
-          if (!venue) throw badRequest('Venue not found for this tenant');
+          if (!venue) throw badRequest('Venue not found');
 
           const [row] = await db.insert(schema.reservations)
             .values({
-              ...input, tenantId: tenant.id,
+              ...input, tenantId,
               commissionPct: String(input.commissionPct),
               womanPct: String(input.womanPct),
             })
@@ -346,7 +336,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         throw badRequest(`Method ${req.method} not allowed`);
       }
 
-      const where = and(eq(schema.reservations.id, id!), eq(schema.reservations.tenantId, tenant.id));
+      const where = eq(schema.reservations.id, id!);
       if (req.method === 'GET') {
         const [row] = await db.select().from(schema.reservations).where(where).limit(1);
         if (!row) throw notFound();
