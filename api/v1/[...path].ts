@@ -42,7 +42,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // CORS — first, unconditional, never inside the try/catch so
   // OPTIONS preflights always succeed.
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,DELETE,OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,PUT,DELETE,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Tenant-Id');
   if (req.method === 'OPTIONS') return res.status(204).end();
 
@@ -184,7 +184,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (!row) throw notFound();
         return res.status(200).json({ venue: row });
       }
-      if (req.method === 'PATCH') {
+      if (req.method === 'PATCH' || req.method === 'PUT') {
         const input = venueInputSchema.partial().parse(parseBody(req.body));
         const [row] = await db.update(schema.venues).set(input).where(where).returning();
         if (!row) throw notFound();
@@ -251,7 +251,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (!row) throw notFound();
         return res.status(200).json({ event: row });
       }
-      if (req.method === 'PATCH') {
+      if (req.method === 'PATCH' || req.method === 'PUT') {
         const input = eventInputSchema.partial().parse(parseBody(req.body));
         const [row] = await db.update(schema.events).set(input).where(where).returning();
         if (!row) throw notFound();
@@ -300,7 +300,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (!row) throw notFound();
         return res.status(200).json({ guest: row });
       }
-      if (req.method === 'PATCH') {
+      if (req.method === 'PATCH' || req.method === 'PUT') {
         const input = guestInputSchema.partial().parse(parseBody(req.body));
         const [row] = await db.update(schema.guests).set(input).where(where).returning();
         if (!row) throw notFound();
@@ -352,7 +352,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (!row) throw notFound();
         return res.status(200).json({ reservation: row });
       }
-      if (req.method === 'PATCH') {
+      if (req.method === 'PATCH' || req.method === 'PUT') {
         const input = reservationInputSchema.partial().parse(parseBody(req.body));
         const patch: Record<string, unknown> = { ...input };
         if (input.commissionPct !== undefined) patch.commissionPct = String(input.commissionPct);
@@ -369,8 +369,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       throw badRequest(`Method ${req.method} not allowed`);
     }
 
-    // No match
-    return res.status(404).json({ error: `Unknown route: /api/v1/${segments.join('/')}` });
+    // No match. Include diagnostic info so when this fires we can
+    // tell whether path extraction worked or Vercel routed us a
+    // shape we don't understand.
+    return res.status(404).json({
+      error: `Unknown route: /api/v1/${segments.join('/')}`,
+      _debug: {
+        method: req.method,
+        url: req.url,
+        queryPath: req.query.path,
+        parsedSegments: segments,
+      },
+    });
 
   } catch (err) {
     // Single error sink for everything thrown inside the try.
@@ -402,32 +412,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 // ─────────────────────────────────────────────────────────────
 //  Robust path-segment extraction.
 //
-//  1. Try the standard Vercel catch-all convention
-//     (`req.query[<bracketName>]` → string[]). Try both `path`
-//     and `slug` since the convention has changed across runtime
-//     versions.
+//  Vercel's behaviour for catch-all params (`[...path].ts`) has
+//  shifted across runtime versions and isn't 100% consistent. We
+//  observed all three of these in production:
+//    A) req.query.path === ['venues', '123']     (proper array)
+//    B) req.query.path === 'venues/123'          (single string with slashes)
+//    C) req.query.path === undefined             (URL has to be parsed)
 //
-//  2. If that's empty, parse `req.url` directly. `req.url` is
-//     always the full path + query string of the incoming request,
-//     so we can recover segments even when query param parsing
-//     misses them.
+//  We support all three by:
+//    1. Reading every candidate query key (`path`, `slug`)
+//    2. Flattening arrays AND splitting any value on '/'
+//    3. Falling back to parsing `req.url` itself
 // ─────────────────────────────────────────────────────────────
 function extractSegments(req: VercelRequest): string[] {
   for (const key of ['path', 'slug']) {
     const v = req.query[key];
-    if (v) {
-      const arr = Array.isArray(v) ? v : [v];
-      const filtered = arr.filter(
-        (s): s is string => typeof s === 'string' && s.length > 0,
-      );
-      if (filtered.length) return filtered;
-    }
+    if (v == null) continue;
+    const arr = Array.isArray(v) ? v : [v];
+    const flat = arr.flatMap((s) =>
+      typeof s === 'string' ? s.split('/').filter(Boolean) : [],
+    );
+    if (flat.length) return flat;
   }
   if (req.url) {
     const pathOnly = req.url.split('?')[0];
     // Strip the `/api/v1/` prefix and split the remainder.
-    const match = pathOnly.match(/^\/api\/v1\/(.*)$/);
-    if (match) return match[1].split('/').filter(Boolean);
+    // If Vercel rewrote `req.url` to the literal bracket form
+    // (`/api/v1/[...path]`), this regex won't capture anything
+    // useful, and we'll fall through to the empty segments path —
+    // that's still safer than a hang.
+    const match = pathOnly.match(/^\/api\/v1\/([^[].*)?$/);
+    if (match && match[1]) return match[1].split('/').filter(Boolean);
   }
   return [];
 }

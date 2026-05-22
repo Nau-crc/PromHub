@@ -1,33 +1,35 @@
 #!/usr/bin/env node
 // ─────────────────────────────────────────────────────────────
-//  CI database sync.
+//  CI schema applier.
 //
-//  Uses `drizzle-kit push` (NOT `migrate`) because at this stage
-//  of the project we're still iterating on the schema and we want
-//  the DB to follow `api/_lib/schema.ts` automatically. Trade-offs:
+//  History: we tried `drizzle-kit migrate` (failed because the
+//  DB had tables but no journal) and `drizzle-kit push` (hung in
+//  CI because drizzle's prompt library wants a TTY). Both routes
+//  through drizzle-kit's CLI proved brittle for Vercel builds.
 //
-//    push     idempotent. Reconciles whatever state the DB is in
-//             with the schema. No journal needed. Right for
-//             prototyping; risky once we have production data
-//             (drops cascade, no audit trail per PR).
-//    migrate  applies committed SQL files in order, tracks them
-//             in `__drizzle_migrations`. Right for prod, but
-//             intolerant of state mismatches (e.g. tables exist
-//             but the journal is empty → CREATE TABLE conflicts).
+//  This script bypasses drizzle-kit at runtime entirely. It:
+//    1. Opens an HTTP connection to Neon
+//    2. Ensures a `__schema_migrations` tracking table exists
+//    3. For each .sql file under api/_lib/migrations/, checks if
+//       it's been applied; if not, runs every statement, skipping
+//       "object already exists" errors so re-runs are safe
+//    4. Records the file as applied
 //
-//  Switch to `migrate` once we have real users + reviewable
-//  schema PRs; for now `push` keeps the deploy moving.
+//  Drizzle-kit is still used LOCALLY (`npm run db:generate`) to
+//  emit the SQL diff when you change `schema.ts`. We just don't
+//  let its CLI touch the production DB.
 //
-//  Rules (same as before):
-//   - Vercel + DATABASE_URL → push, fail build if push fails
-//   - Vercel without DATABASE_URL → exit 1 (build halts loudly)
-//   - Local without DATABASE_URL → skip (frontend-only build)
+//  Rules:
+//    - Vercel + DATABASE_URL → run, fail build on unhandled errors
+//    - Vercel without DATABASE_URL → exit 1 (build halts loudly)
+//    - Local without DATABASE_URL → skip (frontend-only build)
 // ─────────────────────────────────────────────────────────────
 
-import { spawn } from 'node:child_process';
+import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { dirname, resolve } from 'node:path';
+import { dirname, resolve, join } from 'node:path';
 import { config as loadEnv } from 'dotenv';
+import { neon } from '@neondatabase/serverless';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '..');
@@ -46,38 +48,103 @@ function resolveDatabaseUrl() {
 
 const isCi = !!(process.env.CI || process.env.VERCEL);
 const dbUrl = resolveDatabaseUrl();
+const migrationsDir = resolve(repoRoot, 'api/_lib/migrations');
 
 if (!dbUrl) {
   if (isCi) {
-    console.error('[db-sync] No DATABASE_URL found in env. ' +
-      'Connect the Neon integration to this Vercel project.');
+    console.error('[db] No DATABASE_URL found. Connect Neon to this Vercel project.');
     process.exit(1);
   }
-  console.log('[db-sync] No DATABASE_URL — skipping push (local build).');
+  console.log('[db] No DATABASE_URL — skipping (local build).');
   process.exit(0);
 }
 
-console.log('[db-sync] Reconciling schema with `drizzle-kit push`…');
+if (!existsSync(migrationsDir)) {
+  console.log('[db] No migrations directory — skipping. Run `npm run db:generate` to create one.');
+  process.exit(0);
+}
 
-// Push is non-interactive for non-destructive changes. For destructive
-// changes it asks for confirmation; we pipe "y" to stdin so CI never
-// hangs. The trade-off: any destructive change (rename, drop, type
-// change) will be applied silently. With no real users yet this is the
-// right default; we'll tighten before launch.
-const child = spawn('npx', ['drizzle-kit', 'push'], {
-  cwd: repoRoot,
-  stdio: ['pipe', 'inherit', 'inherit'],
-  env: process.env,
-});
+const files = readdirSync(migrationsDir)
+  .filter((f) => f.endsWith('.sql'))
+  .sort(); // lexicographic = chronological (0000_, 0001_, …)
 
-// Drizzle uses an interactive prompt library that reads stdin
-// character-by-character. Feeding a stream of "y\n" answers every
-// possible confirmation it might ask for during this push.
-const autoConfirm = setInterval(() => {
-  try { child.stdin.write('y\n'); } catch { /* stdin closed */ }
-}, 250);
+if (!files.length) {
+  console.log('[db] No .sql files in migrations dir — nothing to apply.');
+  process.exit(0);
+}
 
-child.on('exit', (code) => {
-  clearInterval(autoConfirm);
-  process.exit(code ?? 0);
-});
+const sql = neon(dbUrl);
+
+// Postgres error codes we treat as "already exists, please continue"
+// when applying a migration that was partially run before.
+//   42P07: duplicate_table        (CREATE TABLE … already exists)
+//   42P06: duplicate_schema       (CREATE SCHEMA … already exists)
+//   42710: duplicate_object       (constraint/index name already exists)
+//   42701: duplicate_column       (ALTER ADD COLUMN … already exists)
+//   42P16: invalid_table_def(rare) some constraints
+const IGNORABLE_CODES = new Set(['42P07', '42P06', '42710', '42701']);
+
+try {
+  // 1. Tracking table — our own, separate from drizzle's journal.
+  await sql(`CREATE TABLE IF NOT EXISTS __schema_migrations (
+    id text PRIMARY KEY,
+    applied_at timestamptz DEFAULT now()
+  )`);
+
+  // 2. Apply each file in order if not yet applied.
+  for (const file of files) {
+    const id = file;
+    const seen = await sql(
+      `SELECT 1 FROM __schema_migrations WHERE id = $1 LIMIT 1`,
+      [id],
+    );
+    if (seen.length) {
+      console.log(`[db] ${id} — already applied, skipping`);
+      continue;
+    }
+
+    console.log(`[db] applying ${id}…`);
+    const raw = readFileSync(join(migrationsDir, file), 'utf8');
+
+    // Drizzle separates statements with "--> statement-breakpoint"
+    // comments. Split on that to get individual statements.
+    const statements = raw
+      .split(/-->\s*statement-breakpoint/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    let ranCount = 0;
+    let skippedCount = 0;
+    for (const stmt of statements) {
+      try {
+        await sql(stmt);
+        ranCount++;
+      } catch (err) {
+        const code = err?.code ?? err?.cause?.code;
+        if (code && IGNORABLE_CODES.has(code)) {
+          // The object already exists — fine on a re-run.
+          const oneLine = String(err.message ?? err).split('\n')[0];
+          console.log(`[db]   ↳ skipping (${code}): ${oneLine}`);
+          skippedCount++;
+          continue;
+        }
+        // Unexpected error → fail the build so we don't silently
+        // ship a broken schema.
+        console.error(`[db] FAILED on statement:\n${stmt}\n`);
+        throw err;
+      }
+    }
+
+    await sql(
+      `INSERT INTO __schema_migrations (id) VALUES ($1)`,
+      [id],
+    );
+    console.log(`[db] ${id} ✓  (${ranCount} run, ${skippedCount} pre-existing)`);
+  }
+
+  console.log('[db] all migrations up to date');
+  process.exit(0);
+} catch (err) {
+  console.error('[db] migration failed:', err);
+  process.exit(1);
+}

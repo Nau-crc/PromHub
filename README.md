@@ -456,10 +456,21 @@ the device tenant UUID and the onboarding flag.
 npm run db:migrate:ci && npm run build
 ```
 
-The script (`scripts/migrate-ci.mjs`) runs **`drizzle-kit push`** —
-which reconciles whatever state the DB is in to match
-`api/_lib/schema.ts`. It's idempotent: if the DB already matches,
-nothing happens.
+The script (`scripts/migrate-ci.mjs`) is a small custom migrator
+that bypasses `drizzle-kit` at runtime (its CLI prompts for
+confirmation and hangs in Vercel's CI). It:
+
+1. Connects to Neon over HTTP.
+2. Ensures a `__schema_migrations` tracking table exists.
+3. For each `.sql` file in `api/_lib/migrations/` (sorted), checks
+   if it's been applied. If not, runs every statement and skips
+   "already exists" errors (codes `42P07`, `42710`, `42701`,
+   `42P06`) so re-runs are safe.
+4. Records the file as applied so subsequent deploys skip it.
+
+`drizzle-kit` is still used **locally** (`npm run db:generate`) to
+generate the SQL diffs whenever you change `api/_lib/schema.ts`.
+We just don't run its CLI in production CI.
 
 | Scenario                              | Behaviour                                   |
 | ------------------------------------- | ------------------------------------------- |
