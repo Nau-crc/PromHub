@@ -69,15 +69,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // ── Lazy-load everything heavy ──────────────────────────
     // Any failure here lands in the catch below and gets sent
     // back as a JSON 500 instead of Vercel's generic HTML page.
+    //
+    // The `.js` extension on local imports is REQUIRED — Vercel's
+    // Node ESM resolver doesn't auto-append it for dynamic imports,
+    // and TypeScript's compiler emits the path verbatim. Without it
+    // you get ERR_MODULE_NOT_FOUND at runtime. The .js refers to
+    // the compiled file even though the source is .ts.
     const { and, eq } = await import('drizzle-orm');
-    const { db, schema } = await import('../_lib/db');
-    const { resolveTenant } = await import('../_lib/tenancy');
+    const { db, schema } = await import('../_lib/db.js');
+    const { resolveTenant } = await import('../_lib/tenancy.js');
     const {
       venueInputSchema, eventInputSchema, guestInputSchema,
       reservationInputSchema, snapshotSchema,
-    } = await import('../_lib/validators');
-    const { parseBody } = await import('../_handler');
-    const { badRequest, notFound } = await import('../_lib/errors');
+    } = await import('../_lib/validators.js');
+    const { parseBody } = await import('../_handler.js');
+    const { badRequest, notFound } = await import('../_lib/errors.js');
 
     const tenant = await resolveTenant(req);
 
