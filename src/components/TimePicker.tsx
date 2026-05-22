@@ -90,7 +90,11 @@ export const TimePicker: React.FC<Props> = ({
   const minList = repeated(minuteValues);
 
   return (
-    <IonModal isOpen={open} onDidDismiss={onClose} initialBreakpoint={0.5} breakpoints={[0, 0.5]}>
+    <IonModal
+      isOpen={open}
+      onDidDismiss={onClose}
+      className="time-picker-modal"
+    >
       <IonContent>
         <div style={{
           padding: '14px 16px 10px',
