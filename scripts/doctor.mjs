@@ -115,12 +115,16 @@ async function probe(label, path, init = {}) {
   }
 }
 
-await probe('GET /api/v1/ping  (zero-deps sanity check)', '/api/v1/ping');
-await probe('GET /api/health   (env presence)', '/api/health');
+// /api/v1/ping is handled by the unified router and uses zero DB.
+// If THIS responds with 200, Vercel is serving the new code and
+// the router itself works. If it 404s, the router file isn't
+// deployed; if it 500s with JSON, we have a real bug to debug.
+await probe('GET /api/v1/ping (router + zero-deps)', '/api/v1/ping');
+await probe('GET /api/health  (env presence)', '/api/health');
 
-// Force a request that hits the DB so we surface tenants/Neon errors
+// Force a request that hits the DB so we surface tenant/Neon errors
 const FAKE_TENANT = '11111111-1111-4111-8111-111111111111';
-await probe('GET /api/v1/venues (DB read)', '/api/v1/venues', {
+await probe('GET /api/v1/venues (DB read via router)', '/api/v1/venues', {
   headers: { 'X-Tenant-Id': FAKE_TENANT },
 });
 
