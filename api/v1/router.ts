@@ -1,6 +1,8 @@
 // ─────────────────────────────────────────────────────────────
-//  /api/v1/[...path].ts — single catch-all router for ALL the
-//  versioned CRUD endpoints.
+//  /api/v1/router.ts — single router for ALL the versioned CRUD
+//  endpoints. The file lives at this path and `vercel.json`
+//  rewrites every `/api/v1/*` URL to it with `resource` and `id`
+//  as query parameters.
 //
 //  Why one file instead of one-per-resource:
 //    Vercel Hobby caps deployments at 12 Serverless Functions.
@@ -46,14 +48,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Tenant-Id');
   if (req.method === 'OPTIONS') return res.status(204).end();
 
-  // Path segments. In theory Vercel's catch-all `[...path].ts` should
-  // populate `req.query.path = ['venues', '123']` for `/api/v1/venues/123`.
-  // In practice we've observed it being empty under Vercel's Node 24
-  // runtime — so we parse `req.url` ourselves as a robust fallback.
-  // This makes the router work regardless of how Vercel's routing
-  // layer chooses to forward the path on a given runtime version.
-  const segments = extractSegments(req);
-  const [resource, idSeg] = segments;
+  // Resource and id come from explicit rewrites in vercel.json:
+  //   /api/v1/:resource         → /api/v1/router?resource=:resource
+  //   /api/v1/:resource/:id     → /api/v1/router?resource=:resource&id=:id
+  //
+  // We tried Vercel's catch-all `[...path].ts` first; under the Vite
+  // framework setting it only routed single-segment paths and returned
+  // Vercel's bare 404 (no JSON, no logs) for two-segment paths like
+  // events/123. Explicit rewrites are deterministic regardless of
+  // runtime quirks.
+  const resource = pickString(req.query.resource);
+  const idSeg = pickString(req.query.id);
+  const segments: string[] = [resource, idSeg].filter(
+    (s): s is string => !!s,
+  );
 
   try {
     // ── /api/v1/ping (no DB, no auth — for diagnostics) ─────
@@ -411,40 +419,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 }
 
-// ─────────────────────────────────────────────────────────────
-//  Robust path-segment extraction.
-//
-//  Vercel's behaviour for catch-all params (`[...path].ts`) has
-//  shifted across runtime versions and isn't 100% consistent. We
-//  observed all three of these in production:
-//    A) req.query.path === ['venues', '123']     (proper array)
-//    B) req.query.path === 'venues/123'          (single string with slashes)
-//    C) req.query.path === undefined             (URL has to be parsed)
-//
-//  We support all three by:
-//    1. Reading every candidate query key (`path`, `slug`)
-//    2. Flattening arrays AND splitting any value on '/'
-//    3. Falling back to parsing `req.url` itself
-// ─────────────────────────────────────────────────────────────
-function extractSegments(req: VercelRequest): string[] {
-  for (const key of ['path', 'slug']) {
-    const v = req.query[key];
-    if (v == null) continue;
-    const arr = Array.isArray(v) ? v : [v];
-    const flat = arr.flatMap((s) =>
-      typeof s === 'string' ? s.split('/').filter(Boolean) : [],
-    );
-    if (flat.length) return flat;
-  }
-  if (req.url) {
-    const pathOnly = req.url.split('?')[0];
-    // Strip the `/api/v1/` prefix and split the remainder.
-    // If Vercel rewrote `req.url` to the literal bracket form
-    // (`/api/v1/[...path]`), this regex won't capture anything
-    // useful, and we'll fall through to the empty segments path —
-    // that's still safer than a hang.
-    const match = pathOnly.match(/^\/api\/v1\/([^[].*)?$/);
-    if (match && match[1]) return match[1].split('/').filter(Boolean);
-  }
-  return [];
+// Tiny helper — query values can be string | string[] | undefined.
+// We treat the first non-empty string as the value.
+function pickString(v: string | string[] | undefined): string | undefined {
+  if (Array.isArray(v)) return v.find((s) => typeof s === 'string' && s.length > 0);
+  if (typeof v === 'string' && v.length > 0) return v;
+  return undefined;
 }

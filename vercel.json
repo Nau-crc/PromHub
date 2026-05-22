@@ -5,6 +5,14 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
+      "source": "/api/v1/:resource/:id",
+      "destination": "/api/v1/router?resource=:resource&id=:id"
+    },
+    {
+      "source": "/api/v1/:resource",
+      "destination": "/api/v1/router?resource=:resource"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
