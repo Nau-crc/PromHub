@@ -46,10 +46,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Tenant-Id');
   if (req.method === 'OPTIONS') return res.status(204).end();
 
-  // Path segments from Vercel's catch-all routing.
-  const raw = req.query.path;
-  const segments = (Array.isArray(raw) ? raw : [raw])
-    .filter((s): s is string => typeof s === 'string' && s.length > 0);
+  // Path segments. In theory Vercel's catch-all `[...path].ts` should
+  // populate `req.query.path = ['venues', '123']` for `/api/v1/venues/123`.
+  // In practice we've observed it being empty under Vercel's Node 24
+  // runtime — so we parse `req.url` ourselves as a robust fallback.
+  // This makes the router work regardless of how Vercel's routing
+  // layer chooses to forward the path on a given runtime version.
+  const segments = extractSegments(req);
   const [resource, idSeg] = segments;
 
   try {
@@ -394,4 +397,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       cause: e.cause != null ? String(e.cause) : undefined,
     });
   }
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Robust path-segment extraction.
+//
+//  1. Try the standard Vercel catch-all convention
+//     (`req.query[<bracketName>]` → string[]). Try both `path`
+//     and `slug` since the convention has changed across runtime
+//     versions.
+//
+//  2. If that's empty, parse `req.url` directly. `req.url` is
+//     always the full path + query string of the incoming request,
+//     so we can recover segments even when query param parsing
+//     misses them.
+// ─────────────────────────────────────────────────────────────
+function extractSegments(req: VercelRequest): string[] {
+  for (const key of ['path', 'slug']) {
+    const v = req.query[key];
+    if (v) {
+      const arr = Array.isArray(v) ? v : [v];
+      const filtered = arr.filter(
+        (s): s is string => typeof s === 'string' && s.length > 0,
+      );
+      if (filtered.length) return filtered;
+    }
+  }
+  if (req.url) {
+    const pathOnly = req.url.split('?')[0];
+    // Strip the `/api/v1/` prefix and split the remainder.
+    const match = pathOnly.match(/^\/api\/v1\/(.*)$/);
+    if (match) return match[1].split('/').filter(Boolean);
+  }
+  return [];
 }

@@ -68,7 +68,9 @@ const checks = [
   { path: 'vercel.json', why: 'Vercel config' },
   { path: 'drizzle.config.ts', why: 'migration config' },
   { path: 'api/_lib/schema.ts', why: 'DB schema' },
-  { path: 'api/v1/venues/index.ts', why: 'venues endpoint' },
+  // The whole versioned API now lives in a single catch-all router
+  // to stay under Vercel Hobby's 12-function limit.
+  { path: 'api/v1/[...path].ts', why: 'v1 router (catch-all)' },
   { path: 'scripts/migrate-ci.mjs', why: 'CI migration runner' },
 ];
 for (const c of checks) {
@@ -119,14 +121,24 @@ async function probe(label, path, init = {}) {
 // If THIS responds with 200, Vercel is serving the new code and
 // the router itself works. If it 404s, the router file isn't
 // deployed; if it 500s with JSON, we have a real bug to debug.
-await probe('GET /api/v1/ping (router + zero-deps)', '/api/v1/ping');
-await probe('GET /api/health  (env presence)', '/api/health');
+const pingResult = await probe('GET /api/v1/ping (router + zero-deps)', '/api/v1/ping');
+const healthResult = await probe('GET /api/health  (env presence)', '/api/health');
 
 // Force a request that hits the DB so we surface tenant/Neon errors
 const FAKE_TENANT = '11111111-1111-4111-8111-111111111111';
 await probe('GET /api/v1/venues (DB read via router)', '/api/v1/venues', {
   headers: { 'X-Tenant-Id': FAKE_TENANT },
 });
+
+// Deploy-freshness check: compare local HEAD with what's deployed
+const deployedSha = healthResult?.body?.commitSha
+  ?? pingResult?.body?.commitSha
+  ?? null;
+if (deployedSha && headSha && !deployedSha.startsWith(headSha)) {
+  section('Deploy freshness');
+  warn(`Local HEAD is ${headSha} but Vercel is serving ${deployedSha.slice(0, 7)}.`);
+  warn('Push your local commits (or wait for the in-flight build) so the fix actually goes live.');
+}
 
 line('');
 line('── Done ──');
