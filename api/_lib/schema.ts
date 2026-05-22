@@ -179,9 +179,40 @@ export const reservationsRelations = relations(reservations, ({ one }) => ({
   event: one(events, { fields: [reservations.eventId], references: [events.id] }),
 }));
 
+// ─── Submissions (public registration form) ─────────────────
+//
+//  When the promoter shares an event's public link
+//  (`/register/<shareToken>`), guests fill in a form and the
+//  result lands here. The promoter's app pulls these into the
+//  `guests` table on demand (so they can still review before
+//  the guest officially counts toward capacity).
+//
+//  No tenant_id — submissions are scoped by event, and events
+//  carry the shared workspace anyway.
+export const submissions = pgTable('submissions', {
+  id: serial('id').primaryKey(),
+  eventId: integer('event_id').notNull().references(() => events.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  pax: integer('pax').default(1).notNull(),
+  igHandle: text('ig_handle').default('').notNull(),
+  igPlatform: text('ig_platform', { enum: ['instagram', 'tiktok'] }).default('instagram').notNull(),
+  notes: text('notes').default('').notNull(),
+  /** When the promoter pulled this submission into the guests
+   *  list. Null = not yet imported (used for dedup on re-pulls). */
+  importedAt: timestamp('imported_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  byEvent: index('submissions_event_idx').on(t.eventId),
+}));
+
+export const submissionsRelations = relations(submissions, ({ one }) => ({
+  event: one(events, { fields: [submissions.eventId], references: [events.id] }),
+}));
+
 // Re-exports for type inference at the call site
 export type Tenant = typeof tenants.$inferSelect;
 export type Venue = typeof venues.$inferSelect;
 export type EventRow = typeof events.$inferSelect;
 export type GuestRow = typeof guests.$inferSelect;
 export type ReservationRow = typeof reservations.$inferSelect;
+export type SubmissionRow = typeof submissions.$inferSelect;
