@@ -1,5 +1,11 @@
 /* ─── Design tokens (light, default) ─────────────────────────── */
 :root {
+  /* Tells the browser to render native form controls (date pickers,
+     dropdowns, scrollbars, autofill backgrounds…) in the matching
+     palette. Without this, text selection / placeholders / native
+     date pickers can show light text on light background in dark
+     mode. */
+  color-scheme: light;
   --color-background-primary: #ffffff;
   --color-background-secondary: #f5f4ef;
   --color-background-tertiary: #ebe9e0;
@@ -20,6 +26,11 @@
 
   /* Calendar range band */
   --cal-range-band: #FFE7D2;
+
+  /* "Selected" tint used by chips, slot-pickers, event-pickers.
+     A faint orange in light mode; a dim orange-on-dark in dark mode
+     so the text inside stays readable. */
+  --color-selected-bg: #FFF7ED;
 
   /* Brand colors — fixed across themes */
   --color-primary: #f97316;
@@ -56,6 +67,7 @@
 
 /* ─── Dark theme ─────────────────────────────────────────────── */
 [data-theme="dark"] {
+  color-scheme: dark;
   --color-background-primary: #1a1917;     /* card surface */
   --color-background-secondary: #232220;   /* muted / inputs */
   --color-background-tertiary: #0f0e0c;    /* page background */
@@ -75,6 +87,7 @@
   --pill-purple-bg: #211d3d;  --pill-purple-fg: #b3aae5;
 
   --cal-range-band: #4a2810;
+  --color-selected-bg: #2d1b0e;
 
   --ion-background-color: var(--color-background-tertiary);
   --ion-text-color: var(--color-text-primary);
@@ -246,7 +259,7 @@ body { font-family: var(--font-sans); }
 .day-chip.sel { background: #F97316; border-color: #F97316; color: #fff; font-weight: 500; }
 
 .event-picker-item { display: flex; align-items: center; gap: 10px; padding: 11px 14px; border-radius: var(--border-radius-md); border: 0.5px solid var(--color-border-secondary); background: var(--color-background-primary); cursor: pointer; margin-bottom: 7px; user-select: none; transition: all .15s; }
-.event-picker-item.sel { border-color: #F97316; background: #FFF7ED; }
+.event-picker-item.sel { border-color: #F97316; background: var(--color-selected-bg); }
 .event-picker-item.none-opt { border-style: dashed; }
 .event-picker-info { flex: 1; }
 .event-picker-name { font-size: 13px; font-weight: 500; color: var(--color-text-primary); }
@@ -255,7 +268,7 @@ body { font-family: var(--font-sans); }
 .event-picker-item.sel .event-picker-check { background: #F97316; border-color: #F97316; color: #fff; }
 
 .slot-chip { display: flex; align-items: center; gap: 10px; padding: 11px 14px; border-radius: var(--border-radius-md); border: 0.5px solid var(--color-border-secondary); background: var(--color-background-primary); cursor: pointer; margin-bottom: 7px; user-select: none; transition: all .15s; }
-.slot-chip.sel { border-color: #F97316; background: #FFF7ED; }
+.slot-chip.sel { border-color: #F97316; background: var(--color-selected-bg); }
 .slot-chip-body { flex: 1; }
 .slot-chip-name { font-size: 13px; font-weight: 500; color: var(--color-text-primary); }
 .slot-chip-time { font-size: 11px; color: var(--color-text-secondary); margin-top: 1px; }
@@ -286,8 +299,8 @@ body { font-family: var(--font-sans); }
 /* Selected (single mode) */
 .cal-day.sel { background: #F97316; color: #fff; font-weight: 600; border-radius: 50%; }
 /* Range edges: half soft-orange band + a solid orange disc on the date */
-.cal-day.sel-start { background: linear-gradient(to right, transparent 50%, #FFE7D2 50%); }
-.cal-day.sel-end { background: linear-gradient(to right, #FFE7D2 50%, transparent 50%); }
+.cal-day.sel-start { background: linear-gradient(to right, transparent 50%, var(--cal-range-band) 50%); }
+.cal-day.sel-end { background: linear-gradient(to right, var(--cal-range-band) 50%, transparent 50%); }
 .cal-day.sel-start, .cal-day.sel-end {
   position: relative;
   color: #fff;
@@ -299,8 +312,8 @@ body { font-family: var(--font-sans); }
   display: none;
 }
 .cal-day.sel-start > *, .cal-day.sel-end > * { /* no-op for safety */ }
-.cal-day.sel-start { background-image: linear-gradient(to right, transparent 50%, #FFE7D2 50%); }
-.cal-day.sel-end   { background-image: linear-gradient(to right, #FFE7D2 50%, transparent 50%); }
+.cal-day.sel-start { background-image: linear-gradient(to right, transparent 50%, var(--cal-range-band) 50%); }
+.cal-day.sel-end   { background-image: linear-gradient(to right, var(--cal-range-band) 50%, transparent 50%); }
 /* Solid orange circle drawn via box-shadow inset trick is unreliable; use a wrapping span instead */
 .cal-day.sel-start, .cal-day.sel-end {
   /* inner orange disc via radial-gradient over the half-band */
@@ -308,9 +321,9 @@ body { font-family: var(--font-sans); }
     radial-gradient(circle at center, #F97316 0 48%, transparent 49%),
     linear-gradient(to right, var(--cal-band-left, transparent) 50%, var(--cal-band-right, transparent) 50%);
 }
-.cal-day.sel-start { --cal-band-left: transparent; --cal-band-right: #FFE7D2; }
-.cal-day.sel-end   { --cal-band-left: #FFE7D2;     --cal-band-right: transparent; }
-.cal-day.in-range  { background: #FFE7D2; color: var(--color-text-primary); border-radius: 0; }
+.cal-day.sel-start { --cal-band-left: transparent; --cal-band-right: var(--cal-range-band); }
+.cal-day.sel-end   { --cal-band-left: var(--cal-range-band);     --cal-band-right: transparent; }
+.cal-day.in-range  { background: var(--cal-range-band); color: var(--color-text-primary); border-radius: 0; }
 .cal-day.is-today.sel::after, .cal-day.is-today.sel-start::after, .cal-day.is-today.sel-end::after { background: #fff; }
 .cal-nav { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px 4px; }
 .cal-nav-btn { background: transparent; border: 0.5px solid var(--color-border-secondary); border-radius: var(--border-radius-md); padding: 5px 12px; font-size: 13px; cursor: pointer; color: var(--color-text-primary); }
@@ -320,6 +333,17 @@ body { font-family: var(--font-sans); }
 
 /* Occurrence stepper */
 .occ-picker { display: flex; align-items: center; gap: 10px; background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); padding: 10px 12px; }
+
+/* TimePicker modal — fixed height, not a draggable sheet. The wheel
+   columns inside scroll vertically; the modal itself does NOT move,
+   which is what users expect (otherwise the whole popup slides as
+   you spin the wheel). */
+ion-modal.time-picker-modal {
+  --height: 380px;
+  --max-height: 380px;
+  --width: min(420px, 92vw);
+  --border-radius: 16px;
+}
 
 /* Wheel time picker — Trainline-style infinite-scroll columns */
 .time-wheel-wrap { position: relative; display: flex; align-items: center; justify-content: center; gap: 10px; padding: 32px 16px; min-height: 220px; }
