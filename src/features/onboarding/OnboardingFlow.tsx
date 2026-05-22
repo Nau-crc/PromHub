@@ -11,6 +11,10 @@ import { SlotChips } from '@/components/SlotChips';
 import { Calendar } from '@/components/Calendar';
 import { NumberField } from '@/components/NumberField';
 import { SelectField } from '@/components/SelectField';
+import { COUNTRY_CODES } from '@/core/constants';
+import {
+  formatPhone, isValidPhone, maxDigits, onlyDigits, placeholderForCode,
+} from '@/core/utils/phone';
 
 type StepId = 'welcome' | 'venue' | 'event' | 'legend' | 'done';
 const STEPS: StepId[] = ['welcome', 'venue', 'event', 'legend', 'done'];
@@ -109,6 +113,11 @@ const VenueStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
   const upsertVenue = useAppStore((s) => s.upsertVenue);
   const [name, setName] = useState('');
   const [guestCap, setGuestCap] = useState<number | ''>('');
+  // Phone is optional but shares the country-code + formatted-number
+  // pair with the regular VenueFormModal, so a venue created at
+  // onboarding looks identical to one created later.
+  const [phoneCode, setPhoneCode] = useState('+34');
+  const [phoneNum, setPhoneNum] = useState('');
   const [tsRows, setTsRows] = useState<Timeslot[]>([
     { id: 'ts-seed-1', name: 'Tardeo', startTime: '16:00', endTime: '23:00', guestCapacity: 0 },
   ]);
@@ -121,8 +130,15 @@ const VenueStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
     { id: 'inv-seed-2', name: 'Cocktails only' },
   ]);
 
+  const phoneDigits = onlyDigits(phoneNum);
+  const phoneOk = !phoneDigits || isValidPhone(phoneCode, phoneDigits);
+
   const save = async () => {
     if (!name.trim()) { alert('Enter a venue name.'); return; }
+    if (phoneDigits && !phoneOk) {
+      alert(`Phone number doesn't match the format for ${phoneCode}.`);
+      return;
+    }
     const newTs = tsRows.filter((r) => r.name.trim()).map((r) => ({ ...r, name: r.name.trim() }));
     const newVip = vipRows.filter((r) => r.name.trim()).map((r) => ({
       ...r,
@@ -135,6 +151,8 @@ const VenueStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
     await upsertVenue({
       name: name.trim(),
       guestCapacity: typeof guestCap === 'number' ? guestCap : (parseInt(String(guestCap)) || 0),
+      phoneCode: phoneDigits ? phoneCode : '',
+      phoneNum: phoneDigits ? phoneNum.trim() : '',
       timeslots: newTs,
       vipTypes: newVip,
       inviteTypes: newInv,
@@ -167,6 +185,44 @@ const VenueStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
           onChange={(e) => setGuestCap(e.target.value === '' ? '' : (parseInt(e.target.value) || 0))}
         />
       </div>
+
+      <div className="form-group">
+        <label className="form-label">Phone (optional)</label>
+        <div className="phone-row">
+          <SelectField
+            value={phoneCode}
+            onChange={(code) => {
+              setPhoneCode(code);
+              const limited = onlyDigits(phoneNum).slice(0, maxDigits(code));
+              setPhoneNum(formatPhone(code, limited));
+            }}
+            title="Country code"
+            style={{ minWidth: 110, flexShrink: 0 }}
+            options={COUNTRY_CODES.map((c) => ({
+              value: c.code,
+              label: `${c.flag} ${c.code}`,
+            }))}
+          />
+          <input
+            className="form-input"
+            type="tel"
+            inputMode="numeric"
+            autoComplete="tel-national"
+            placeholder={placeholderForCode(phoneCode)}
+            value={phoneNum}
+            onChange={(e) => {
+              const limited = onlyDigits(e.target.value).slice(0, maxDigits(phoneCode));
+              setPhoneNum(formatPhone(phoneCode, limited));
+            }}
+          />
+        </div>
+        {phoneDigits.length > 0 && !phoneOk && (
+          <div style={{ fontSize: 11, color: 'var(--color-danger)', marginTop: 4 }}>
+            ⚠︎ Format for {phoneCode} doesn't match. Expected like: {placeholderForCode(phoneCode)}
+          </div>
+        )}
+      </div>
+
       <TimeslotRows rows={tsRows} setRows={setTsRows} />
       <VipRows rows={vipRows} setRows={setVipRows} />
       <InviteTypeRows rows={invRows} setRows={setInvRows} />
@@ -196,6 +252,7 @@ const EventStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
   const [seasonStart, setSeasonStart] = useState<string>('');
   const [seasonEnd, setSeasonEnd] = useState<string>('');
   const [capacity, setCapacity] = useState<number | null>(null);
+  const [desc, setDesc] = useState('');
 
   const onVenueChange = (id: number) => {
     setVenueId(id);
@@ -228,7 +285,7 @@ const EventStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
       weekdays: isOneTime ? [] : [...days],
       weekday: isOneTime ? '' : days[0],
       selectedSlotIds: [...slotIds],
-      description: '',
+      description: desc.trim(),
       videoUrl: '',
       isPrivate: isPriv,
       isLateClub: isLate,
@@ -326,6 +383,15 @@ const EventStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
             <NumberField
               className="form-input" placeholder="e.g. 20" min={0}
               value={capacity} onChange={setCapacity}
+            />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Description (optional)</label>
+            <textarea
+              className="form-textarea"
+              value={desc}
+              onChange={(e) => setDesc(e.target.value)}
+              placeholder="What's special about this night?"
             />
           </div>
           <div className="form-group">
