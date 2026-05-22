@@ -448,7 +448,7 @@ the device tenant UUID and the onboarding flag.
    ```
 5. Optional dev UI: `npm run db:studio` opens Drizzle Studio.
 
-### Migration pipeline (auto-applied on each deploy)
+### Schema sync on deploy (`db:migrate:ci`)
 
 `vercel.json` `buildCommand` chains `db:migrate:ci` before `vite build`:
 
@@ -456,27 +456,34 @@ the device tenant UUID and the onboarding flag.
 npm run db:migrate:ci && npm run build
 ```
 
-What `db:migrate:ci` does (`scripts/migrate-ci.mjs`):
+The script (`scripts/migrate-ci.mjs`) runs **`drizzle-kit push`** —
+which reconciles whatever state the DB is in to match
+`api/_lib/schema.ts`. It's idempotent: if the DB already matches,
+nothing happens.
 
 | Scenario                              | Behaviour                                   |
 | ------------------------------------- | ------------------------------------------- |
-| On Vercel, env present, has SQL       | Runs `drizzle-kit migrate`, fails build if it errors |
+| On Vercel, env present                | Runs `drizzle-kit push`, fails build on err |
 | On Vercel, env missing                | Aborts the build loudly (`exit 1`)          |
-| On Vercel, no migrations dir yet      | Skips silently (first deploy bootstrap)     |
 | Local `npm run build`, no env         | Skips silently — frontend build still works |
 
-So the workflow is:
+Workflow:
 1. Change the schema in `api/_lib/schema.ts`.
-2. `npm run db:generate` → drizzle writes a new diff SQL file under
-   `api/_lib/migrations/` (named `0001_*.sql`, `0002_*.sql`, …).
-3. Commit the SQL files alongside the schema change.
-4. Push → Vercel's build pipeline applies the migrations to that
-   environment's Neon branch automatically. Production deploys hit
-   the prod branch; preview deploys hit the preview branch.
+2. `git push` — Vercel's build pipeline pushes the schema diff to
+   the right Neon branch automatically.
 
-> **Why `migrate` and not `push` in CI:** `db:push` is interactive
-> and destructive on diffs; `db:migrate` reads versioned SQL files
-> and applies them in order. Reproducible, reviewable in PRs.
+> **Why `push` and not `migrate` right now:** at this prototype
+> stage we're still iterating on the schema and don't have real
+> users. `push` is "make the DB look like the schema"; it ignores
+> drizzle's migrations journal so it survives state mismatches
+> (e.g. when a DB has tables that were created from a slightly
+> different schema version).
+>
+> **Trade-off:** any destructive change (rename, drop column, type
+> change) is auto-confirmed in CI. **Before we have real users,
+> switch to versioned migrations**: change the script to
+> `drizzle-kit migrate`, commit the SQL diffs from
+> `npm run db:generate`, and review them in PRs.
 
 ### Emergency: bypass the pipeline
 

@@ -1,18 +1,30 @@
 #!/usr/bin/env node
 // ─────────────────────────────────────────────────────────────
-//  CI-friendly wrapper around `drizzle-kit migrate`.
+//  CI database sync.
 //
-//  Rules:
-//   - On Vercel (CI=1 / VERCEL=1), DATABASE_URL must be present
-//     or we exit with code 1 so the build halts loudly.
-//   - Locally, if no DATABASE_URL is set, we SKIP migrations
-//     so developers can run `npm run build` to compile the
-//     frontend without needing a DB connection.
-//   - In all cases, if migrations exist, we apply them.
+//  Uses `drizzle-kit push` (NOT `migrate`) because at this stage
+//  of the project we're still iterating on the schema and we want
+//  the DB to follow `api/_lib/schema.ts` automatically. Trade-offs:
+//
+//    push     idempotent. Reconciles whatever state the DB is in
+//             with the schema. No journal needed. Right for
+//             prototyping; risky once we have production data
+//             (drops cascade, no audit trail per PR).
+//    migrate  applies committed SQL files in order, tracks them
+//             in `__drizzle_migrations`. Right for prod, but
+//             intolerant of state mismatches (e.g. tables exist
+//             but the journal is empty → CREATE TABLE conflicts).
+//
+//  Switch to `migrate` once we have real users + reviewable
+//  schema PRs; for now `push` keeps the deploy moving.
+//
+//  Rules (same as before):
+//   - Vercel + DATABASE_URL → push, fail build if push fails
+//   - Vercel without DATABASE_URL → exit 1 (build halts loudly)
+//   - Local without DATABASE_URL → skip (frontend-only build)
 // ─────────────────────────────────────────────────────────────
 
 import { spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { config as loadEnv } from 'dotenv';
@@ -20,8 +32,6 @@ import { config as loadEnv } from 'dotenv';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '..');
 
-// Load env the same way drizzle.config.ts does (Vercel injects at
-// build time; locally we use .env.local).
 loadEnv({ path: resolve(repoRoot, '.env.local') });
 loadEnv({ path: resolve(repoRoot, '.env') });
 
@@ -36,30 +46,38 @@ function resolveDatabaseUrl() {
 
 const isCi = !!(process.env.CI || process.env.VERCEL);
 const dbUrl = resolveDatabaseUrl();
-const migrationsDir = resolve(repoRoot, 'api/_lib/migrations');
-const hasMigrations = existsSync(migrationsDir);
 
 if (!dbUrl) {
   if (isCi) {
-    console.error('[migrate-ci] No DATABASE_URL found in env. ' +
+    console.error('[db-sync] No DATABASE_URL found in env. ' +
       'Connect the Neon integration to this Vercel project.');
     process.exit(1);
   }
-  console.log('[migrate-ci] No DATABASE_URL — skipping migrations (local build).');
+  console.log('[db-sync] No DATABASE_URL — skipping push (local build).');
   process.exit(0);
 }
 
-if (!hasMigrations) {
-  console.log('[migrate-ci] No migrations directory yet. ' +
-    'Run `npm run db:generate` locally and commit the SQL files.');
-  // Don't fail — first deploy might happen before migrations exist.
-  process.exit(0);
-}
+console.log('[db-sync] Reconciling schema with `drizzle-kit push`…');
 
-console.log('[migrate-ci] Applying migrations…');
-const child = spawn('npx', ['drizzle-kit', 'migrate'], {
+// Push is non-interactive for non-destructive changes. For destructive
+// changes it asks for confirmation; we pipe "y" to stdin so CI never
+// hangs. The trade-off: any destructive change (rename, drop, type
+// change) will be applied silently. With no real users yet this is the
+// right default; we'll tighten before launch.
+const child = spawn('npx', ['drizzle-kit', 'push'], {
   cwd: repoRoot,
-  stdio: 'inherit',
+  stdio: ['pipe', 'inherit', 'inherit'],
   env: process.env,
 });
-child.on('exit', (code) => process.exit(code ?? 0));
+
+// Drizzle uses an interactive prompt library that reads stdin
+// character-by-character. Feeding a stream of "y\n" answers every
+// possible confirmation it might ask for during this push.
+const autoConfirm = setInterval(() => {
+  try { child.stdin.write('y\n'); } catch { /* stdin closed */ }
+}, 250);
+
+child.on('exit', (code) => {
+  clearInterval(autoConfirm);
+  process.exit(code ?? 0);
+});
