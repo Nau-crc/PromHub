@@ -92,23 +92,32 @@ section(`Deployed at ${host}`);
 
 async function probe(label, path, init = {}) {
   const url = `${host}${path}`;
+  const method = init.method ?? 'GET';
   try {
     const res = await fetch(url, init);
     const text = await res.text();
     let body;
-    try { body = JSON.parse(text); } catch { body = text.slice(0, 300); }
+    try { body = JSON.parse(text); } catch { body = text; }
     const status = `${res.status} ${res.statusText}`;
-    if (res.ok) {
-      ok(`${label}: ${status}`);
-      if (body && typeof body === 'object') console.log('     ', JSON.stringify(body, null, 2).split('\n').slice(0, 20).join('\n      '));
+    const tag = res.ok ? ok : fail;
+    tag(`${label} → ${method} ${path} :: ${status}`);
+
+    // Print key response headers so we can see if Vercel intercepted
+    // before reaching our handler.
+    const showHeaders = ['x-vercel-id', 'x-vercel-cache', 'server', 'content-type', 'x-matched-path'];
+    for (const h of showHeaders) {
+      const v = res.headers.get(h);
+      if (v) console.log(`        ${h}: ${v}`);
+    }
+
+    // Print the body. If JSON, pretty-print full. If string, strip HTML.
+    if (body && typeof body === 'object') {
+      console.log('        body:', JSON.stringify(body, null, 2).split('\n').map((s, i) => i === 0 ? s : '              ' + s).join('\n'));
+    } else if (typeof body === 'string') {
+      const stripped = body.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+      console.log('        body (plain):', stripped.slice(0, 400) || '(empty)');
     } else {
-      fail(`${label}: ${status}`);
-      if (typeof body === 'string') {
-        const stripped = body.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-        console.log('      response:', stripped.slice(0, 200));
-      } else {
-        console.log('      response:', JSON.stringify(body, null, 2).split('\n').slice(0, 15).join('\n      '));
-      }
+      console.log('        body: (empty)');
     }
     return { res, body };
   } catch (err) {
@@ -125,7 +134,20 @@ const pingResult = await probe('GET /api/v1/ping (router + zero-deps)', '/api/v1
 const healthResult = await probe('GET /api/health  (env presence)', '/api/health');
 
 // DB read via router — no tenant header needed any more (shared workspace).
-await probe('GET /api/v1/venues (DB read via router)', '/api/v1/venues');
+await probe('list venues', '/api/v1/venues');
+
+// Method tests: the v1 router must accept PATCH and DELETE on item paths.
+// We pick id=999999 (almost certainly nonexistent) so we never mutate
+// real data — the expected response is a 404 from our router with a
+// JSON body explaining 'not found', NOT a bare Vercel 404 with empty body.
+section('Method routing (events/999999 — should NOT exist; we want JSON 404 or 200)');
+await probe('GET item',    '/api/v1/events/999999');
+await probe('PATCH item',  '/api/v1/events/999999', {
+  method: 'PATCH',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ name: 'doctor-probe' }),
+});
+await probe('DELETE item', '/api/v1/events/999999', { method: 'DELETE' });
 
 // Deploy-freshness check: compare local HEAD with what's deployed
 const deployedSha = healthResult?.body?.commitSha

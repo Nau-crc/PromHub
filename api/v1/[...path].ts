@@ -373,17 +373,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
 
   } catch (err) {
-    // Single error sink for everything thrown inside the try.
+    // Single error sink. Every error response carries the full
+    // request context (method, url, parsed segments) so we can
+    // diagnose without server logs.
     console.error('[api/v1]', segments.join('/'), err);
     const e = (err ?? {}) as {
       name?: string; message?: string; status?: number;
       stack?: string; cause?: unknown; issues?: unknown;
+    };
+    const ctx = {
+      method: req.method,
+      url: req.url,
+      queryPath: req.query.path,
+      parsedSegments: segments,
+      resource: resource ?? null,
+      idSeg: idSeg ?? null,
     };
     if (e.name === 'ZodError') {
       return res.status(400).json({
         error: 'Validation failed',
         name: 'ZodError',
         issues: e.issues,
+        _ctx: ctx,
       });
     }
     const status = typeof e.status === 'number' ? e.status : 500;
@@ -395,6 +406,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         ? e.stack.split('\n').map((s) => s.trim()).slice(0, 15)
         : undefined,
       cause: e.cause != null ? String(e.cause) : undefined,
+      _ctx: ctx,
     });
   }
 }
