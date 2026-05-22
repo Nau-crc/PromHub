@@ -1,6 +1,6 @@
 import type { VercelRequest } from '@vercel/node';
 import { eq } from 'drizzle-orm';
-import { db, schema } from './db';
+import { db, schema } from './db.js';
 
 // ─────────────────────────────────────────────────────────────
 //  Tenancy: resolve a tenant from the X-Tenant-Id header.

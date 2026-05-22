@@ -3,8 +3,8 @@ import {
   put, list, del, readJson,
   eventPath, expiresAtForEvent, isExpired,
   type EventMeta,
-} from './_blob';
-import { withErrorBoundary, parseBody } from './_handler';
+} from './_blob.js';
+import { withErrorBoundary, parseBody } from './_handler.js';
 
 // ─────────────────────────────────────────────────────────────
 //  /api/event

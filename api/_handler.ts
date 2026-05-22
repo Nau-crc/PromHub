@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { ZodError } from 'zod';
-import { HttpError } from './_lib/errors';
+import { HttpError } from './_lib/errors.js';
 
 // ─────────────────────────────────────────────────────────────
 //  Common HTTP wrapper for every /api endpoint.

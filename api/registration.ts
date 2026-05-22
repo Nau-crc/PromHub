@@ -4,8 +4,8 @@ import {
   eventPath, submissionPath, submissionPrefix,
   isExpired,
   type EventMeta, type Submission,
-} from './_blob';
-import { withErrorBoundary, parseBody } from './_handler';
+} from './_blob.js';
+import { withErrorBoundary, parseBody } from './_handler.js';
 
 // ─────────────────────────────────────────────────────────────
 //  /api/registration
