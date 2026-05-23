@@ -74,7 +74,6 @@ function normalizeVenue(row: any): Venue {
     guestCapacity: row.guestCapacity ?? 0,
     timeslots: row.timeslots ?? [],
     vipTypes: row.vipTypes ?? [],
-    inviteTypes: row.inviteTypes ?? [],
   };
 }
 
@@ -106,8 +105,8 @@ function normalizeGuest(row: any): Guest {
     name: row.name,
     venueId: row.venueId ?? 0,
     eventId: row.eventId,
-    inviteTypeIds: row.inviteTypeIds ?? [],
-    inviteTypeNames: row.inviteTypeNames ?? [],
+    timeslotIds: row.timeslotIds ?? [],
+    timeslotNames: row.timeslotNames ?? [],
     pax: row.pax,
     clubEventId: row.clubEventId ?? null,
     checked: !!row.checked,
@@ -259,7 +258,6 @@ function buildSyncPayload(snap: AppDataSnapshot) {
       guestCapacity: v.guestCapacity,
       timeslots: v.timeslots,
       vipTypes: v.vipTypes,
-      inviteTypes: v.inviteTypes,
     })),
     events: snap.events.map((e) => ({
       clientId: e.id,
@@ -284,8 +282,8 @@ function buildSyncPayload(snap: AppDataSnapshot) {
       venueClientId: g.venueId,
       clubEventClientId: g.clubEventId,
       name: g.name,
-      inviteTypeIds: g.inviteTypeIds,
-      inviteTypeNames: g.inviteTypeNames,
+      timeslotIds: g.timeslotIds,
+      timeslotNames: g.timeslotNames,
       pax: g.pax,
       checked: g.checked,
       cancelled: g.cancelled ?? false,

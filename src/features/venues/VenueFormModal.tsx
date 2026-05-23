@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { IonModal, IonContent } from '@ionic/react';
-import type { Venue, Timeslot, VipType, InviteType } from '@/core/types';
+import type { Venue, Timeslot, VipType } from '@/core/types';
 import { useAppStore } from '@/store/useAppStore';
 import { useConfirm } from '@/store/useConfirmStore';
-import { TimeslotRows, VipRows, InviteTypeRows } from './VenueEditor';
+import { TimeslotRows, VipRows } from './VenueEditor';
 import { SheetHeader } from '@/components/SheetHeader';
 import { SelectField } from '@/components/SelectField';
 import { COUNTRY_CODES } from '@/core/constants';
@@ -29,7 +29,6 @@ export const VenueFormModal: React.FC<Props> = ({ open, onClose, editing }) => {
   const [phoneNum, setPhoneNum] = useState<string>('');
   const [tsRows, setTsRows] = useState<Timeslot[]>([]);
   const [vipRows, setVipRows] = useState<VipType[]>([]);
-  const [invRows, setInvRows] = useState<InviteType[]>([]);
 
   useEffect(() => {
     if (!open) return;
@@ -39,7 +38,6 @@ export const VenueFormModal: React.FC<Props> = ({ open, onClose, editing }) => {
     setPhoneNum(editing?.phoneNum || '');
     setTsRows(editing ? [...(editing.timeslots || [])] : []);
     setVipRows(editing ? [...(editing.vipTypes || [])] : []);
-    setInvRows(editing ? [...(editing.inviteTypes || [])] : []);
   }, [open, editing]);
 
   const phoneDigits = onlyDigits(phoneNum);
@@ -68,9 +66,6 @@ export const VenueFormModal: React.FC<Props> = ({ open, onClose, editing }) => {
       maxPax: r.maxPax || 10,
       tableCapacity: r.tableCapacity || 0,
     }));
-    const newInv = invRows.filter((r) => r.name.trim()).map((r) => ({
-      ...r, name: r.name.trim(),
-    }));
     // Top-level entity IDs come from the backend (Postgres SERIAL).
     // We pass the editing.id only when updating; new venues omit it
     // and upsertVenue handles the create-vs-update branch.
@@ -80,7 +75,6 @@ export const VenueFormModal: React.FC<Props> = ({ open, onClose, editing }) => {
       guestCapacity: typeof guestCap === 'number' ? guestCap : (parseInt(String(guestCap)) || 0),
       timeslots: newTs,
       vipTypes: newVip,
-      inviteTypes: newInv,
       phoneCode: phoneDigits ? phoneCode : '',
       phoneNum: phoneDigits ? phoneNum.trim() : '',
     } as Venue | Omit<Venue, 'id'>;
@@ -166,7 +160,6 @@ export const VenueFormModal: React.FC<Props> = ({ open, onClose, editing }) => {
 
           <TimeslotRows rows={tsRows} setRows={setTsRows} />
           <VipRows rows={vipRows} setRows={setVipRows} />
-          <InviteTypeRows rows={invRows} setRows={setInvRows} />
 
           <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
             {editing && (

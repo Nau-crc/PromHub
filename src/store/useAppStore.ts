@@ -43,12 +43,12 @@ export interface PublicSubmission {
   notes: string;
 }
 
-// Strings inside a Venue's JSONB (timeslots, vipTypes, inviteTypes)
-// still need stable identifiers — they don't go to a SERIAL column,
-// they're keys within the JSON document. We mint short prefixed IDs
-// here so React keys stay stable across re-renders.
+// Strings inside a Venue's JSONB (timeslots, vipTypes) still need
+// stable identifiers — they don't go to a SERIAL column, they're
+// keys within the JSON document. We mint short prefixed IDs here so
+// React keys stay stable across re-renders.
 let _localCounter = 1_000;
-const mintLocalId = (prefix: 'ts' | 'vip' | 'inv'): string =>
+const mintLocalId = (prefix: 'ts' | 'vip'): string =>
   `${prefix}${_localCounter++}`;
 
 interface AppState {
@@ -69,7 +69,7 @@ interface AppState {
   setOnboarded: (v: boolean) => Promise<void>;
 
   /** Local-only ID for sub-rows inside a venue (timeslots / vip / invite types). */
-  nextId: (kind: 'ts' | 'vip' | 'inv') => string;
+  nextId: (kind: 'ts' | 'vip') => string;
 
   // venues
   upsertVenue: (v: Venue | Omit<Venue, 'id'>) => Promise<Venue>;
@@ -325,8 +325,11 @@ export const useAppStore = create<AppState>((set, get) => ({
           name: sub.name,
           venueId: event.venueId ?? 0,
           eventId,
-          inviteTypeIds: [],
-          inviteTypeNames: [],
+          // Public submissions don't (yet) ask which timeslot the
+          // guest will attend — the promoter can edit the imported
+          // guest to pick the slots if it matters.
+          timeslotIds: [],
+          timeslotNames: [],
           pax: sub.pax,
           clubEventId: null,
           checked: false,

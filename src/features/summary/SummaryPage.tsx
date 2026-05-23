@@ -83,7 +83,7 @@ const TodayPanel: React.FC<{ onJumpInfluencers: () => void }> = ({ onJumpInfluen
                   <span>{g.name}</span>
                 </div>
                 <div className="list-sub">
-                  {venueName(g.venueId, venues)} · {(g.inviteTypeNames || []).join(', ') || 'No type'} · {g.pax} pax
+                  {venueName(g.venueId, venues)} · {(g.timeslotNames || []).join(' · ') || 'No slot'} · {g.pax} pax
                 </div>
               </div>
               <div className="list-right-sub" style={{ color: g.checked ? '#0F6E56' : undefined }}>
@@ -95,9 +95,9 @@ const TodayPanel: React.FC<{ onJumpInfluencers: () => void }> = ({ onJumpInfluen
       )}
 
       <div className="summary-block">
-        <div className="summary-head">Guests by invitation type</div>
-        {Object.keys(summary.guestsByInviteType).length ? (
-          Object.entries(summary.guestsByInviteType).map(([t, n]) => (
+        <div className="summary-head">Guests by timeslot</div>
+        {Object.keys(summary.guestsByTimeslot).length ? (
+          Object.entries(summary.guestsByTimeslot).map(([t, n]) => (
             <div key={t} className="detail-kv" style={{ padding: '8px 14px' }}>
               <span className="dk">{t}</span><span className="dv">{n} guests</span>
             </div>

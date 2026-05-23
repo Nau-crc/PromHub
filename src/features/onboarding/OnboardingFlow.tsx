@@ -4,8 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { useAppStore } from '@/store/useAppStore';
 import { isoDay, todayWeekday } from '@/core/utils/date';
 import { today } from '@/core/constants';
-import type { Timeslot, VipType, InviteType } from '@/core/types';
-import { TimeslotRows, VipRows, InviteTypeRows } from '@/features/venues/VenueEditor';
+import type { Timeslot, VipType } from '@/core/types';
+import { TimeslotRows, VipRows } from '@/features/venues/VenueEditor';
 import { DayChips } from '@/components/DayChips';
 import { SlotChips } from '@/components/SlotChips';
 import { Calendar } from '@/components/Calendar';
@@ -125,11 +125,6 @@ const VenueStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
     { id: 'vip-seed-1', name: 'VIP', price: 500, minPax: 2, maxPax: 6, tableCapacity: 5 },
     { id: 'vip-seed-2', name: 'SUPER VIP', price: 1000, minPax: 6, maxPax: 12, tableCapacity: 3 },
   ]);
-  const [invRows, setInvRows] = useState<InviteType[]>([
-    { id: 'inv-seed-1', name: 'Dinner + Cocktails' },
-    { id: 'inv-seed-2', name: 'Cocktails only' },
-  ]);
-
   const phoneDigits = onlyDigits(phoneNum);
   const phoneOk = !phoneDigits || isValidPhone(phoneCode, phoneDigits);
 
@@ -147,7 +142,6 @@ const VenueStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
       maxPax: r.maxPax || 10,
       tableCapacity: r.tableCapacity || 0,
     }));
-    const newInv = invRows.filter((r) => r.name.trim()).map((r) => ({ ...r, name: r.name.trim() }));
     await upsertVenue({
       name: name.trim(),
       guestCapacity: typeof guestCap === 'number' ? guestCap : (parseInt(String(guestCap)) || 0),
@@ -155,7 +149,6 @@ const VenueStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
       phoneNum: phoneDigits ? phoneNum.trim() : '',
       timeslots: newTs,
       vipTypes: newVip,
-      inviteTypes: newInv,
     });
     onNext();
   };
@@ -225,7 +218,6 @@ const VenueStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
 
       <TimeslotRows rows={tsRows} setRows={setTsRows} />
       <VipRows rows={vipRows} setRows={setVipRows} />
-      <InviteTypeRows rows={invRows} setRows={setInvRows} />
       <button className="onboard-btn" onClick={save}>Save venue & continue →</button>
       <button className="onboard-btn-secondary" onClick={onNext}>Skip for now</button>
     </>

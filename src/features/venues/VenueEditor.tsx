@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { Timeslot, VipType, InviteType } from '@/core/types';
+import type { Timeslot, VipType } from '@/core/types';
 import { useAppStore } from '@/store/useAppStore';
 import { PaxStepper } from '@/components/PaxStepper';
 import { NumberField } from '@/components/NumberField';
@@ -202,43 +202,6 @@ export const VipRows: React.FC<VipRowsProps> = ({ rows, setRows }) => {
   );
 };
 
-// ── InviteTypeRows ─────────────────────────────────────────
-interface InvRowsProps {
-  rows: InviteType[];
-  setRows: (rows: InviteType[]) => void;
-}
-export const InviteTypeRows: React.FC<InvRowsProps> = ({ rows, setRows }) => {
-  const nextId = useAppStore((s) => s.nextId);
-  const update = (i: number, patch: Partial<InviteType>) =>
-    setRows(rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
-  const remove = (i: number) => setRows(rows.filter((_, idx) => idx !== i));
-  const add = () => setRows([...rows, { id: nextId('inv') as string, name: '' }]);
-
-  return (
-    <div className="form-group">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-        <label className="form-label" style={{ margin: 0 }}>Invitation types</label>
-        <button type="button" className="btn-sm" onClick={add}>+ Add</button>
-      </div>
-      <div className="info-box" style={{ marginBottom: 8 }}>
-        e.g. "Dinner + Cocktails", "Cocktails only"
-      </div>
-      {!rows.length ? (
-        <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', padding: '4px 0' }}>
-          No invitation types yet.
-        </div>
-      ) : (
-        rows.map((r, i) => (
-          <div className="inv-row" key={r.id}>
-            <input
-              placeholder="e.g. Dinner + Cocktails"
-              value={r.name}
-              onChange={(e) => update(i, { name: e.target.value })}
-            />
-            <button type="button" className="row-del-btn" aria-label="Delete" onClick={() => remove(i)}>✕</button>
-          </div>
-        ))
-      )}
-    </div>
-  );
-};
+// (InviteTypeRows removed — guests now choose from the event's
+//  selected timeslots in the guest form, no separate per-venue
+//  invite-type list to manage.)

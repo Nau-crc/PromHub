@@ -154,7 +154,7 @@ export const GuestsPage: React.FC = () => {
                           <SocialBadge handle={g.igHandle} platform={g.igPlatform} />
                         </div>
                         <div className="list-sub">
-                          {venueName(g.venueId, venues)} · {(g.inviteTypeNames || []).join(', ') || 'No type'} · {g.pax} pax
+                          {venueName(g.venueId, venues)} · {(g.timeslotNames || []).join(' · ') || 'No slot'} · {g.pax} pax
                         </div>
                       </div>
                       <div className="list-right">

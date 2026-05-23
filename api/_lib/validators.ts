@@ -33,10 +33,8 @@ const vipTypeSchema = z.object({
   tableCapacity: z.number().int().min(0),
 });
 
-const inviteTypeSchema = z.object({
-  id: z.string(),
-  name: z.string().min(1),
-});
+// (Legacy invite-type schema dropped — guests now select from the
+//  event's selected timeslots instead of a per-venue invite-type list.)
 
 export const venueInputSchema = z.object({
   name: z.string().min(1).max(120),
@@ -45,7 +43,6 @@ export const venueInputSchema = z.object({
   phoneNum: z.string().nullable().optional(),
   timeslots: z.array(timeslotSchema).default([]),
   vipTypes: z.array(vipTypeSchema).default([]),
-  inviteTypes: z.array(inviteTypeSchema).default([]),
 });
 export type VenueInput = z.infer<typeof venueInputSchema>;
 
@@ -74,8 +71,8 @@ export const guestInputSchema = z.object({
   eventId: z.number().int(),                    // required
   venueId: z.number().int().nullable().optional(),
   clubEventId: z.number().int().nullable().optional(),
-  inviteTypeIds: z.array(z.string()).default([]),
-  inviteTypeNames: z.array(z.string()).default([]),
+  timeslotIds: z.array(z.string()).default([]),
+  timeslotNames: z.array(z.string()).default([]),
   pax: z.number().int().min(1).max(50).default(1),
   checked: z.boolean().default(false),
   cancelled: z.boolean().default(false),

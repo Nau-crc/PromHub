@@ -302,7 +302,7 @@ export interface TodayTotals {
   totW: number;        // total to inviters (€)
   net: number;         // net to you (€)
   influencerCount: number;
-  guestsByInviteType: Record<string, number>; // type name → pax count
+  guestsByTimeslot: Record<string, number>; // timeslot name → pax count
 }
 
 export function summarizeToday(
@@ -317,10 +317,14 @@ export function summarizeToday(
     totP += promoter;
     totW += woman;
   }
-  const byType: Record<string, number> = {};
+  // Replaces the legacy `guestsByInviteType` aggregation — we now
+  // bucket each guest's pax by whichever event timeslots she's
+  // attending. Names are denormalised onto the guest row so this
+  // stays a flat list aggregation.
+  const byTimeslot: Record<string, number> = {};
   guests.forEach((g) => {
-    (g.inviteTypeNames || []).forEach((t) => {
-      byType[t] = (byType[t] || 0) + g.pax;
+    (g.timeslotNames || []).forEach((t) => {
+      byTimeslot[t] = (byTimeslot[t] || 0) + g.pax;
     });
   });
   return {
@@ -328,7 +332,7 @@ export function summarizeToday(
     totW: round2(totW),
     net: round2(totP - totW),
     influencerCount: guests.filter((g) => g.influencer).length,
-    guestsByInviteType: byType,
+    guestsByTimeslot: byTimeslot,
   };
 }
 

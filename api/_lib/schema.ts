@@ -13,11 +13,11 @@ import { relations } from 'drizzle-orm';
 //      sent via the X-Tenant-Id header. When auth ships, we'll
 //      add a `user_id` column and migrate device-tenants to
 //      user-owned tenants in one query.
-//    - JSONB for "value object" lists (timeslots, vipTypes,
-//      inviteTypes inside a venue): these are read together with
-//      the venue 99% of the time, never queried independently,
-//      and modeling them as separate tables adds joins without
-//      benefit at this scale.
+//    - JSONB for "value object" lists (timeslots, vipTypes
+//      inside a venue): these are read together with the venue
+//      99% of the time, never queried independently, and modeling
+//      them as separate tables adds joins without benefit at this
+//      scale.
 //    - Soft FK strategy: events.venueId → ON DELETE SET NULL
 //      (the cascade rules of "delete venue keeps past events"
 //      are enforced at the service layer, not blindly at the
@@ -52,8 +52,8 @@ export const venues = pgTable('venues', {
   vipTypes: jsonb('vip_types').$type<Array<{
     id: string; name: string; price: number; minPax: number; maxPax: number; tableCapacity: number;
   }>>().default([]).notNull(),
-  /** Array of { id, name }. */
-  inviteTypes: jsonb('invite_types').$type<Array<{ id: string; name: string }>>().default([]).notNull(),
+  // (Legacy `invite_types` jsonb dropped in 0003 — guests now pick
+  // from the event's selected timeslots directly.)
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (t) => ({
   byTenant: index('venues_tenant_idx').on(t.tenantId),
@@ -93,8 +93,15 @@ export const guests = pgTable('guests', {
   /** Optional secondary link — "going to the club later". */
   clubEventId: integer('club_event_id'),
   name: text('name').notNull(),
-  inviteTypeIds: text('invite_type_ids').array().default([]).notNull(),
-  inviteTypeNames: text('invite_type_names').array().default([]).notNull(),
+  /** Which of the event's selected timeslots this guest is coming to.
+   *  Replaces the old `invite_type_ids` / `invite_type_names` pair —
+   *  invite types were a separate concept that mapped 1:1 onto
+   *  timeslots in practice, so we collapsed them. */
+  timeslotIds: text('timeslot_ids').array().default([]).notNull(),
+  /** Denormalised display names of the chosen timeslots ("Comida",
+   *  "Tardeo") — kept so guest lists keep rendering correctly even
+   *  if a venue's timeslot is later renamed/deleted. */
+  timeslotNames: text('timeslot_names').array().default([]).notNull(),
   pax: integer('pax').default(1).notNull(),
   checked: boolean('checked').default(false).notNull(),
   cancelled: boolean('cancelled').default(false).notNull(),

@@ -219,7 +219,7 @@ export const EventDetailModal: React.FC<Props> = ({ open, onClose, eventId, onEd
                   <Avatar name={g.name} handle={g.igHandle} platform={g.igPlatform} />
                   <div className="list-main">
                     <div className="list-name"><StarBadge on={g.influencer} /><span>{g.name}</span></div>
-                    <div className="list-sub">{(g.inviteTypeNames || []).join(', ') || 'No type'} · {g.pax} pax</div>
+                    <div className="list-sub">{(g.timeslotNames || []).join(' · ') || 'No slot'} · {g.pax} pax</div>
                   </div>
                 </div>
               ))}

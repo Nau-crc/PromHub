@@ -19,10 +19,8 @@ export interface VipType {
   tableCapacity: number;
 }
 
-export interface InviteType {
-  id: string;
-  name: string;
-}
+// (InviteType removed — guests now pick from the event's selected
+//  timeslots instead of a separate per-venue invite-type list.)
 
 export interface Venue {
   id: number;
@@ -30,7 +28,6 @@ export interface Venue {
   guestCapacity: number;
   timeslots: Timeslot[];
   vipTypes: VipType[];
-  inviteTypes: InviteType[];
   /** Optional venue contact for WhatsApp dispatch of reservations. */
   phoneCode?: string;
   phoneNum?: string;
@@ -70,8 +67,13 @@ export interface Guest {
   name: string;
   venueId: number;
   eventId: number | null;
-  inviteTypeIds: string[];
-  inviteTypeNames: string[];
+  /** Subset of the event's `selectedSlotIds` this guest is coming to.
+   *  Renders as chips ("Comida · Tardeo") wherever invite types used
+   *  to render. */
+  timeslotIds: string[];
+  /** Denormalised display names for the chosen timeslots so chips
+   *  keep rendering even if a venue's timeslot is later renamed. */
+  timeslotNames: string[];
   pax: number;
   clubEventId: number | null;
   checked: boolean;

@@ -44,7 +44,10 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
   const [name, setName] = useState('');
   const [venueId, setVenueId] = useState<number | null>(null);
   const [pax, setPax] = useState<number | null>(1);
-  const [invTypeIds, setInvTypeIds] = useState<string[]>([]);
+  /** Which of the picked event's timeslots she's coming to. Replaces
+   *  the old "invitation types" concept — same chip-picker UX,
+   *  driven now by the event's `selectedSlotIds`. */
+  const [slotIds, setSlotIds] = useState<string[]>([]);
   const [eventId, setEventId] = useState<number | null>(null);
   const [eventDate, setEventDate] = useState<string>('');
   const [platform, setPlatform] = useState<Platform>('instagram');
@@ -102,7 +105,7 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
     setVenueId(startVenue);
 
     setPax(editing?.pax ?? 1);
-    setInvTypeIds(editing ? [...(editing.inviteTypeIds || [])] : []);
+    setSlotIds(editing ? [...(editing.timeslotIds || [])] : []);
 
     // Seed event from: existing guest → explicit seed → auto-pick the
     // next upcoming event at the seeded venue. No more empty picker
@@ -121,8 +124,18 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
   }, [open, editing, seedEventId, venues, events]); // events: needed for nextEventAtVenue
 
   const v = useMemo(() => (venueId != null ? venueById(venueId, venues) : undefined), [venueId, venues]);
-  const invTypes = v?.inviteTypes || [];
   const lateEvents: PromEvent[] = useMemo(() => lateClubEvents(events), [events]);
+
+  // Timeslots offered to the chip picker = the EVENT's selected slots
+  // resolved against the venue's timeslot definitions. Resolving via
+  // the venue means we always have name + start/end for display.
+  const eventTimeslots = useMemo(() => {
+    if (!v || !eventId) return [];
+    const ev = events.find((e) => e.id === eventId);
+    if (!ev) return [];
+    const slotIdSet = new Set(ev.selectedSlotIds || []);
+    return (v.timeslots || []).filter((ts) => slotIdSet.has(ts.id));
+  }, [v, eventId, events]);
 
   // Events to show in the picker — only the ones at the selected
   // venue, ordered by their next occurrence so the soonest is on top.
@@ -140,6 +153,10 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
   const onPickEvent = (id: number | null) => {
     setEventId(id);
     setEventDate(initialEventDate(id, null));
+    // Each event has its own timeslot list, so any previously-picked
+    // slot ids are meaningless for the new event. Reset to empty so
+    // the user explicitly picks for this event.
+    setSlotIds([]);
   };
 
   const selectedEvent = eventId != null ? events.find((e) => e.id === eventId) : null;
@@ -150,7 +167,7 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
 
   const onVenueChange = (id: number) => {
     setVenueId(id);
-    setInvTypeIds([]); // reset like MVP
+    setSlotIds([]); // event changes below, so any old slot pins are stale
     // The previously-selected event probably belongs to a different
     // venue now. Re-anchor on the next upcoming event at the new
     // venue so the user doesn't have to re-pick manually.
@@ -159,8 +176,8 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
     setEventDate(initialEventDate(nextEvId, null));
   };
 
-  const toggleInvType = (id: string) =>
-    setInvTypeIds((arr) => (arr.includes(id) ? arr.filter((x) => x !== id) : [...arr, id]));
+  const toggleSlot = (id: string) =>
+    setSlotIds((arr) => (arr.includes(id) ? arr.filter((x) => x !== id) : [...arr, id]));
 
   const save = async () => {
     const trimmed = name.trim();
@@ -181,16 +198,19 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
       return;
     }
 
-    const inviteTypeNames = invTypeIds
-      .map((id) => (v?.inviteTypes || []).find((x) => x.id === id)?.name || '')
+    // Resolve chosen slot ids → display names via the venue's timeslot
+    // definitions. Denormalising the names onto the guest row keeps
+    // chips rendering correctly even if the venue is later edited.
+    const timeslotNames = slotIds
+      .map((id) => (v?.timeslots || []).find((x) => x.id === id)?.name || '')
       .filter(Boolean);
     const entry = {
       ...(editing?.id != null ? { id: editing.id } : {}),
       name: trimmed,
       venueId,
       eventId: eventId ?? null,
-      inviteTypeIds: [...invTypeIds],
-      inviteTypeNames,
+      timeslotIds: [...slotIds],
+      timeslotNames,
       pax: Math.max(1, pax ?? 1),
       clubEventId: goingToClub ? (clubEventId ?? null) : null,
       checked: editing?.checked ?? false,
@@ -265,27 +285,6 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
           </div>
 
           <div className="form-group">
-            <label className="form-label">Invitation type(s)</label>
-            {invTypes.length ? (
-              <div className="chip-picker">
-                {invTypes.map((t) => (
-                  <div
-                    key={t.id}
-                    className={`chip ${invTypeIds.includes(t.id) ? 'sel' : ''}`}
-                    onClick={() => toggleInvType(t.id)}
-                  >
-                    {t.name}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
-                No invitation types set for this venue. Add them in Venues.
-              </div>
-            )}
-          </div>
-
-          <div className="form-group">
             <label className="form-label">Select event *</label>
             <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 6 }}>
               Only events at the selected venue. Sorted by next date —
@@ -349,6 +348,37 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
           {selectedEvent?.isOneTime && selectedEvent.eventDate && (
             <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', margin: '-6px 0 12px' }}>
               Event date: <b>{selectedEvent.eventDate}</b>
+            </div>
+          )}
+
+          {/* What is she coming to? — chips driven by the EVENT's
+              selected timeslots (resolved against the venue). Shows
+              the same UX the old "Invitation type(s)" picker did but
+              the data now lives on the event, not on the venue. */}
+          {selectedEvent && (
+            <div className="form-group">
+              <label className="form-label">Coming to</label>
+              <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 6 }}>
+                Which of the event's timeslots is she attending?
+              </div>
+              {eventTimeslots.length ? (
+                <div className="chip-picker">
+                  {eventTimeslots.map((ts) => (
+                    <div
+                      key={ts.id}
+                      className={`chip ${slotIds.includes(ts.id) ? 'sel' : ''}`}
+                      onClick={() => toggleSlot(ts.id)}
+                    >
+                      {ts.name}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
+                  This event has no timeslots selected. Edit the event to
+                  pick one or more from the venue's schedule.
+                </div>
+              )}
             </div>
           )}
 

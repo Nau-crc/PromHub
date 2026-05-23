@@ -55,13 +55,12 @@ export const VenuesPage: React.FC = () => {
               const vips = (v.vipTypes || []).map(
                 (t) => `${t.name}(${t.minPax}-${t.maxPax}pax €${t.price}/${t.tableCapacity || 0}tbls)`,
               ).join(', ') || 'No VIP types';
-              const invTypes = (v.inviteTypes || []).map((t) => t.name).join(', ') || 'No invite types';
               return (
                 <div key={v.id} className="venue-row-item">
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div className="venue-name">{v.name}</div>
                     <div className="venue-sub">
-                      {slots}<br />{vips}<br />Invite: {invTypes}
+                      {slots}<br />{vips}
                     </div>
                     {gcap > 0 && (
                       <>
