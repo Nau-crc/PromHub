@@ -12,9 +12,9 @@
 -- re-selected per guest. Acceptable since this is an MVP-stage
 -- concept replacement, not a rename.
 --
--- One statement per "--> statement-breakpoint" chunk because the
--- migrator runs each chunk through Neon's HTTP driver, which only
--- accepts a single SQL command per call.
+-- Each statement is in its own chunk (separated by the breakpoint
+-- marker below) because the migrator runs each chunk through
+-- Neon's HTTP driver, which only accepts ONE SQL command per call.
 
 ALTER TABLE "guests" DROP COLUMN IF EXISTS "invite_type_ids";
 --> statement-breakpoint

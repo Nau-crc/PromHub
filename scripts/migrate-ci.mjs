@@ -106,10 +106,13 @@ try {
     console.log(`[db] applying ${id}…`);
     const raw = readFileSync(join(migrationsDir, file), 'utf8');
 
-    // Drizzle separates statements with "--> statement-breakpoint"
-    // comments. Split on that to get individual statements.
+    // Drizzle separates statements with a breakpoint marker on its
+    // own line. We anchor the match to start-of-line (multiline `m`)
+    // so any in-comment mention of the marker — e.g. a doc-comment
+    // explaining the convention — doesn't accidentally split the
+    // file mid-statement.
     const statements = raw
-      .split(/-->\s*statement-breakpoint/)
+      .split(/^\s*-->\s*statement-breakpoint\s*$/m)
       .map((s) => s.trim())
       .filter(Boolean);
 
