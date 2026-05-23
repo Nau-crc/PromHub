@@ -47,6 +47,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .select({
         token: schema.events.shareToken,
         name: schema.events.name,
+        description: schema.events.description,
         eventDate: schema.events.eventDate,
         isOneTime: schema.events.isOneTime,
         capacity: schema.events.capacity,
@@ -82,6 +83,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json({
       token: row.token,
       name: row.name,
+      description: row.description ?? '',
       eventDate: occurrenceDate,
       isOneTime: row.isOneTime,
       venueName: venueNameValue,

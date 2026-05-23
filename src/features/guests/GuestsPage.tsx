@@ -1,62 +1,150 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   IonPage, IonContent, IonHeader, IonToolbar, IonButtons, IonMenuButton,
-  IonList, IonItem, IonItemSliding, IonItemOptions, IonItemOption,
 } from '@ionic/react';
 import { useTranslation } from 'react-i18next';
+import type { Guest, PromEvent } from '@/core/types';
 import { useAppStore } from '@/store/useAppStore';
 import { useUIStore } from '@/store/useUIStore';
 import { useConfirm } from '@/store/useConfirmStore';
-import { venueName } from '@/features/summary/calculations';
+import { occurs, venueById } from '@/features/summary/calculations';
+import { today } from '@/core/constants';
+import { isoDay } from '@/core/utils/date';
 import { StarBadge, SocialBadge } from '@/components/SocialBadge';
 import { Avatar } from '@/components/Avatar';
 import { Pill } from '@/components/Pill';
 import { EmptyBox } from '@/components/EmptyBox';
 
+// ─────────────────────────────────────────────────────────────
+//  Guests page — TODAY-only view, grouped by event.
+//
+//  Behaviour rules (from product):
+//    1. Only guests whose `eventDate === today` (or whose event
+//       occurs today AND eventDate is null) appear.
+//    2. Guests are grouped under their event so you can scan the
+//       night's lists at a glance.
+//    3. Drag-and-drop: dragging a guest row onto another event's
+//       group reassigns the guest to that event (and pins their
+//       date to today). Native HTML5 DnD — desktop-first; on
+//       mobile the user can fall back to editing the guest.
+//    4. The page polls every 20s while visible so guests landing
+//       via the public registration form appear without manual
+//       refresh.
+// ─────────────────────────────────────────────────────────────
+
+const POLL_MS = 20_000;
+
 export const GuestsPage: React.FC = () => {
-  const { guests, venues, toggleArrived, toggleCancelled } = useAppStore((s) => ({
-    guests: s.guests, venues: s.venues,
+  const {
+    venues, events, guests, refresh,
+    toggleArrived, toggleCancelled, upsertGuest,
+  } = useAppStore((s) => ({
+    venues: s.venues, events: s.events, guests: s.guests,
+    refresh: s.refresh,
     toggleArrived: s.toggleArrived, toggleCancelled: s.toggleCancelled,
+    upsertGuest: s.upsertGuest,
   }));
   const open = useUIStore((s) => s.open);
   const confirm = useConfirm();
   const { t } = useTranslation();
-  const [activeVenue, setActiveVenue] = useState<'all' | number>('all');
 
-  const filtered = activeVenue === 'all' ? guests : guests.filter((g) => g.venueId === activeVenue);
+  const todayIso = useMemo(() => isoDay(today()), []);
 
-  // Hint animation: when the list mounts, the first row briefly opens
-  // its right options (revealing "Cancel") then its left ("Arrived"),
-  // so users discover the swipe affordance. Once per session, only on
-  // the first guest in the list. Uses IonItemSliding's open/close API
-  // since the actual translation is owned by the Ionic gesture engine.
-  const firstRowRef = useRef<HTMLIonItemSlidingElement | null>(null);
-  const peekedRef = useRef(false);
+  // Today's events — the only ones we render groups for. A guest
+  // whose event isn't running today shouldn't even be considered.
+  const todayEvents: PromEvent[] = useMemo(() => {
+    return events.filter((e) => occurs(e, todayIso));
+  }, [events, todayIso]);
+  const todayEventIds = useMemo(() => new Set(todayEvents.map((e) => e.id)), [todayEvents]);
+
+  // Today's guests: assigned to a today-event, AND either explicitly
+  // pinned to today, or unpinned (legacy / pre-occurrence-pinning).
+  // Past-dated guests are filtered out per the product rule.
+  const todayGuests = useMemo(() => {
+    return guests.filter((g) => {
+      if (g.eventId == null) return false;
+      if (!todayEventIds.has(g.eventId)) return false;
+      return !g.eventDate || g.eventDate === todayIso;
+    });
+  }, [guests, todayEventIds, todayIso]);
+
+  // Bucket guests by event id for rendering.
+  const guestsByEvent = useMemo(() => {
+    const map = new Map<number, Guest[]>();
+    todayEvents.forEach((e) => map.set(e.id, []));
+    for (const g of todayGuests) {
+      const arr = map.get(g.eventId!);
+      if (arr) arr.push(g);
+    }
+    return map;
+  }, [todayEvents, todayGuests]);
+
+  // ── Polling for new public-form submissions ─────────────────
+  // Only ticks while the document is visible — no point burning
+  // bandwidth when the app is backgrounded.
   useEffect(() => {
-    if (peekedRef.current || !filtered.length) return;
-    const el = firstRowRef.current;
-    if (!el) return;
-    peekedRef.current = true;
     let cancelled = false;
-    const peek = async () => {
-      await new Promise((r) => setTimeout(r, 500));
+    const tick = async () => {
+      if (document.visibilityState !== 'visible') return;
       if (cancelled) return;
-      try {
-        await el.open('end');
-        await new Promise((r) => setTimeout(r, 700));
-        if (cancelled) return;
-        await el.close();
-        await new Promise((r) => setTimeout(r, 200));
-        if (cancelled) return;
-        await el.open('start');
-        await new Promise((r) => setTimeout(r, 700));
-        if (cancelled) return;
-        await el.close();
-      } catch { /* IonItemSliding may not be ready */ }
+      await refresh();
     };
-    peek();
-    return () => { cancelled = true; };
-  }, [filtered.length]);
+    const id = window.setInterval(tick, POLL_MS);
+    const onVis = () => { if (document.visibilityState === 'visible') tick(); };
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+      document.removeEventListener('visibilitychange', onVis);
+    };
+  }, [refresh]);
+
+  // ── Drag-and-drop wiring ───────────────────────────────────
+  // Plain HTML5 DnD: each guest row is `draggable`, each event
+  // group is a drop target. We carry the guest id in dataTransfer.
+  const [dropTargetEventId, setDropTargetEventId] = useState<number | null>(null);
+
+  const onDragStartGuest = (e: React.DragEvent<HTMLDivElement>, guestId: number) => {
+    e.dataTransfer.setData('text/plain', String(guestId));
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const onDragOverGroup = (e: React.DragEvent<HTMLDivElement>, eventId: number) => {
+    e.preventDefault(); // required to allow drop
+    e.dataTransfer.dropEffect = 'move';
+    if (dropTargetEventId !== eventId) setDropTargetEventId(eventId);
+  };
+
+  const onDragLeaveGroup = (_e: React.DragEvent<HTMLDivElement>, eventId: number) => {
+    if (dropTargetEventId === eventId) setDropTargetEventId(null);
+  };
+
+  const onDropOnGroup = async (e: React.DragEvent<HTMLDivElement>, targetEventId: number) => {
+    e.preventDefault();
+    setDropTargetEventId(null);
+    const raw = e.dataTransfer.getData('text/plain');
+    const guestId = Number(raw);
+    if (!Number.isFinite(guestId)) return;
+    const g = guests.find((x) => x.id === guestId);
+    if (!g || g.eventId === targetEventId) return;
+    const targetEvent = events.find((ev) => ev.id === targetEventId);
+    if (!targetEvent) return;
+    try {
+      // Update the guest's event + venue. Timeslot pins reference the
+      // OLD event's slots so they're meaningless on the new event;
+      // clear them — the promoter re-picks if it matters.
+      await upsertGuest({
+        ...g,
+        eventId: targetEventId,
+        venueId: targetEvent.venueId ?? g.venueId,
+        eventDate: todayIso,
+        timeslotIds: [],
+        timeslotNames: [],
+      });
+    } catch (err) {
+      alert(`Couldn't move guest: ${(err as Error).message}`);
+    }
+  };
 
   const askCancel = async (id: number, name: string) => {
     const ok = await confirm({
@@ -82,129 +170,141 @@ export const GuestsPage: React.FC = () => {
                 onClick={() => open('addGuest')}
               >{t('guests.addBtn')}</button>
             </div>
-            <div style={{ overflowX: 'auto', display: 'flex', gap: 6, marginTop: 10, paddingBottom: 10 }}>
-              <button className={`tog-btn ${activeVenue === 'all' ? 'on' : ''}`} onClick={() => setActiveVenue('all')}>{t('guests.venueAll')}</button>
-              {venues.map((v) => (
-                <button
-                  key={v.id}
-                  className={`tog-btn ${activeVenue === v.id ? 'on' : ''}`}
-                  onClick={() => setActiveVenue(v.id)}
-                >{v.name}</button>
-              ))}
-            </div>
-            <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', paddingBottom: 6 }}>
-              {t('guests.swipeHint')}
+            <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', padding: '8px 0 6px' }}>
+              Showing today's guests, grouped by event. Drag a guest into another group to reassign.
             </div>
           </div>
         </IonToolbar>
       </IonHeader>
       <IonContent>
         <div className="spacer" />
-        {filtered.length ? (
-          <IonList lines="none" style={{ background: 'transparent', padding: '0 16px' }}>
-            {filtered.map((g, i) => {
-              const isArrived = g.checked;
-              const isCancelled = !!g.cancelled;
-              const rowState = isArrived ? 'arrived' : isCancelled ? 'cancelled' : 'pending';
+        {todayEvents.length === 0 ? (
+          <EmptyBox>
+            No events scheduled for today.
+          </EmptyBox>
+        ) : (
+          <div style={{ padding: '0 16px' }}>
+            {todayEvents.map((ev) => {
+              const list = guestsByEvent.get(ev.id) ?? [];
+              const v = ev.venueId != null ? venueById(ev.venueId, venues) : undefined;
+              const isDropTarget = dropTargetEventId === ev.id;
+              const totalPax = list.filter((g) => !g.cancelled).reduce((a, g) => a + g.pax, 0);
               return (
-                <IonItemSliding
-                  key={g.id}
-                  ref={i === 0 ? firstRowRef : undefined}
-                  className={`guest-sliding-item state-${rowState}`}
+                <div
+                  key={ev.id}
+                  onDragOver={(e) => onDragOverGroup(e, ev.id)}
+                  onDragLeave={(e) => onDragLeaveGroup(e, ev.id)}
+                  onDrop={(e) => onDropOnGroup(e, ev.id)}
+                  style={{
+                    margin: '0 0 18px',
+                    border: isDropTarget
+                      ? '2px dashed var(--color-primary)'
+                      : '0.5px solid var(--color-border-tertiary)',
+                    borderRadius: 'var(--border-radius-md)',
+                    background: isDropTarget
+                      ? 'rgba(249,115,22,.05)'
+                      : 'var(--color-background-secondary)',
+                    transition: 'background-color 120ms, border-color 120ms',
+                  }}
                 >
-                  {/* Left side: arrived. Closes after 1s so the user
-                      sees the action confirmed before the panel slides
-                      back to the normal list view. */}
-                  <IonItemOptions
-                    side="start"
-                    onIonSwipe={(ev) => {
-                      toggleArrived(g.id);
-                      const ion = (ev.target as HTMLElement).closest('ion-item-sliding') as HTMLIonItemSlidingElement | null;
-                      setTimeout(() => ion?.close(), 1000);
-                    }}
-                  >
-                    <IonItemOption
-                      expandable
-                      color={isArrived ? 'medium' : 'primary'}
-                      onClick={(ev) => {
-                        toggleArrived(g.id);
-                        const ion = ev.currentTarget.closest('ion-item-sliding') as HTMLIonItemSlidingElement | null;
-                        setTimeout(() => ion?.close(), 1000);
-                      }}
-                    >
-                      {isArrived ? t('guests.markPending') : t('guests.markArrived')}
-                    </IonItemOption>
-                  </IonItemOptions>
-
-                  <IonItem
-                    button detail={false}
-                    onClick={() => open('guestDetail', { id: g.id })}
-                    className="guest-row"
-                    lines="none"
-                  >
-                    <div className="list-row" style={{ flex: 1, padding: '8px 4px', borderBottom: 'none' }}>
-                      <span className={`status-dot status-dot--${rowState}`} />
-                      <Avatar name={g.name} handle={g.igHandle} platform={g.igPlatform} />
-                      <div className="list-main">
-                        <div className="list-name">
-                          <StarBadge on={g.influencer} />
-                          <span style={{ textDecoration: isCancelled ? 'line-through' : undefined }}>
-                            {g.name}
-                          </span>
-                          <SocialBadge handle={g.igHandle} platform={g.igPlatform} />
-                        </div>
-                        <div className="list-sub">
-                          {venueName(g.venueId, venues)} · {(g.timeslotNames || []).join(' · ') || 'No slot'} · {g.pax} pax
-                        </div>
+                  <div style={{
+                    padding: '10px 14px',
+                    borderBottom: '0.5px solid var(--color-border-tertiary)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  }}>
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                        {ev.name}
                       </div>
-                      <div className="list-right">
-                        <div className={`list-right-sub state-label state-label--${rowState}`}>
-                          {isArrived ? t('guests.arrived') : isCancelled ? t('guests.cancelled') : t('guests.pending')}
-                        </div>
-                        {g.clubEventId && (
-                          <Pill tone="purple" style={{ fontSize: 10, marginTop: 3, display: 'inline-block' }}>
-                            🌙 Club
-                          </Pill>
-                        )}
+                      <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>
+                        {v ? v.name : 'No venue'} · {totalPax} pax
                       </div>
                     </div>
-                  </IonItem>
-
-                  {/* Right side: cancel (with styled confirmation prompt). */}
-                  <IonItemOptions
-                    side="end"
-                    onIonSwipe={async (ev) => {
-                      const ion = (ev.target as HTMLElement).closest('ion-item-sliding') as HTMLIonItemSlidingElement | null;
-                      if (isCancelled) {
-                        toggleCancelled(g.id);            // restore — no confirm needed
-                      } else {
-                        await askCancel(g.id, g.name);    // confirm dialog handles actual cancel
-                      }
-                      setTimeout(() => ion?.close(), 1000);
-                    }}
-                  >
-                    <IonItemOption
-                      expandable
-                      color={isCancelled ? 'medium' : 'danger'}
-                      onClick={async (ev) => {
-                        const ion = ev.currentTarget.closest('ion-item-sliding') as HTMLIonItemSlidingElement | null;
-                        if (isCancelled) toggleCancelled(g.id);
-                        else await askCancel(g.id, g.name);
-                        setTimeout(() => ion?.close(), 1000);
-                      }}
-                    >
-                      {isCancelled ? t('guests.restore') : t('guests.cancelInvite')}
-                    </IonItemOption>
-                  </IonItemOptions>
-                </IonItemSliding>
+                    {ev.capacity ? (
+                      <Pill tone="blue">{totalPax}/{ev.capacity}</Pill>
+                    ) : null}
+                  </div>
+                  {list.length === 0 ? (
+                    <div style={{
+                      padding: '14px', fontSize: 12,
+                      color: 'var(--color-text-secondary)',
+                      textAlign: 'center', fontStyle: 'italic',
+                    }}>
+                      No guests yet — drop someone here.
+                    </div>
+                  ) : (
+                    list.map((g) => {
+                      const isArrived = g.checked;
+                      const isCancelled = !!g.cancelled;
+                      const rowState = isArrived ? 'arrived' : isCancelled ? 'cancelled' : 'pending';
+                      return (
+                        <div
+                          key={g.id}
+                          draggable
+                          onDragStart={(e) => onDragStartGuest(e, g.id)}
+                          onClick={() => open('guestDetail', { id: g.id })}
+                          className={`guest-row state-${rowState}`}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 10,
+                            padding: '10px 14px',
+                            borderBottom: '0.5px solid var(--color-border-tertiary)',
+                            cursor: 'grab',
+                          }}
+                        >
+                          <span className={`status-dot status-dot--${rowState}`} />
+                          <Avatar name={g.name} handle={g.igHandle} platform={g.igPlatform} />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div className="list-name" style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                              <StarBadge on={g.influencer} />
+                              <span style={{ textDecoration: isCancelled ? 'line-through' : undefined }}>
+                                {g.name}
+                              </span>
+                              <SocialBadge handle={g.igHandle} platform={g.igPlatform} />
+                            </div>
+                            <div className="list-sub">
+                              {(g.timeslotNames || []).join(' · ') || 'No slot'} · {g.pax} pax
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); toggleArrived(g.id); }}
+                              className="btn-sm"
+                              style={{
+                                fontSize: 11,
+                                background: isArrived ? '#EAF3DE' : 'transparent',
+                                color: isArrived ? '#0F6E56' : 'var(--color-text-secondary)',
+                                border: '0.5px solid var(--color-border-tertiary)',
+                              }}
+                            >
+                              {isArrived ? '✓ Arrived' : 'Mark arrived'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (isCancelled) toggleCancelled(g.id);
+                                else askCancel(g.id, g.name);
+                              }}
+                              className="btn-sm"
+                              style={{
+                                fontSize: 11,
+                                background: 'transparent',
+                                color: isCancelled ? 'var(--color-text-secondary)' : '#A32D2D',
+                                border: '0.5px solid var(--color-border-tertiary)',
+                              }}
+                            >
+                              {isCancelled ? 'Restore' : 'Cancel'}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
               );
             })}
-          </IonList>
-        ) : (
-          <EmptyBox>
-            {t('guests.empty')}<br />
-            <span dangerouslySetInnerHTML={{ __html: t('guests.emptySub') }} />
-          </EmptyBox>
+          </div>
         )}
         <div className="spacer" />
       </IonContent>

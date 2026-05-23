@@ -42,9 +42,13 @@ export const EventDetailModal: React.FC<Props> = ({ open, onClose, eventId, onEd
   const e = eventId != null ? events.find((x) => x.id === eventId) : null;
 
   // ── Per-occurrence date selector ─────────────────────────
-  // For one-time events the date is fixed to event.eventDate.
-  // For recurring events we default to today if it's an occurrence,
-  // otherwise the next upcoming occurrence (fallback: most recent).
+  // Floored at today: past occurrences are deliberately excluded
+  // from this view — the promoter only acts on tonight or later.
+  // For one-time events: lock to event.eventDate (which may itself
+  // be past — we'll show the date but the list filter hides past
+  // rows anyway, so the modal degrades to "event already happened").
+  // For recurring events: today if it's an occurrence, else the
+  // next future occurrence. We never step back behind today.
   const todayKey = isoDay(today());
   const [selectedDate, setSelectedDate] = useState<string>('');
   useEffect(() => {
@@ -54,8 +58,23 @@ export const EventDetailModal: React.FC<Props> = ({ open, onClose, eventId, onEd
       return;
     }
     if (occurs(e, todayKey)) setSelectedDate(todayKey);
-    else setSelectedDate(nextOccurrence(e, todayKey) ?? previousOccurrence(e, todayKey) ?? '');
+    else setSelectedDate(nextOccurrence(e, todayKey) ?? '');
   }, [open, e, todayKey]);
+
+  // Background poll so submissions landing via the public form show
+  // up here without a manual refresh. Same cadence as GuestsPage.
+  const refresh = useAppStore((s) => s.refresh);
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    const tick = async () => {
+      if (document.visibilityState !== 'visible') return;
+      if (cancelled) return;
+      await refresh();
+    };
+    const id = window.setInterval(tick, 20_000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, [open, refresh]);
 
   if (!e) {
     return <IonModal isOpen={open} onDidDismiss={onClose}><IonContent /></IonModal>;
@@ -63,23 +82,24 @@ export const EventDetailModal: React.FC<Props> = ({ open, onClose, eventId, onEd
 
   const v = e.venueId != null ? venueById(e.venueId, venues) : undefined;
 
-  // Per-occurrence filter — but permissive so we don't hide rows that
-  // are simply unpinned. A guest/reservation shows up when:
-  //   - it belongs to this event AND
-  //   - either: we have no selected occurrence yet (event has no
-  //     date), or the row has no eventDate (legacy / created before
-  //     per-occurrence pinning, or imported from an old submission),
-  //     or the row's eventDate matches the selected occurrence.
-  //
-  // Strict equality alone wiped out everything created before this
-  // column was always populated. Capacity stays strict on purpose so
-  // legacy null-date rows don't double-count across occurrences.
+  // Per-occurrence filter, today-floored:
+  //   - belongs to this event AND
+  //   - the row's eventDate is today-or-future AND
+  //   - matches the selected occurrence (or has no pin → show on
+  //     every future occurrence as before).
+  // Rows pinned to a past date are excluded — the rule is "past
+  // occurrences are discarded from this view".
   // Plain filters (no useMemo) — must not introduce conditional
   // hooks after the `if (!e)` early return above.
+  const isPastPin = (rowDate: string | null) => !!rowDate && rowDate < todayKey;
   const dateMatches = (rowDate: string | null) =>
     !selectedDate || !rowDate || rowDate === selectedDate;
-  const evG = guests.filter((g) => g.eventId === e.id && dateMatches(g.eventDate));
-  const evR = reservations.filter((r) => r.eventId === e.id && dateMatches(r.eventDate));
+  const evG = guests.filter((g) =>
+    g.eventId === e.id && !isPastPin(g.eventDate) && dateMatches(g.eventDate),
+  );
+  const evR = reservations.filter((r) =>
+    r.eventId === e.id && !isPastPin(r.eventDate) && dateMatches(r.eventDate),
+  );
 
   const ids = e.selectedSlotIds || [];
   const cap = eventCapacity(e.id, guests, events, selectedDate);
@@ -92,7 +112,9 @@ export const EventDetailModal: React.FC<Props> = ({ open, onClose, eventId, onEd
 
   const scheduleLabel = eventScheduleLabel(e);
 
-  // Step the recurring date selector by one occurrence
+  // Step the recurring date selector by one occurrence — but never
+  // backwards past today, since past occurrences are filtered out
+  // of the view anyway.
   const stepDate = (direction: -1 | 1) => {
     if (e.isOneTime || !selectedDate) return;
     const [y, m, d] = selectedDate.split('-').map(Number);
@@ -101,8 +123,11 @@ export const EventDetailModal: React.FC<Props> = ({ open, onClose, eventId, onEd
     const next = direction === 1
       ? nextOccurrence(e, seedIso)
       : previousOccurrence(e, seedIso);
-    if (next) setSelectedDate(next);
+    if (!next) return;
+    if (next < todayKey) return; // floor at today
+    setSelectedDate(next);
   };
+  const canStepBack = !e.isOneTime && !!selectedDate && selectedDate > todayKey;
 
   return (
     <IonModal isOpen={open} onDidDismiss={onClose} initialBreakpoint={1} breakpoints={[0, 1]}>
@@ -130,7 +155,7 @@ export const EventDetailModal: React.FC<Props> = ({ open, onClose, eventId, onEd
                 <button
                   type="button" className="cal-nav-btn"
                   onClick={() => stepDate(-1)}
-                  disabled={!selectedDate}
+                  disabled={!canStepBack}
                 >‹</button>
                 <div style={{ textAlign: 'center', flex: 1 }}>
                   <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '.04em' }}>
@@ -151,9 +176,19 @@ export const EventDetailModal: React.FC<Props> = ({ open, onClose, eventId, onEd
                   type="date"
                   className="form-input"
                   value={selectedDate}
-                  min={e.seasonStart ?? undefined}
+                  // Floor: today (past occurrences discarded). Honour
+                  // a later seasonStart if the event hasn't begun yet.
+                  min={
+                    e.seasonStart && e.seasonStart > todayKey
+                      ? e.seasonStart
+                      : todayKey
+                  }
                   max={e.seasonEnd ?? undefined}
-                  onChange={(ev) => setSelectedDate(ev.target.value)}
+                  onChange={(ev) => {
+                    const v = ev.target.value;
+                    if (v && v < todayKey) return; // hard floor
+                    setSelectedDate(v);
+                  }}
                   style={{ fontSize: 13, padding: '8px 10px' }}
                 />
                 {selectedDate && !occurs(e, selectedDate) && (

@@ -14,6 +14,10 @@
 export interface PublicEventMeta {
   token: string;
   name: string;
+  /** Free-form event description, rendered on the thanks page after
+   *  a successful submission ("Remember: <description>"). Empty
+   *  string when the promoter didn't write one. */
+  description: string;
   /** The specific occurrence date the link is for (yyyy-mm-dd).
    *  One-time events: matches the event's own date. Recurring
    *  events: the date the promoter pinned in the share URL. */

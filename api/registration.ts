@@ -60,11 +60,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // Look up the event by share token — the only thing tying a
       // public submission back to a real event row. Also pulls the
-      // event's own date + isOneTime so we can pin the submission
-      // to the right occurrence even if the client omits the field.
+      // event's own date + isOneTime + venueId so we can pin the
+      // submission to the right occurrence AND mirror it straight
+      // into the guests table (so the promoter sees the new guest
+      // without having to tap "Refresh").
       const [event] = await db
         .select({
           id: schema.events.id,
+          venueId: schema.events.venueId,
           eventDate: schema.events.eventDate,
           isOneTime: schema.events.isOneTime,
         })
@@ -102,8 +105,47 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           notes,
         })
         .returning({ id: schema.submissions.id });
+      const submissionId = String(row.id);
 
-      return res.status(200).json({ ok: true, id: String(row.id) });
+      // Mirror the submission as a guest row right now. The guest is
+      // dedup'd by `submission_id`, so if the public form is ever
+      // retried (network blip + resubmit) we'd insert another
+      // submission row but skip a duplicate guest. The promoter then
+      // sees the new guest on their next poll — no manual import.
+      try {
+        const { ensureSharedTenant, SHARED_TENANT_ID } = await import('./_lib/tenancy.js');
+        await ensureSharedTenant();
+        const existing = await db
+          .select({ id: schema.guests.id })
+          .from(schema.guests)
+          .where(eq(schema.guests.submissionId, submissionId))
+          .limit(1);
+        if (!existing.length) {
+          await db.insert(schema.guests).values({
+            tenantId: SHARED_TENANT_ID,
+            name,
+            eventId: event.id,
+            venueId: event.venueId,
+            pax,
+            igHandle,
+            igPlatform,
+            // Guests submitted via the public form pick a date but
+            // don't choose timeslots — the promoter can edit afterwards.
+            timeslotIds: [],
+            timeslotNames: [],
+            eventDate: submissionDate,
+            submissionId,
+            notes: notes || null,
+          });
+        }
+      } catch (mirrorErr) {
+        // Don't fail the public submission if the guest mirror fails
+        // — the submission is still recorded and the promoter can
+        // pull it via the legacy refresh path as a fallback.
+        console.error('[api/registration] guest-mirror failed:', mirrorErr);
+      }
+
+      return res.status(200).json({ ok: true, id: submissionId });
     }
 
     if (req.method === 'GET') {

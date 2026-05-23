@@ -24,6 +24,11 @@ import type { Platform } from '@/core/types';
 
 type Phase = 'loading' | 'ready' | 'submitting' | 'done' | 'not-found';
 
+// The "Register someone else" button is intentionally gone — each
+// guest gets their own confirmation moment and the promoter doesn't
+// want one person flipping the form back to register a string of
+// friends from the same device.
+
 export const PublicRegistrationPage: React.FC = () => {
   const { token } = useParams<{ token: string }>();
   const location = useLocation();
@@ -75,11 +80,6 @@ export const PublicRegistrationPage: React.FC = () => {
       setErrorMsg((err as Error).message);
       setPhase('ready');
     }
-  };
-
-  const submitAnother = () => {
-    setName(''); setPax(1); setIgHandle('');
-    setPhase('ready');
   };
 
   // The date shown right under the event name — the source of truth
@@ -229,23 +229,37 @@ export const PublicRegistrationPage: React.FC = () => {
                 fontSize: 32,
               }}>✓</div>
               <div style={{ fontSize: 22, fontWeight: 600, textAlign: 'center', marginBottom: 8 }}>
-                You're on the list!
+                Your submission has been sent.
               </div>
               {eventDateLabel && (
-                <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', textAlign: 'center', marginBottom: 6 }}>
+                <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', textAlign: 'center', marginBottom: 14 }}>
                   for <strong style={{ color: 'var(--color-text-primary)' }}>{eventDateLabel}</strong>
                 </div>
               )}
-              <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', textAlign: 'center', marginBottom: 24, lineHeight: 1.5 }}>
-                The promoter will see your details on their side. See you there.
-              </div>
-              <button
-                className="btn-secondary"
-                style={{ width: '100%', padding: 12 }}
-                onClick={submitAnother}
-              >
-                Register someone else
-              </button>
+              {/* Echo the event description back so the guest leaves
+                  the form with the promoter's own message in front of
+                  them ("dress code", "bring ID", whatever). Falls back
+                  to a neutral note if no description was set. */}
+              {meta?.description?.trim() ? (
+                <div style={{
+                  background: 'var(--color-background-secondary)',
+                  border: '0.5px solid var(--color-border-tertiary)',
+                  borderRadius: 'var(--border-radius-md)',
+                  padding: '12px 14px',
+                  fontSize: 13, lineHeight: 1.5,
+                  color: 'var(--color-text-primary)',
+                  whiteSpace: 'pre-wrap',
+                }}>
+                  <strong style={{ color: 'var(--color-text-secondary)', fontWeight: 600 }}>
+                    Remember:
+                  </strong>{' '}
+                  {meta.description.trim()}
+                </div>
+              ) : (
+                <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', textAlign: 'center', lineHeight: 1.5 }}>
+                  The promoter will see your details on their side. See you there.
+                </div>
+              )}
             </>
           )}
         </div>

@@ -66,6 +66,11 @@ interface AppState {
 
   // lifecycle
   load: () => Promise<void>;
+  /** Re-fetch the whole dataset silently (no spinner). Used by
+   *  visible pages to poll for new sign-ups landing via the public
+   *  form. Errors are swallowed — a transient network blip shouldn't
+   *  clear the local cache. */
+  refresh: () => Promise<void>;
   setOnboarded: (v: boolean) => Promise<void>;
 
   /** Local-only ID for sub-rows inside a venue (timeslots / vip / invite types). */
@@ -181,6 +186,16 @@ export const useAppStore = create<AppState>((set, get) => ({
   setOnboarded: async (v) => {
     set({ onboarded: v });
     await storage.set(STORAGE_KEYS.onboarded, v);
+  },
+
+  refresh: async () => {
+    try {
+      const all = await api.listAll();
+      set({ ...all });
+    } catch {
+      // Stay quiet — the user is mid-task. Errors during background
+      // polls shouldn't disrupt the UI.
+    }
   },
 
   nextId: (kind) => mintLocalId(kind),
