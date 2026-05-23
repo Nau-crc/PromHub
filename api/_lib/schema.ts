@@ -192,6 +192,12 @@ export const reservationsRelations = relations(reservations, ({ one }) => ({
 export const submissions = pgTable('submissions', {
   id: serial('id').primaryKey(),
   eventId: integer('event_id').notNull().references(() => events.id, { onDelete: 'cascade' }),
+  /** Specific occurrence date this sign-up is for (yyyy-mm-dd).
+   *  For one-time events this equals `events.event_date`. For
+   *  recurring events it's whichever night the promoter shared
+   *  the link for. Nullable for legacy submissions made before
+   *  the column existed. */
+  eventDate: date('event_date'),
   name: text('name').notNull(),
   pax: integer('pax').default(1).notNull(),
   igHandle: text('ig_handle').default('').notNull(),

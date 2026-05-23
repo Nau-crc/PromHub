@@ -278,6 +278,7 @@ export const EventDetailModal: React.FC<Props> = ({ open, onClose, eventId, onEd
 
           <SharePanel
             event={e}
+            occurrenceDate={selectedDate || null}
             onPublish={(updatedEvent) => upsertEvent(updatedEvent)}
             onSync={async (token) => {
               const { submissions } = await listSubmissions(token);
@@ -309,11 +310,16 @@ const SectionHead: React.FC<{ children: React.ReactNode }> = ({ children }) => (
 // ─────────────────────────────────────────────────────────────
 interface SharePanelProps {
   event: import('@/core/types').PromEvent;
+  /** Which occurrence the share link is for. For one-time events
+   *  the public endpoint ignores it and uses the event's own date;
+   *  for recurring events the link MUST carry one so the sign-up
+   *  ends up on the right night. */
+  occurrenceDate: string | null;
   onPublish: (e: import('@/core/types').PromEvent) => void;
   onSync: (token: string) => Promise<number>;
 }
 
-const SharePanel: React.FC<SharePanelProps> = ({ event, onPublish, onSync }) => {
+const SharePanel: React.FC<SharePanelProps> = ({ event, occurrenceDate, onPublish, onSync }) => {
   const [working, setWorking] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
 
@@ -339,9 +345,17 @@ const SharePanel: React.FC<SharePanelProps> = ({ event, onPublish, onSync }) => 
     }
   };
 
+  // The link MUST point at a specific occurrence. For one-time
+  // events that's the event's own date; for recurring events it's
+  // whichever night the promoter has selected in the detail view.
+  const linkDate: string | null = event.isOneTime
+    ? (event.eventDate ?? null)
+    : occurrenceDate;
+  const canShare = !!event.shareToken && !!linkDate;
+
   const copyLink = async () => {
-    if (!event.shareToken) return;
-    const url = buildShareUrl(event.shareToken);
+    if (!event.shareToken || !linkDate) return;
+    const url = buildShareUrl(event.shareToken, linkDate);
     try {
       await navigator.clipboard.writeText(url);
       showFeedback('Link copied ✓');
@@ -351,8 +365,8 @@ const SharePanel: React.FC<SharePanelProps> = ({ event, onPublish, onSync }) => 
   };
 
   const shareNative = async () => {
-    if (!event.shareToken) return;
-    const url = buildShareUrl(event.shareToken);
+    if (!event.shareToken || !linkDate) return;
+    const url = buildShareUrl(event.shareToken, linkDate);
     const text = `Sign up for ${event.name}: ${url}`;
     if (navigator.share) {
       try { await navigator.share({ title: event.name, text, url }); }
@@ -413,7 +427,12 @@ const SharePanel: React.FC<SharePanelProps> = ({ event, onPublish, onSync }) => 
     );
   }
 
-  const url = buildShareUrl(event.shareToken);
+  const url = canShare ? buildShareUrl(event.shareToken!, linkDate) : '';
+  const linkDateLabel = linkDate
+    ? new Date(linkDate + 'T00:00:00').toLocaleDateString(undefined, {
+        weekday: 'long', day: 'numeric', month: 'long',
+      })
+    : null;
   return (
     <div style={{
       marginTop: 14, padding: '14px 14px',
@@ -429,29 +448,60 @@ const SharePanel: React.FC<SharePanelProps> = ({ event, onPublish, onSync }) => 
           Registration link
         </div>
       </div>
+
+      {/* Date pill — makes the bound occurrence unmissable so the
+          promoter knows which night they're sharing for. */}
+      {linkDateLabel ? (
+        <div style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+          background: 'var(--color-background-secondary)',
+          border: '0.5px solid var(--color-border-tertiary)',
+          borderRadius: 'var(--border-radius-sm)',
+          padding: '4px 10px',
+          fontSize: 12, fontWeight: 500,
+          color: 'var(--color-text-primary)',
+          marginBottom: 10,
+        }}>
+          📅 {linkDateLabel}
+        </div>
+      ) : (
+        <div style={{
+          fontSize: 12, color: '#A32D2D',
+          background: '#FDECEC', border: '0.5px solid #F3C4C4',
+          padding: '8px 10px', borderRadius: 'var(--border-radius-sm)',
+          marginBottom: 10,
+        }}>
+          ⚠︎ Pick the occurrence above before sharing — the link must
+          point at a specific night.
+        </div>
+      )}
+
       <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 10, lineHeight: 1.5 }}>
-        Share this so guests fill in their own details. Submissions appear
-        here when you tap "Refresh".
+        Share this so guests fill in their own details for the date above.
+        Submissions appear here when you tap "Refresh".
       </div>
 
-      <div style={{
-        background: 'var(--color-background-secondary)',
-        border: '0.5px solid var(--color-border-tertiary)',
-        borderRadius: 'var(--border-radius-md)',
-        padding: '10px 12px',
-        fontSize: 12, color: 'var(--color-text-primary)',
-        wordBreak: 'break-all',
-        marginBottom: 10,
-        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-      }}>
-        {url}
-      </div>
+      {canShare && (
+        <div style={{
+          background: 'var(--color-background-secondary)',
+          border: '0.5px solid var(--color-border-tertiary)',
+          borderRadius: 'var(--border-radius-md)',
+          padding: '10px 12px',
+          fontSize: 12, color: 'var(--color-text-primary)',
+          wordBreak: 'break-all',
+          marginBottom: 10,
+          fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+        }}>
+          {url}
+        </div>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
         <button
           className="btn-primary"
           style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
           onClick={copyLink}
+          disabled={!canShare}
         >
           📋 Copy
         </button>
@@ -459,6 +509,7 @@ const SharePanel: React.FC<SharePanelProps> = ({ event, onPublish, onSync }) => 
           className="btn-primary"
           style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
           onClick={shareNative}
+          disabled={!canShare}
         >
           <IonIcon icon={shareSocialOutline} style={{ fontSize: 14 }} /> Share
         </button>

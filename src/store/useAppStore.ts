@@ -33,6 +33,9 @@ const MIGRATION_FLAG_KEY = 'promhub.migrated.v1';
 // Local shape carried over from the public-form sync helper.
 export interface PublicSubmission {
   id: string;
+  /** Specific occurrence the sign-up was made for. Null only for
+   *  legacy submissions stored before the column existed. */
+  eventDate: string | null;
   name: string;
   pax: number;
   igHandle: string;
@@ -313,6 +316,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     let imported = 0;
     for (const sub of fresh) {
       try {
+        // Pin the imported guest to the same occurrence the public
+        // sign-up was made for. Falls back to the event's own date
+        // for one-time events, or null for very old legacy rows.
+        const guestEventDate =
+          sub.eventDate ?? (event.isOneTime ? event.eventDate : null);
         await get().upsertGuest({
           name: sub.name,
           venueId: event.venueId ?? 0,
@@ -328,7 +336,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           igPlatform: sub.igPlatform,
           createdMonth: new Date().getMonth(),
           createdAt: new Date().toISOString().slice(0, 10),
-          eventDate: event.isOneTime ? event.eventDate : null,
+          eventDate: guestEventDate,
           submissionId: sub.id,
           notes: sub.notes || undefined,
         });

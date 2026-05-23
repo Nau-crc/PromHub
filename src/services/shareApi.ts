@@ -1,6 +1,6 @@
 // ─────────────────────────────────────────────────────────────
 //  Frontend client for the public-registration backend
-//  (Vercel KV + serverless functions in /api/).
+//  (Neon Postgres via serverless functions in /api/).
 //
 //  All calls go to the same origin as the deployed app — Vite
 //  proxies are not required because Vercel serves both the static
@@ -14,7 +14,12 @@
 export interface PublicEventMeta {
   token: string;
   name: string;
+  /** The specific occurrence date the link is for (yyyy-mm-dd).
+   *  One-time events: matches the event's own date. Recurring
+   *  events: the date the promoter pinned in the share URL. */
   eventDate: string | null;
+  /** True when the event has a fixed single date (no recurrence). */
+  isOneTime: boolean;
   venueName: string | null;
   capacity: number | null;
 }
@@ -22,6 +27,8 @@ export interface PublicEventMeta {
 export interface SubmissionDTO {
   id: string;
   token: string;
+  /** Occurrence date the sign-up was made for (yyyy-mm-dd). */
+  eventDate: string | null;
   name: string;
   pax: number;
   igHandle: string;
@@ -51,8 +58,11 @@ async function jsonFetch<T>(path: string, init?: RequestInit): Promise<T> {
 // with old app builds that called it, but new code shouldn't.
 
 /** Public side: fetch event metadata so the form can prefill. */
-export const fetchEvent = (token: string): Promise<PublicEventMeta> =>
-  jsonFetch(`/api/event?token=${encodeURIComponent(token)}`);
+export const fetchEvent = (token: string, date?: string | null): Promise<PublicEventMeta> => {
+  const q = new URLSearchParams({ token });
+  if (date) q.set('date', date);
+  return jsonFetch(`/api/event?${q.toString()}`);
+};
 
 /** Public side: submit a registration. */
 export const submitRegistration = (
@@ -64,8 +74,11 @@ export const submitRegistration = (
 export const listSubmissions = (token: string): Promise<{ submissions: SubmissionDTO[] }> =>
   jsonFetch(`/api/registration?token=${encodeURIComponent(token)}`);
 
-/** Make a registration URL the promoter can share. */
-export const buildShareUrl = (token: string): string => {
-  if (typeof window === 'undefined') return `/register/${token}`;
-  return `${window.location.origin}/register/${token}`;
+/** Make a registration URL the promoter can share. The optional
+ *  `date` query pin tells the public form which occurrence it's
+ *  for (required for recurring events; ignored for one-time ones). */
+export const buildShareUrl = (token: string, date?: string | null): string => {
+  const path = date ? `/register/${token}?d=${encodeURIComponent(date)}` : `/register/${token}`;
+  if (typeof window === 'undefined') return path;
+  return `${window.location.origin}${path}`;
 };

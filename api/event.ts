@@ -35,16 +35,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const token = String(req.query.token ?? '').trim();
     if (!token) return res.status(400).json({ error: 'token is required' });
 
+    // Optional ?date=YYYY-MM-DD pin for recurring events. For
+    // one-time events we ignore it and use `events.event_date`.
+    const dateParam = String(req.query.date ?? '').trim();
+    const isIsoDate = /^\d{4}-\d{2}-\d{2}$/.test(dateParam);
+
     const { eq } = await import('drizzle-orm');
     const { db, schema } = await import('./_lib/db.js');
-    const venueName = (await import('./_lib/db.js')).schema; // unused but loads module
-    void venueName;
 
     const [row] = await db
       .select({
         token: schema.events.shareToken,
         name: schema.events.name,
         eventDate: schema.events.eventDate,
+        isOneTime: schema.events.isOneTime,
         capacity: schema.events.capacity,
         venueId: schema.events.venueId,
       })
@@ -67,10 +71,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       venueNameValue = v?.name ?? null;
     }
 
+    // The "occurrence date" the form will display and pin the
+    // submission to. One-time events use their own date; recurring
+    // events use the URL param. If neither is set, the form warns
+    // the user the link is missing its date.
+    const occurrenceDate = row.isOneTime
+      ? row.eventDate
+      : (isIsoDate ? dateParam : null);
+
     return res.status(200).json({
       token: row.token,
       name: row.name,
-      eventDate: row.eventDate,
+      eventDate: occurrenceDate,
+      isOneTime: row.isOneTime,
       venueName: venueNameValue,
       capacity: row.capacity,
     });

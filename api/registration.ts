@@ -27,6 +27,8 @@ interface IncomingSubmission {
   igHandle?: string;
   igPlatform?: string;
   notes?: string;
+  /** yyyy-mm-dd. The specific event occurrence this sign-up is for. */
+  eventDate?: string;
 }
 
 function parseBody<T = Record<string, unknown>>(body: unknown): Partial<T> {
@@ -57,9 +59,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!token) return res.status(400).json({ error: 'token is required' });
 
       // Look up the event by share token — the only thing tying a
-      // public submission back to a real event row.
+      // public submission back to a real event row. Also pulls the
+      // event's own date + isOneTime so we can pin the submission
+      // to the right occurrence even if the client omits the field.
       const [event] = await db
-        .select({ id: schema.events.id })
+        .select({
+          id: schema.events.id,
+          eventDate: schema.events.eventDate,
+          isOneTime: schema.events.isOneTime,
+        })
         .from(schema.events)
         .where(eq(schema.events.shareToken, token))
         .limit(1);
@@ -73,10 +81,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const igPlatform = body.igPlatform === 'tiktok' ? 'tiktok' : 'instagram';
       const notes = String(body.notes ?? '').trim().slice(0, MAX_NOTES);
 
+      // Pick the occurrence the submission should belong to:
+      //   - one-time event → always the event's own date
+      //   - recurring     → the client-provided ISO date (validated)
+      const incomingDate = String(body.eventDate ?? '').trim();
+      const isIsoDate = /^\d{4}-\d{2}-\d{2}$/.test(incomingDate);
+      const submissionDate: string | null = event.isOneTime
+        ? (event.eventDate ?? null)
+        : (isIsoDate ? incomingDate : null);
+
       const [row] = await db
         .insert(schema.submissions)
         .values({
           eventId: event.id,
+          eventDate: submissionDate,
           name,
           pax,
           igHandle,
@@ -104,6 +122,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const rows = await db
         .select({
           id: schema.submissions.id,
+          eventDate: schema.submissions.eventDate,
           name: schema.submissions.name,
           pax: schema.submissions.pax,
           igHandle: schema.submissions.igHandle,
@@ -122,6 +141,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const submissions = rows.map((r) => ({
         id: String(r.id),
         token,
+        eventDate: r.eventDate ?? null,
         name: r.name,
         pax: r.pax,
         igHandle: r.igHandle,
