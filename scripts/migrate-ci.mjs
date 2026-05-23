@@ -128,6 +128,21 @@ try {
           skippedCount++;
           continue;
         }
+        // Heuristic: Neon's HTTP driver only accepts ONE SQL command
+        // per call. If we see 42601 (syntax_error) on a chunk that
+        // contains multiple `;` outside string literals, the most
+        // likely cause is a missing `--> statement-breakpoint` between
+        // statements in the .sql file. Surface that to save debug time.
+        if (code === '42601') {
+          const semis = (stmt.match(/;/g) || []).length;
+          if (semis > 1) {
+            console.error(
+              `[db] HINT: this chunk contains ${semis} semicolons. Neon's HTTP\n` +
+              `         driver runs ONE statement at a time. Split the file\n` +
+              `         with "--> statement-breakpoint" lines between statements.`,
+            );
+          }
+        }
         // Unexpected error → fail the build so we don't silently
         // ship a broken schema.
         console.error(`[db] FAILED on statement:\n${stmt}\n`);
