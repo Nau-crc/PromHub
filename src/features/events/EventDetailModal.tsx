@@ -15,9 +15,7 @@ import { StarBadge, SocialBadge } from '@/components/SocialBadge';
 import { CapacityBar } from '@/components/CapacityBar';
 import { CopyButton } from '@/components/CopyButton';
 import { SheetHeader } from '@/components/SheetHeader';
-import {
-  publishEvent, listSubmissions, buildShareUrl,
-} from '@/services/shareApi';
+import { listSubmissions, buildShareUrl } from '@/services/shareApi';
 
 interface Props {
   open: boolean;
@@ -209,7 +207,7 @@ export const EventDetailModal: React.FC<Props> = ({ open, onClose, eventId, onEd
                   <Avatar name={g.name} handle={g.igHandle} platform={g.igPlatform} />
                   <div className="list-main">
                     <div className="list-name"><StarBadge on={g.influencer} /><span>{g.name}</span></div>
-                    <div className="list-sub">{(g.inviteTypeNames || []).join(', ')} · {g.pax} pax</div>
+                    <div className="list-sub">{(g.inviteTypeNames || []).join(', ') || 'No type'} · {g.pax} pax</div>
                   </div>
                 </div>
               ))}
@@ -316,7 +314,6 @@ interface SharePanelProps {
 }
 
 const SharePanel: React.FC<SharePanelProps> = ({ event, onPublish, onSync }) => {
-  const venues = useAppStore((s) => s.venues);
   const [working, setWorking] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
 
@@ -325,35 +322,18 @@ const SharePanel: React.FC<SharePanelProps> = ({ event, onPublish, onSync }) => 
     setTimeout(() => setFeedback(null), 3500);
   };
 
-  // Publish (or re-publish) the event metadata to the backend. Used:
-  //  - As the "Generate link" action for legacy events that pre-date
-  //    auto-token creation (no shareToken yet)
-  //  - As a recovery path inside `pullSignups` when the backend has
-  //    forgotten this event (404). Idempotent on the backend side
-  //    thanks to `allowOverwrite: true`.
-  const republish = async (token: string): Promise<boolean> => {
-    const venueName = event.venueId != null
-      ? venues.find((v) => v.id === event.venueId)?.name ?? null
-      : null;
-    await publishEvent({
-      token,
-      name: event.name,
-      eventDate: event.eventDate,
-      venueName,
-      capacity: event.capacity,
-    });
-    return true;
-  };
-
+  // Legacy events created before auto-token generation may not have
+  // a `shareToken` yet. Generating one just means assigning a UUID
+  // and saving the event back — the row itself IS the registration
+  // record (no separate publish call needed).
   const generate = async () => {
     setWorking(true);
     try {
       const token = event.shareToken ?? safeUuid();
-      await republish(token);
       onPublish({ ...event, shareToken: token });
       showFeedback('Link ready ✓');
     } catch (err) {
-      showFeedback(`Couldn't publish: ${(err as Error).message}`);
+      showFeedback(`Couldn't generate: ${(err as Error).message}`);
     } finally {
       setWorking(false);
     }
@@ -383,14 +363,12 @@ const SharePanel: React.FC<SharePanelProps> = ({ event, onPublish, onSync }) => 
     }
   };
 
-  // Pulls submissions AND re-publishes the event metadata in case the
-  // backend lost it (e.g. the event was created while the backend was
-  // down, or its TTL just elapsed and we want it back).
+  // Pulls submissions from the `submissions` table (joined to the
+  // event via its share token) into the local guests list.
   const pullSignups = async () => {
     if (!event.shareToken) return;
     setWorking(true);
     try {
-      await republish(event.shareToken);  // ensure backend knows the event
       const added = await onSync(event.shareToken);
       showFeedback(added > 0 ? `Imported ${added} new sign-ups` : 'No new sign-ups');
     } catch (err) {

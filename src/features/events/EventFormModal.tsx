@@ -12,7 +12,6 @@ import { NumberField } from '@/components/NumberField';
 import { Calendar } from '@/components/Calendar';
 import { SelectField } from '@/components/SelectField';
 import { safeUuid } from '@/core/utils/format';
-import { publishEvent } from '@/services/shareApi';
 
 interface Props {
   open: boolean;
@@ -145,25 +144,9 @@ export const EventFormModal: React.FC<Props> = ({ open, onClose, editing, onRequ
       shareToken,
     };
 
-    // Best-effort publish so the public registration form works
-    // immediately. If it fails (backend down, env var missing, offline)
-    // we still save locally — SharePanel exposes a "Refresh" action
-    // that retries the publish later.
-    const venueName = venueId != null
-      ? venues.find((v) => v.id === venueId)?.name ?? null
-      : null;
-    try {
-      await publishEvent({
-        token: shareToken,
-        name: trimmed,
-        eventDate: entry.eventDate,
-        venueName,
-        capacity: entry.capacity,
-      });
-    } catch (err) {
-      console.warn('[event] could not publish share link, saved locally only:', err);
-    }
-
+    // The event row itself carries the `shareToken` column, so
+    // upserting the event IS the publish — no second backend call
+    // needed. /api/event resolves the token by reading `events`.
     try {
       await upsertEvent(entry as PromEvent | Omit<PromEvent, 'id'>);
       onClose();

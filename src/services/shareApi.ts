@@ -45,9 +45,10 @@ async function jsonFetch<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-/** Promoter side: register / refresh an event in the backend. */
-export const publishEvent = (meta: PublicEventMeta): Promise<{ ok: true }> =>
-  jsonFetch('/api/event', { method: 'POST', body: JSON.stringify(meta) });
+// NOTE: `publishEvent` is gone. Events live in Postgres with the
+// share token on the row itself, so saving an event IS the publish.
+// The /api/event POST endpoint still returns 200 for backward compat
+// with old app builds that called it, but new code shouldn't.
 
 /** Public side: fetch event metadata so the form can prefill. */
 export const fetchEvent = (token: string): Promise<PublicEventMeta> =>
