@@ -53,29 +53,23 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
   const [goingToClub, setGoingToClub] = useState(false);
   const [clubEventId, setClubEventId] = useState<number | null>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    setName(editing?.name ?? '');
-    setVenueId(editing?.venueId ?? venues[0]?.id ?? null);
-    setPax(editing?.pax ?? 1);
-    setInvTypeIds(editing ? [...(editing.inviteTypeIds || [])] : []);
-    const startEv = editing ? editing.eventId : (seedEventId ?? null);
-    setEventId(startEv);
-    setEventDate(initialEventDate(startEv, editing?.eventDate ?? null));
-    setPlatform(editing?.igPlatform ?? 'instagram');
-    setHandle(editing?.igHandle ?? '');
-    setInfluencer(!!editing?.influencer);
-    setGoingToClub(!!editing?.clubEventId);
-    setClubEventId(editing?.clubEventId ?? null);
-  }, [open, editing, seedEventId, venues]);
+  // ── Helpers (declared before useEffect that uses them) ─────────
+  //
+  // Sort key used both for ordering the event picker and for
+  // picking the default event when the venue changes. For one-time
+  // events the date IS the key; for recurring events it's the next
+  // occurrence on or after today. Past one-time / closed-season
+  // recurring events sort last via the '9999-…' sentinel.
+  function eventSortKey(e: PromEvent, todayIso: string): string {
+    if (e.isOneTime) return e.eventDate && e.eventDate >= todayIso
+      ? e.eventDate
+      : `9999-${e.eventDate ?? '00-00'}`; // past one-times pushed down
+    return nextOccurrence(e, todayIso) ?? '9999-12-31';
+  }
 
-  const v = useMemo(() => (venueId != null ? venueById(venueId, venues) : undefined), [venueId, venues]);
-  const invTypes = v?.inviteTypes || [];
-  const lateEvents: PromEvent[] = useMemo(() => lateClubEvents(events), [events]);
-
-  // Computes the default `eventDate` to surface in the picker when the user
-  // (re)selects an event. One-time events lock the date; recurring default to
-  // the next occurrence on or after today, or whatever the guest already had.
+  // Default eventDate to surface when the user (re)selects an event.
+  // One-time events lock the date; recurring default to the next
+  // occurrence on or after today, or whatever the guest already had.
   function initialEventDate(evId: number | null, prevDate: string | null): string {
     if (evId == null) return '';
     const ev = events.find((e) => e.id === evId);
@@ -84,6 +78,64 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
     if (prevDate) return prevDate;
     return nextOccurrence(ev, isoDay(today())) ?? '';
   }
+
+  // Returns the event the picker should default to when a venue is
+  // (re)selected: the next upcoming event AT THAT VENUE. Falls back
+  // to the very first event at the venue if nothing's upcoming.
+  function nextEventAtVenue(vid: number | null): number | null {
+    if (vid == null) return null;
+    const todayIso = isoDay(today());
+    const candidates = events
+      .filter((e) => e.venueId === vid)
+      .sort((a, b) => eventSortKey(a, todayIso).localeCompare(eventSortKey(b, todayIso)));
+    return candidates[0]?.id ?? null;
+  }
+
+  useEffect(() => {
+    if (!open) return;
+    setName(editing?.name ?? '');
+
+    // Seed venue from: existing guest → seeded event's venue → first.
+    // This keeps "+ Guest" from EventDetail aligned with that event's venue.
+    const seedEv = seedEventId != null ? events.find((e) => e.id === seedEventId) : null;
+    const startVenue = editing?.venueId ?? seedEv?.venueId ?? venues[0]?.id ?? null;
+    setVenueId(startVenue);
+
+    setPax(editing?.pax ?? 1);
+    setInvTypeIds(editing ? [...(editing.inviteTypeIds || [])] : []);
+
+    // Seed event from: existing guest → explicit seed → auto-pick the
+    // next upcoming event at the seeded venue. No more empty picker
+    // for brand-new guests.
+    const startEv = editing
+      ? editing.eventId
+      : (seedEventId ?? nextEventAtVenue(startVenue));
+    setEventId(startEv);
+    setEventDate(initialEventDate(startEv, editing?.eventDate ?? null));
+
+    setPlatform(editing?.igPlatform ?? 'instagram');
+    setHandle(editing?.igHandle ?? '');
+    setInfluencer(!!editing?.influencer);
+    setGoingToClub(!!editing?.clubEventId);
+    setClubEventId(editing?.clubEventId ?? null);
+  }, [open, editing, seedEventId, venues, events]); // events: needed for nextEventAtVenue
+
+  const v = useMemo(() => (venueId != null ? venueById(venueId, venues) : undefined), [venueId, venues]);
+  const invTypes = v?.inviteTypes || [];
+  const lateEvents: PromEvent[] = useMemo(() => lateClubEvents(events), [events]);
+
+  // Events to show in the picker — only the ones at the selected
+  // venue, ordered by their next occurrence so the soonest is on top.
+  const venueEvents: PromEvent[] = useMemo(() => {
+    if (venueId == null) return [];
+    const todayIso = isoDay(today());
+    return events
+      .filter((e) => e.venueId === venueId)
+      .slice()
+      .sort((a, b) => eventSortKey(a, todayIso).localeCompare(eventSortKey(b, todayIso)));
+    // eventSortKey is pure (declared at module scope of the component),
+    // safe to reference without an extra dependency.
+  }, [events, venueId]);
 
   const onPickEvent = (id: number | null) => {
     setEventId(id);
@@ -99,6 +151,12 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
   const onVenueChange = (id: number) => {
     setVenueId(id);
     setInvTypeIds([]); // reset like MVP
+    // The previously-selected event probably belongs to a different
+    // venue now. Re-anchor on the next upcoming event at the new
+    // venue so the user doesn't have to re-pick manually.
+    const nextEvId = nextEventAtVenue(id);
+    setEventId(nextEvId);
+    setEventDate(initialEventDate(nextEvId, null));
   };
 
   const toggleInvType = (id: string) =>
@@ -230,10 +288,20 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
           <div className="form-group">
             <label className="form-label">Select event *</label>
             <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 6 }}>
-              A guest always attends an event.
+              Only events at the selected venue. Sorted by next date —
+              the next upcoming one is pre-selected.
             </div>
-            {events.map((e) => {
-              const vv = e.venueId != null ? venueById(e.venueId, venues) : undefined;
+            {venueEvents.length === 0 ? (
+              <div style={{
+                fontSize: 12, color: 'var(--color-text-secondary)',
+                padding: '10px 12px',
+                background: 'var(--color-background-secondary)',
+                border: '0.5px solid var(--color-border-tertiary)',
+                borderRadius: 'var(--border-radius-sm)',
+              }}>
+                No events at this venue yet. Create one in the Events tab.
+              </div>
+            ) : venueEvents.map((e) => {
               const sched = e.isOneTime && e.eventDate
                 ? new Date(e.eventDate + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
                 : (e.weekdays || [e.weekday || '?']).join(', ');
@@ -249,7 +317,7 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
                   <div className="event-picker-info">
                     <div className="event-picker-name">{e.name}</div>
                     <div className="event-picker-sub">
-                      {sched} · {vv ? vv.name : 'No venue'}{e.isLateClub ? ' 🌙' : ''}
+                      {sched}{e.isLateClub ? ' · 🌙' : ''}
                       {cap.capacity > 0 && ` · ${cap.used}/${cap.capacity} (${cap.left} left)`}
                     </div>
                     {on && cap.capacity > 0 && overflow && (
