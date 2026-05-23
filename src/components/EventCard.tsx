@@ -22,8 +22,11 @@ export const EventCard: React.FC<Props> = ({ event: e, occurrenceDate, onClick }
   const v = e.venueId != null ? venueById(e.venueId, venues) : undefined;
 
   // Per-occurrence counters when a date is given; otherwise totals.
+  // Permissive: rows with no eventDate (legacy / unpinned) count
+  // toward every occurrence so they don't silently disappear from
+  // the home cards. Capacity uses a stricter rule elsewhere.
   const matchByDate = (date: string | null) =>
-    occurrenceDate ? date === occurrenceDate : true;
+    !occurrenceDate || !date || date === occurrenceDate;
 
   const gc = guests
     .filter((g) => g.eventId === e.id && matchByDate(g.eventDate))

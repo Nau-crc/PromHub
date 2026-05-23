@@ -63,11 +63,23 @@ export const EventDetailModal: React.FC<Props> = ({ open, onClose, eventId, onEd
 
   const v = e.venueId != null ? venueById(e.venueId, venues) : undefined;
 
-  // STRICT per-date filtering. Guests/reservations show only for the selected
-  // occurrence. Plain filters (no useMemo) — must not introduce conditional
+  // Per-occurrence filter — but permissive so we don't hide rows that
+  // are simply unpinned. A guest/reservation shows up when:
+  //   - it belongs to this event AND
+  //   - either: we have no selected occurrence yet (event has no
+  //     date), or the row has no eventDate (legacy / created before
+  //     per-occurrence pinning, or imported from an old submission),
+  //     or the row's eventDate matches the selected occurrence.
+  //
+  // Strict equality alone wiped out everything created before this
+  // column was always populated. Capacity stays strict on purpose so
+  // legacy null-date rows don't double-count across occurrences.
+  // Plain filters (no useMemo) — must not introduce conditional
   // hooks after the `if (!e)` early return above.
-  const evG = guests.filter((g) => g.eventId === e.id && g.eventDate === selectedDate);
-  const evR = reservations.filter((r) => r.eventId === e.id && r.eventDate === selectedDate);
+  const dateMatches = (rowDate: string | null) =>
+    !selectedDate || !rowDate || rowDate === selectedDate;
+  const evG = guests.filter((g) => g.eventId === e.id && dateMatches(g.eventDate));
+  const evR = reservations.filter((r) => r.eventId === e.id && dateMatches(r.eventDate));
 
   const ids = e.selectedSlotIds || [];
   const cap = eventCapacity(e.id, guests, events, selectedDate);
