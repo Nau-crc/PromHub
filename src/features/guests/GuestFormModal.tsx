@@ -256,7 +256,7 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
   };
 
   return (
-    <IonModal isOpen={open} onDidDismiss={onClose} initialBreakpoint={1} breakpoints={[0, 1]}>
+    <IonModal isOpen={open} onDidDismiss={onClose}>
       <IonContent>
         <SheetHeader title={editing ? 'Edit guest' : 'Add guest'} onClose={onClose} />
         <div style={{ padding: '16px 16px 32px' }}>

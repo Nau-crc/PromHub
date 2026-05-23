@@ -57,7 +57,7 @@ export const ReservationDetailModal: React.FC<Props> = ({ open, onClose, reserva
   };
 
   return (
-    <IonModal isOpen={open} onDidDismiss={onClose} initialBreakpoint={1} breakpoints={[0, 1]}>
+    <IonModal isOpen={open} onDidDismiss={onClose}>
       <IonContent>
         <div style={{
           padding: '14px 16px 10px', borderBottom: '0.5px solid var(--color-border-tertiary)',

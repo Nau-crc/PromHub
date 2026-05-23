@@ -211,7 +211,7 @@ export const ReservationFormModal: React.FC<Props> = ({ open, onClose, editing, 
   };
 
   return (
-    <IonModal isOpen={open} onDidDismiss={onClose} initialBreakpoint={1} breakpoints={[0, 1]}>
+    <IonModal isOpen={open} onDidDismiss={onClose}>
       <IonContent>
         <SheetHeader title={editing ? 'Edit reservation' : 'Add reservation'} onClose={onClose} />
         <div style={{ padding: '16px 16px 32px' }}>

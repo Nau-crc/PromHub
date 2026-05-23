@@ -69,7 +69,7 @@ export const DateField: React.FC<Props> = (props) => {
       >
         {display}
       </button>
-      <IonModal isOpen={open} onDidDismiss={() => setOpen(false)} initialBreakpoint={1} breakpoints={[0, 1]}>
+      <IonModal isOpen={open} onDidDismiss={() => setOpen(false)}>
         <IonContent>
           <div style={{
             padding: '14px 16px 10px',

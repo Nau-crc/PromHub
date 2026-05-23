@@ -130,7 +130,7 @@ export const EventDetailModal: React.FC<Props> = ({ open, onClose, eventId, onEd
   const canStepBack = !e.isOneTime && !!selectedDate && selectedDate > todayKey;
 
   return (
-    <IonModal isOpen={open} onDidDismiss={onClose} initialBreakpoint={1} breakpoints={[0, 1]}>
+    <IonModal isOpen={open} onDidDismiss={onClose}>
       <IonContent>
         <SheetHeader
           title={e.name}

@@ -156,7 +156,7 @@ export const EventFormModal: React.FC<Props> = ({ open, onClose, editing, onRequ
   };
 
   return (
-    <IonModal isOpen={open} onDidDismiss={onClose} initialBreakpoint={1} breakpoints={[0, 1]}>
+    <IonModal isOpen={open} onDidDismiss={onClose}>
       <IonContent>
         <SheetHeader title={editing ? 'Edit event' : 'New event'} onClose={onClose} />
         <div style={{ padding: '16px 16px 32px' }}>
