@@ -15,6 +15,7 @@ import { MONTHS_FULL, MONTHS_SHORT, DAYS_SHORT } from '@/core/constants';
 import { SocialBadge, StarBadge } from '@/components/SocialBadge';
 import { CapacityBar } from '@/components/CapacityBar';
 import { EmptyBox } from '@/components/EmptyBox';
+import { ExportPanel } from '@/features/nightClose/ExportPanel';
 
 type Tab = 'today' | 'monthly' | 'yearly' | 'influencers';
 
@@ -169,6 +170,10 @@ const TodayPanel: React.FC<{ onJumpInfluencers: () => void }> = ({ onJumpInfluen
         )}
       </div>
 
+      {/* Export sits on the Today panel so it's always visible
+          regardless of which sub-tab is active. */}
+      <ExportPanel />
+
       <div className="spacer" />
     </>
   );
@@ -177,8 +182,9 @@ const TodayPanel: React.FC<{ onJumpInfluencers: () => void }> = ({ onJumpInfluen
 // ── Monthly panel ──────────────────────────────────────────
 const MonthlyPanel: React.FC = () => {
   const { t } = useTranslation();
-  const { guests, reservations, venues } = useAppStore((s) => ({
+  const { guests, reservations, venues, latestClosedNight } = useAppStore((s) => ({
     guests: s.guests, reservations: s.reservations, venues: s.venues,
+    latestClosedNight: s.latestClosedNight,
   }));
   // Always start in the actual current month
   const now = today();
@@ -209,7 +215,16 @@ const MonthlyPanel: React.FC = () => {
     return set;
   }, [guests, reservations]);
 
-  const dayDigest = selectedDay ? digestForDay(selectedDay, guests, reservations, venues) : null;
+  // If the selected day has a closed-night snapshot, we render from
+  // the frozen snapshot (the authoritative report). Otherwise fall
+  // back to the live digest computed from current store data —
+  // useful for unclosed past days where the data is still in flux.
+  const closedSnapshot = selectedDay ? latestClosedNight(selectedDay) : null;
+  const dayDigest = selectedDay
+    ? closedSnapshot
+      ? digestForDay(selectedDay, closedSnapshot.guestsSnapshot, closedSnapshot.reservationsSnapshot, closedSnapshot.venuesSnapshot)
+      : digestForDay(selectedDay, guests, reservations, venues)
+    : null;
   const monthDigest = digestForMonth(year, month, guests, reservations, venues);
 
   return (
@@ -248,10 +263,20 @@ const MonthlyPanel: React.FC = () => {
       {/* Day detail */}
       {selectedDay && dayDigest && (
         <div className="summary-block" style={{ marginTop: 8 }}>
-          <div className="summary-head">{formatLongDay(selectedDay)}</div>
+          <div className="summary-head">
+            {formatLongDay(selectedDay)}
+            {closedSnapshot && (
+              <span style={{
+                marginLeft: 8, fontSize: 10, fontWeight: 500,
+                color: '#0F6E56', letterSpacing: '.04em',
+              }}>
+                · {t('nightClose.closedSnapshotBadge')}
+              </span>
+            )}
+          </div>
           {!dayDigest.guests.length && !dayDigest.reservations.length ? (
             <div style={{ padding: '14px', fontSize: 13, color: 'var(--color-text-secondary)' }}>
-              Nothing logged that day.
+              {t('summary.noGuestsYet')}
             </div>
           ) : (
             <>

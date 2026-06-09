@@ -125,6 +125,36 @@ export interface Reservation {
   eventDate: string | null;
 }
 
+// ─── Night records (closed-night snapshots) ─────────────────
+//
+// Pre-calculated aggregates stored alongside the full snapshot.
+// Once a night is closed, these numbers are authoritative forever
+// — venue prices and event configs can drift later, but a closed
+// night's totals never re-derive.
+export interface NightRecordSummary {
+  totalGuests: number;
+  totalReservations: number;
+  grossCommission: number;
+  paidToInviters: number;
+  netCommission: number;
+  influencerCount: number;
+  byInviteType: Record<string, number>;
+  byVenue: Record<string, { guests: number; tables: number }>;
+  byVipType: Record<string, { sold: number; capacity: number; revenue: number }>;
+}
+
+export interface NightRecord {
+  id: string;             // uuid
+  date: string;           // yyyy-mm-dd
+  closedAt: string;       // ISO 8601
+  isCorrection: boolean;
+  guestsSnapshot: Guest[];
+  reservationsSnapshot: Reservation[];
+  eventsSnapshot: PromEvent[];
+  venuesSnapshot: Venue[];
+  summary: NightRecordSummary;
+}
+
 /**
  * Legacy on-disk snapshot from when the app was Preferences-backed.
  * Kept around so the first launch after the backend migration can

@@ -1,4 +1,7 @@
-import type { Venue, PromEvent, Guest, Reservation, AppDataSnapshot } from '@/core/types';
+import type {
+  Venue, PromEvent, Guest, Reservation, AppDataSnapshot,
+  NightRecord, NightRecordSummary,
+} from '@/core/types';
 
 // ─────────────────────────────────────────────────────────────
 //  Typed REST client for the /api/v1 backend.
@@ -122,6 +125,30 @@ function normalizeGuest(row: any): Guest {
   };
 }
 
+function normalizeNightRecord(row: any): NightRecord {
+  // Snapshots arrive as JSONB → already-parsed objects. Pass them
+  // through verbatim — they were serialized from the same client
+  // types so no transformation is needed. closedAt may come as a
+  // Date object from drizzle or as an ISO string from JSON; coerce.
+  return {
+    id: String(row.id),
+    date: String(row.date),
+    closedAt: row.closedAt instanceof Date
+      ? row.closedAt.toISOString()
+      : String(row.closedAt),
+    isCorrection: !!row.isCorrection,
+    guestsSnapshot: row.guestsSnapshot ?? [],
+    reservationsSnapshot: row.reservationsSnapshot ?? [],
+    eventsSnapshot: row.eventsSnapshot ?? [],
+    venuesSnapshot: row.venuesSnapshot ?? [],
+    summary: row.summary ?? {
+      totalGuests: 0, totalReservations: 0, grossCommission: 0,
+      paidToInviters: 0, netCommission: 0, influencerCount: 0,
+      byInviteType: {}, byVenue: {}, byVipType: {},
+    },
+  };
+}
+
 function normalizeReservation(row: any): Reservation {
   return {
     id: row.id,
@@ -229,6 +256,33 @@ export const api = {
   },
   async deleteReservation(id: number): Promise<void> {
     await call<{ ok: true }>(`/reservations/${id}`, { method: 'DELETE' });
+  },
+
+  // ── Night records (closed-night snapshots) ──
+  async listNightRecords(opts?: { from?: string; to?: string }): Promise<NightRecord[]> {
+    const params = new URLSearchParams();
+    if (opts?.from) params.set('from', opts.from);
+    if (opts?.to) params.set('to', opts.to);
+    const qs = params.toString();
+    const { nightRecords } = await call<{ nightRecords: any[] }>(
+      `/night-records${qs ? `?${qs}` : ''}`,
+    );
+    return nightRecords.map(normalizeNightRecord);
+  },
+  async createNightRecord(input: {
+    date: string;
+    isCorrection?: boolean;
+    guestsSnapshot: Guest[];
+    reservationsSnapshot: Reservation[];
+    eventsSnapshot: PromEvent[];
+    venuesSnapshot: Venue[];
+    summary: NightRecordSummary;
+  }): Promise<NightRecord> {
+    const { nightRecord } = await call<{ nightRecord: any }>('/night-records', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+    return normalizeNightRecord(nightRecord);
   },
 
   // ── First-run migration ──

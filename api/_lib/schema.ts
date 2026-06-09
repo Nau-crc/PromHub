@@ -222,6 +222,49 @@ export const submissionsRelations = relations(submissions, ({ one }) => ({
   event: one(events, { fields: [submissions.eventId], references: [events.id] }),
 }));
 
+// ─── Night records (closed-night snapshots) ─────────────────
+//
+//  When the promoter taps "Close night" we freeze a full snapshot
+//  of guests / reservations / events / venues for that date AND
+//  store the pre-calculated summary aggregates inline. The summary
+//  is the authoritative number forever — venue prices and event
+//  configs can change later, but a closed night's totals must not.
+//
+//  We allow multiple records per `date` for corrections (the spec's
+//  `isCorrection` flow). The latest `closedAt` for a given date is
+//  treated as the canonical one by the UI; older corrections stay
+//  in the table for audit. No `tenant_id` for the same reason as
+//  submissions — shared workspace.
+export const nightRecords = pgTable('night_records', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  /** yyyy-mm-dd — the calendar date this record is FOR (not when
+   *  it was closed; that's `closedAt`). */
+  date: date('date').notNull(),
+  /** When the promoter pressed "Close night" — the act of closing. */
+  closedAt: timestamp('closed_at', { withTimezone: true }).defaultNow().notNull(),
+  /** True when this row is a correction of an earlier close for
+   *  the same `date`. The UI surfaces the most recent. */
+  isCorrection: boolean('is_correction').default(false).notNull(),
+  /** Frozen snapshots — never re-derived. Stored as JSONB so the
+   *  shapes match the runtime Guest/Reservation/PromEvent/Venue
+   *  types byte-for-byte (we serialize on close, deserialize on
+   *  read). */
+  guestsSnapshot: jsonb('guests_snapshot').default([]).notNull(),
+  reservationsSnapshot: jsonb('reservations_snapshot').default([]).notNull(),
+  eventsSnapshot: jsonb('events_snapshot').default([]).notNull(),
+  venuesSnapshot: jsonb('venues_snapshot').default([]).notNull(),
+  /** Pre-calculated aggregates. Never recomputed. */
+  summary: jsonb('summary').default({}).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  byDate: index('night_records_date_idx').on(t.date),
+  byClosedAt: index('night_records_closed_at_idx').on(t.closedAt),
+}));
+
+export const nightRecordsRelations = relations(nightRecords, () => ({
+  // No relations — snapshots are self-contained by design.
+}));
+
 // Re-exports for type inference at the call site
 export type Tenant = typeof tenants.$inferSelect;
 export type Venue = typeof venues.$inferSelect;
@@ -229,3 +272,4 @@ export type EventRow = typeof events.$inferSelect;
 export type GuestRow = typeof guests.$inferSelect;
 export type ReservationRow = typeof reservations.$inferSelect;
 export type SubmissionRow = typeof submissions.$inferSelect;
+export type NightRecordRow = typeof nightRecords.$inferSelect;

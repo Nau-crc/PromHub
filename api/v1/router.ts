@@ -86,12 +86,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // and TypeScript's compiler emits the path verbatim. Without it
     // you get ERR_MODULE_NOT_FOUND at runtime. The .js refers to
     // the compiled file even though the source is .ts.
-    const { eq } = await import('drizzle-orm');
+    const { eq, and, gte, lte, asc } = await import('drizzle-orm');
     const { db, schema } = await import('../_lib/db.js');
     const { ensureSharedTenant, SHARED_TENANT_ID } = await import('../_lib/tenancy.js');
     const {
       venueInputSchema, eventInputSchema, guestInputSchema,
-      reservationInputSchema, snapshotSchema,
+      reservationInputSchema, snapshotSchema, nightRecordInputSchema,
     } = await import('../_lib/validators.js');
     const { parseBody } = await import('../_handler.js');
     const { badRequest, notFound } = await import('../_lib/errors.js');
@@ -168,8 +168,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    const id = idSeg !== undefined ? Number(idSeg) : null;
-    if (idSeg !== undefined && !Number.isFinite(id)) throw badRequest('Invalid id');
+    // night-records uses uuid ids (text), every other resource uses
+    // serial integer ids. So id parsing is conditional — uuid resources
+    // are handled in their own branch below before the numeric guard.
+    const isUuidResource = resource === 'night-records' || resource === 'nightRecords';
+    const id = !isUuidResource && idSeg !== undefined ? Number(idSeg) : null;
+    if (!isUuidResource && idSeg !== undefined && !Number.isFinite(id)) {
+      throw badRequest('Invalid id');
+    }
 
     // ── /api/v1/venues ──────────────────────────────────────
     if (resource === 'venues') {
@@ -363,6 +369,59 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const [row] = await db.delete(schema.reservations).where(where).returning();
         if (!row) throw notFound();
         return res.status(200).json({ ok: true });
+      }
+      throw badRequest(`Method ${req.method} not allowed`);
+    }
+
+    // ── /api/v1/night-records ───────────────────────────────
+    // Closed-night snapshots. POST creates one; GET lists or
+    // fetches by id. Supports `?from=YYYY-MM-DD&to=YYYY-MM-DD`
+    // range filter on the list endpoint for the XLSX export.
+    if (resource === 'night-records' || resource === 'nightRecords') {
+      if (id === null) {
+        if (req.method === 'GET') {
+          const from = pickString(req.query.from);
+          const to = pickString(req.query.to);
+          const conditions = [];
+          if (from && /^\d{4}-\d{2}-\d{2}$/.test(from)) {
+            conditions.push(gte(schema.nightRecords.date, from));
+          }
+          if (to && /^\d{4}-\d{2}-\d{2}$/.test(to)) {
+            conditions.push(lte(schema.nightRecords.date, to));
+          }
+          const where = conditions.length === 1 ? conditions[0]
+            : conditions.length > 1 ? and(...conditions)
+            : undefined;
+          const rows = where
+            ? await db.select().from(schema.nightRecords).where(where)
+                .orderBy(asc(schema.nightRecords.date), asc(schema.nightRecords.closedAt))
+            : await db.select().from(schema.nightRecords)
+                .orderBy(asc(schema.nightRecords.date), asc(schema.nightRecords.closedAt));
+          return res.status(200).json({ nightRecords: rows });
+        }
+        if (req.method === 'POST') {
+          const input = nightRecordInputSchema.parse(parseBody(req.body));
+          // Auto-flag as correction if a row already exists for this date.
+          const existing = await db.select({ id: schema.nightRecords.id })
+            .from(schema.nightRecords)
+            .where(eq(schema.nightRecords.date, input.date))
+            .limit(1);
+          const isCorrection = input.isCorrection || existing.length > 0;
+          const [row] = await db.insert(schema.nightRecords)
+            .values({ ...input, isCorrection })
+            .returning();
+          return res.status(201).json({ nightRecord: row });
+        }
+        throw badRequest(`Method ${req.method} not allowed`);
+      }
+      // Single record (by uuid in idSeg, not numeric id)
+      if (!idSeg) throw badRequest('id is required');
+      const where = eq(schema.nightRecords.id, idSeg);
+      if (req.method === 'GET') {
+        const [row] = await db.select().from(schema.nightRecords)
+          .where(where).limit(1);
+        if (!row) throw notFound();
+        return res.status(200).json({ nightRecord: row });
       }
       throw badRequest(`Method ${req.method} not allowed`);
     }

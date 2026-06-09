@@ -29,6 +29,13 @@
       "when": 1779470000000,
       "tag": "0003_timeslot_invites",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1779480000000,
+      "tag": "0004_night_records",
+      "breakpoints": true
     }
   ]
 }

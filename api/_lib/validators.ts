@@ -86,6 +86,43 @@ export const guestInputSchema = z.object({
 export type GuestInput = z.infer<typeof guestInputSchema>;
 
 // ── Reservation ────────────────────────────────────────────
+// ── Night record (close-night snapshot) ────────────────────
+//  Snapshots are deliberately loose-typed (z.any() arrays of
+//  whatever Guest/Reservation/PromEvent/Venue look like on the
+//  client at the moment of close). Loosening it here means the
+//  shape can evolve client-side without forcing a backend rev.
+//  The summary IS validated structurally — those numbers feed the
+//  XLSX export and need to be trustworthy.
+export const nightRecordSummarySchema = z.object({
+  totalGuests: z.number().int().min(0),
+  totalReservations: z.number().int().min(0),
+  grossCommission: z.number().min(0),
+  paidToInviters: z.number().min(0),
+  netCommission: z.number(),
+  influencerCount: z.number().int().min(0),
+  byInviteType: z.record(z.string(), z.number()).default({}),
+  byVenue: z.record(z.string(), z.object({
+    guests: z.number().int().min(0),
+    tables: z.number().int().min(0),
+  })).default({}),
+  byVipType: z.record(z.string(), z.object({
+    sold: z.number().int().min(0),
+    capacity: z.number().int().min(0),
+    revenue: z.number().min(0),
+  })).default({}),
+});
+
+export const nightRecordInputSchema = z.object({
+  date: isoDate,
+  isCorrection: z.boolean().default(false),
+  guestsSnapshot: z.array(z.any()).default([]),
+  reservationsSnapshot: z.array(z.any()).default([]),
+  eventsSnapshot: z.array(z.any()).default([]),
+  venuesSnapshot: z.array(z.any()).default([]),
+  summary: nightRecordSummarySchema,
+});
+export type NightRecordInput = z.infer<typeof nightRecordInputSchema>;
+
 export const reservationInputSchema = z.object({
   name: z.string().min(1).max(120),
   venueId: z.number().int(),                    // required

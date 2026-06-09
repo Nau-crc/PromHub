@@ -1,8 +1,15 @@
 import { create } from 'zustand';
-import type { AppDataSnapshot, Venue, PromEvent, Guest, Reservation } from '@/core/types';
+import type {
+  AppDataSnapshot, Venue, PromEvent, Guest, Reservation,
+  NightRecord,
+} from '@/core/types';
 import { storage } from '@/services/storage';
 import { STORAGE_KEYS } from '@/core/constants';
 import { api } from '@/services/apiClient';
+import {
+  buildNightSummary, guestsForNight,
+  reservationsForNight, eventsForNight,
+} from '@/features/summary/nightSummary';
 
 // ─────────────────────────────────────────────────────────────
 //  App store after the backend migration.
@@ -57,6 +64,7 @@ interface AppState {
   events: PromEvent[];
   guests: Guest[];
   reservations: Reservation[];
+  nightRecords: NightRecord[];
 
   // ui meta
   hydrated: boolean;
@@ -97,6 +105,25 @@ interface AppState {
 
   // public-form sync
   importSubmissionsAsGuests: (eventId: number, submissions: PublicSubmission[]) => Promise<number>;
+
+  // night records
+  /** True if at least one NightRecord exists for the given date. */
+  hasClosedNight: (isoDate: string) => boolean;
+  /** Latest (by closedAt) NightRecord for the date, or null. */
+  latestClosedNight: (isoDate: string) => NightRecord | null;
+  /** Compute the would-be summary for today (preview before closing). */
+  buildTodaySummary: (isoDate: string) => {
+    summary: ReturnType<typeof buildNightSummary>;
+    guests: Guest[];
+    reservations: Reservation[];
+    events: PromEvent[];
+  };
+  /** Freeze tonight: build the snapshot + summary, POST to backend,
+   *  push the returned record into the local cache. Marks as a
+   *  correction automatically if a record for this date exists. */
+  closeNight: (isoDate: string) => Promise<NightRecord>;
+  /** Pull a date range (or all) from the backend. */
+  loadNightRecords: (opts?: { from?: string; to?: string }) => Promise<NightRecord[]>;
 }
 
 /**
@@ -139,6 +166,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   events: [],
   guests: [],
   reservations: [],
+  nightRecords: [],
   hydrated: false,
   onboarded: false,
   syncing: false,
@@ -173,7 +201,16 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
 
       const all = await api.listAll();
-      set({ ...all, hydrated: true, onboarded, syncing: false });
+      // Night records are fetched separately because they're a
+      // different table and the existing listAll() shape doesn't
+      // include them. We don't fail the whole load if this errors.
+      let nightRecords: NightRecord[] = [];
+      try {
+        nightRecords = await api.listNightRecords();
+      } catch (err) {
+        console.warn('[store] failed to load night records:', err);
+      }
+      set({ ...all, nightRecords, hydrated: true, onboarded, syncing: false });
     } catch (err) {
       set({
         hydrated: true,
@@ -386,5 +423,62 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
     }
     return imported;
+  },
+
+  // ── Night records ───────────────────────────────────────
+  hasClosedNight: (isoDate) => {
+    return get().nightRecords.some((r) => r.date === isoDate);
+  },
+
+  latestClosedNight: (isoDate) => {
+    const matches = get().nightRecords.filter((r) => r.date === isoDate);
+    if (!matches.length) return null;
+    // Sort by closedAt desc, return first (the latest correction).
+    return matches.slice().sort((a, b) =>
+      a.closedAt < b.closedAt ? 1 : -1,
+    )[0];
+  },
+
+  buildTodaySummary: (isoDate) => {
+    const { guests, reservations, events, venues } = get();
+    const nightGuests = guestsForNight(guests, events, isoDate);
+    const nightReservations = reservationsForNight(reservations, isoDate);
+    const nightEvents = eventsForNight(events, isoDate);
+    const summary = buildNightSummary(nightGuests, nightReservations, venues);
+    return {
+      summary,
+      guests: nightGuests,
+      reservations: nightReservations,
+      events: nightEvents,
+    };
+  },
+
+  closeNight: async (isoDate) => {
+    const { guests, reservations, events, venues } = get();
+    const nightGuests = guestsForNight(guests, events, isoDate);
+    const nightReservations = reservationsForNight(reservations, isoDate);
+    const nightEvents = eventsForNight(events, isoDate);
+    const summary = buildNightSummary(nightGuests, nightReservations, venues);
+    // Server auto-flags as correction when another record for the
+    // date exists, so we don't have to pre-check here. The local
+    // detection is just for the confirmation copy in the UI.
+    const isCorrection = get().hasClosedNight(isoDate);
+    const created = await api.createNightRecord({
+      date: isoDate,
+      isCorrection,
+      guestsSnapshot: nightGuests,
+      reservationsSnapshot: nightReservations,
+      eventsSnapshot: nightEvents,
+      venuesSnapshot: venues,
+      summary,
+    });
+    set((s) => ({ nightRecords: [...s.nightRecords, created] }));
+    return created;
+  },
+
+  loadNightRecords: async (opts) => {
+    const rows = await api.listNightRecords(opts);
+    set({ nightRecords: rows });
+    return rows;
   },
 }));
