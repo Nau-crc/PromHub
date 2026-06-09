@@ -68,7 +68,9 @@ export const EventCard: React.FC<Props> = ({ event: e, occurrenceDate, onClick }
       <div className="event-body">
         <div className="event-meta-row">
           {ids.map((id) => <SlotPill key={id} slotId={id} />)}
-          {v && <Pill tone="gray">{v.name}</Pill>}
+          {/* Venue name is data, not a category tag — moved out of
+              the chip row so it doesn't sit next to Private / Late
+              Club / etc. as if it were one of them. */}
           {gc > 0 && (
             <Pill tone="blue">
               {e.capacity ? `${gc}/${e.capacity} guests` : `${gc} guests`}
@@ -77,6 +79,14 @@ export const EventCard: React.FC<Props> = ({ event: e, occurrenceDate, onClick }
           {rc > 0 && <Pill tone="green">{rc} res.</Pill>}
           {inv > 0 && <Pill tone="teal">{inv} invited</Pill>}
         </div>
+        {v && (
+          <div style={{
+            fontSize: 11, color: 'var(--color-text-secondary)',
+            marginTop: 4,
+          }}>
+            at {v.name}
+          </div>
+        )}
       </div>
     </div>
   );

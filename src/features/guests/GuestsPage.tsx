@@ -520,7 +520,6 @@ export const GuestsPage: React.FC = () => {
           <div style={{ padding: '0 16px' }}>
             {todayEvents.map((ev) => {
               const list = guestsByEvent.get(ev.id) ?? [];
-              const v = ev.venueId != null ? venueById(ev.venueId, venues) : undefined;
               const division = divisionByEvent.get(ev.id) ?? { slots: [], single: true };
               // De-duplicated unique guests for the header pax sum, so
               // a guest in two slots doesn't get counted twice here.
@@ -538,29 +537,40 @@ export const GuestsPage: React.FC = () => {
                     overflow: 'hidden',
                   }}
                 >
-                  {/* Event header (not a drop target — slot sub-buckets
-                      take that role when subdivided, or the single
-                      bucket below when not). */}
+                  {/* Event header — only the four pieces of metadata the
+                      promoter cares about per the product rule:
+                      event name, capacity, "private" flag, "late club"
+                      flag. Venue name lives elsewhere (event detail);
+                      surfacing it here as a chip made it look like a
+                      category tag, which it isn't. */}
                   <div style={{
                     padding: '10px 14px',
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    gap: 8,
                   }}>
-                    <div>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)' }}>
-                        {ev.name}
-                        {ev.isLateClub && (
-                          <Pill tone="purple" style={{ fontSize: 9, marginLeft: 8, display: 'inline-block' }}>
-                            🌙 Late Club
-                          </Pill>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{
+                        fontSize: 14, fontWeight: 600,
+                        color: 'var(--color-text-primary)',
+                        display: 'flex', alignItems: 'center', gap: 6,
+                        flexWrap: 'wrap',
+                      }}>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {ev.name}
+                        </span>
+                        {ev.isPrivate && (
+                          <Pill tone="pink" style={{ fontSize: 9 }}>Private</Pill>
                         )}
-                      </div>
-                      <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>
-                        {v ? v.name : 'No venue'} · {totalPax} pax
+                        {ev.isLateClub && (
+                          <Pill tone="purple" style={{ fontSize: 9 }}>🌙 Late Club</Pill>
+                        )}
                       </div>
                     </div>
                     {ev.capacity ? (
                       <Pill tone="blue">{totalPax}/{ev.capacity}</Pill>
-                    ) : null}
+                    ) : (
+                      <Pill tone="gray">{totalPax} pax</Pill>
+                    )}
                   </div>
 
                   {division.single ? (

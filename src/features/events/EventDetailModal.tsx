@@ -141,11 +141,21 @@ export const EventDetailModal: React.FC<Props> = ({ open, onClose, eventId, onEd
           rightExtras={<button className="btn-ghost" onClick={() => onEdit(e.id)}>Edit</button>}
         />
         <div style={{ padding: '16px 16px 32px' }}>
-          {/* Pills row: schedule, slots, venue, flags */}
+          {/* Venue is data (not a category tag) — surface it under the
+              title as a plain "at <venue>" subtitle instead of in the
+              chip row next to Private / Late Club / etc. */}
+          {v && (
+            <div style={{
+              fontSize: 12, color: 'var(--color-text-secondary)',
+              marginBottom: 10,
+            }}>
+              at {v.name}
+            </div>
+          )}
+          {/* Pills row: schedule, slots, flags */}
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>
             <Pill tone="gray">{scheduleLabel}</Pill>
             {ids.map((id) => <SlotPill key={id} slotId={id} />)}
-            {v && <Pill tone="gray">{v.name}</Pill>}
             {e.isOneTime && <Pill tone="blue">One-time</Pill>}
             {e.isPrivate && <Pill tone="pink">Private</Pill>}
             {e.isLateClub && <Pill tone="purple">🌙 Late Club</Pill>}
