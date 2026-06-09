@@ -170,6 +170,21 @@ const Drawer: React.FC = () => {
 
         <ThemeToggle />
         <LanguageToggle />
+
+        {/* Copyright footer — pinned at the bottom of the drawer's
+            scroll area. Plain text, no i18n needed (it's a name +
+            year), kept subtle (small, secondary text colour) so it
+            reads as legal chrome rather than nav content. */}
+        <div style={{
+          padding: '20px 20px 24px',
+          marginTop: 8,
+          textAlign: 'center',
+          fontSize: 11,
+          color: 'var(--color-text-secondary)',
+          borderTop: '0.5px solid var(--color-border-tertiary)',
+        }}>
+          © 2026 Nau-crc
+        </div>
       </IonContent>
     </IonMenu>
   );
