@@ -4,7 +4,7 @@ import {
   IonItemSliding, IonItem, IonItemOptions, IonItemOption,
 } from '@ionic/react';
 import { useTranslation } from 'react-i18next';
-import type { Guest, PromEvent } from '@/core/types';
+import type { Guest, PromEvent, Timeslot } from '@/core/types';
 import { useAppStore } from '@/store/useAppStore';
 import { useUIStore } from '@/store/useUIStore';
 import { useConfirm } from '@/store/useConfirmStore';
@@ -17,29 +17,44 @@ import { Pill } from '@/components/Pill';
 import { EmptyBox } from '@/components/EmptyBox';
 
 // ─────────────────────────────────────────────────────────────
-//  Guests page — TODAY-only view, grouped by event.
+//  Guests page — TODAY-only view, grouped by event, optionally
+//  sub-grouped by timeslot when an event has more than one slot.
 //
-//  Two distinct gestures live on each row:
-//    1. SWIPE (Ionic IonItemSliding): horizontal pan reveals
-//       "Arrived" (left side) / "Cancel" (right side) — fast
-//       one-handed actions while the promoter is at the door.
-//    2. DRAG (native HTML5 DnD via a dedicated grip handle on the
-//       right edge): drop a guest onto a different event group to
-//       reassign her (eventId + venueId updated, eventDate pinned
-//       to today, timeslot pins cleared).
+//  Layout rules:
+//    1. Only today-occurring events render groups.
+//    2. A guest with main event A + late-club B appears under both.
+//    3. If an event has >1 selected slot:
+//         - One sub-bucket per slot (named, time-ranged)
+//         - One "Unassigned" sub-bucket at the end for guests
+//           whose `timeslotIds` is empty (legacy or didn't pick)
+//       A guest in two slots shows in BOTH sub-buckets.
+//       If the event has 0 or 1 slot, the list stays flat.
 //
-//  The two coexist because they listen to different inputs:
-//    - Swipes: pointer/touch events on the IonItem body.
-//    - DnD:    `draggable` is set ONLY on the grip handle, so the
-//              browser's drag gesture starts from that element and
-//              never from a pan across the row.
+//  Drag-and-drop rules:
+//    Same gesture (the `≡` handle), three contexts:
+//      a) Drop on a different EVENT      → reassign main/club event
+//      b) Drop on a different SLOT of the SAME event
+//                                        → swap the source slot for
+//                                          the target in `timeslotIds`
+//                                          (other slots untouched)
+//      c) Drop on the unassigned bucket  → remove the source slot
+//                                          (or all slots when from a
+//                                          different event)
+//    The drag payload encodes `guestId:sourceEventId:sourceSlotId`
+//    (sourceSlotId is empty for unassigned/single-slot origins).
 //
-//  Plus a 20s background poll while the document is visible, so
-//  guests arriving via the public registration form appear without
-//  a manual refresh.
+//  Plus the existing 20s background poll while visible.
 // ─────────────────────────────────────────────────────────────
 
 const POLL_MS = 20_000;
+const UNASSIGNED = '__unassigned__';
+
+interface SlotDivision {
+  /** Real venue timeslots filtered to the event's selectedSlotIds. */
+  slots: Timeslot[];
+  /** True if the event has 0 or 1 slot — render flat, no subdivisions. */
+  single: boolean;
+}
 
 export const GuestsPage: React.FC = () => {
   const {
@@ -57,17 +72,14 @@ export const GuestsPage: React.FC = () => {
 
   const todayIso = useMemo(() => isoDay(today()), []);
 
-  // Today's events — the only ones we render groups for. A guest
-  // whose event isn't running today shouldn't even be considered.
+  // Today's events — the only ones we render groups for.
   const todayEvents: PromEvent[] = useMemo(() => {
     return events.filter((e) => occurs(e, todayIso));
   }, [events, todayIso]);
   const todayEventIds = useMemo(() => new Set(todayEvents.map((e) => e.id)), [todayEvents]);
 
-  // Today's guests: at least one of their event links (main OR
-  // late-club) points to an event happening today, AND they're
-  // either pinned to today or unpinned (legacy). Past-dated guests
-  // are excluded per the product rule.
+  // Today's guests: at least one of their event links (main OR club)
+  // points to a today-event AND they're pinned to today or unpinned.
   const todayGuests = useMemo(() => {
     return guests.filter((g) => {
       const mainOnToday = g.eventId != null && todayEventIds.has(g.eventId);
@@ -77,10 +89,7 @@ export const GuestsPage: React.FC = () => {
     });
   }, [guests, todayEventIds, todayIso]);
 
-  // Bucket guests under EVERY today-event they belong to (main +
-  // late-club). A guest with main event A and club event B appears
-  // in both A's group and B's group with the same pax — same person,
-  // shown wherever she's heading that night.
+  // Top-level bucket: which guests fall under each event id (main or club).
   const guestsByEvent = useMemo(() => {
     const map = new Map<number, Guest[]>();
     todayEvents.forEach((e) => map.set(e.id, []));
@@ -93,6 +102,23 @@ export const GuestsPage: React.FC = () => {
     }
     return map;
   }, [todayEvents, todayGuests]);
+
+  // For each event, resolve its selected slots against the venue
+  // definitions so we can render proper names + time ranges.
+  const divisionByEvent = useMemo(() => {
+    const map = new Map<number, SlotDivision>();
+    for (const ev of todayEvents) {
+      const v = ev.venueId != null ? venueById(ev.venueId, venues) : undefined;
+      if (!v) {
+        map.set(ev.id, { slots: [], single: true });
+        continue;
+      }
+      const slotIdSet = new Set(ev.selectedSlotIds || []);
+      const slots = (v.timeslots || []).filter((ts) => slotIdSet.has(ts.id));
+      map.set(ev.id, { slots, single: slots.length <= 1 });
+    }
+    return map;
+  }, [todayEvents, venues]);
 
   // ── Polling for new public-form submissions ─────────────────
   useEffect(() => {
@@ -113,8 +139,6 @@ export const GuestsPage: React.FC = () => {
   }, [refresh]);
 
   // ── Swipe affordance hint ──────────────────────────────────
-  // Demo the swipe action once per mount on the first visible
-  // guest row so users discover the gesture without a tutorial.
   const firstRowRef = useRef<HTMLIonItemSlidingElement | null>(null);
   const peekedRef = useRef(false);
   useEffect(() => {
@@ -144,63 +168,119 @@ export const GuestsPage: React.FC = () => {
   }, [todayGuests.length]);
 
   // ── Drag-and-drop wiring ───────────────────────────────────
-  // Since a single guest can appear in TWO groups (main event + late
-  // club), we encode the SOURCE group's eventId alongside the guest
-  // id in dataTransfer. On drop we decide which link to update:
-  //   - dragged from main event group → reassign `eventId`
-  //   - dragged from late-club group  → reassign `clubEventId`
-  // This keeps the other link intact: moving the club assignment
-  // doesn't blow away the main, and vice-versa.
-  const [dropTargetEventId, setDropTargetEventId] = useState<number | null>(null);
+  // Composite drop-target key: `${eventId}:${slotId ?? ''}`. Empty
+  // slotId means "the event as a whole" (single-slot event) or
+  // "unassigned" (when the slot id sentinel is UNASSIGNED, see below).
+  const [dropKey, setDropKey] = useState<string | null>(null);
 
   const onDragStartGuest = (
     e: React.DragEvent<HTMLElement>,
     guestId: number,
     sourceEventId: number,
+    sourceSlotId: string, // '' for single-slot / unassigned origin
   ) => {
-    e.dataTransfer.setData('text/plain', `${guestId}:${sourceEventId}`);
+    e.dataTransfer.setData('text/plain', `${guestId}:${sourceEventId}:${sourceSlotId}`);
     e.dataTransfer.effectAllowed = 'move';
   };
-  const onDragOverGroup = (e: React.DragEvent<HTMLDivElement>, eventId: number) => {
+
+  const onDragOverBucket = (
+    e: React.DragEvent<HTMLDivElement>,
+    targetEventId: number,
+    targetSlotId: string,
+  ) => {
     e.preventDefault();
+    e.stopPropagation();
     e.dataTransfer.dropEffect = 'move';
-    if (dropTargetEventId !== eventId) setDropTargetEventId(eventId);
+    const key = `${targetEventId}:${targetSlotId}`;
+    if (dropKey !== key) setDropKey(key);
   };
-  const onDragLeaveGroup = (_e: React.DragEvent<HTMLDivElement>, eventId: number) => {
-    if (dropTargetEventId === eventId) setDropTargetEventId(null);
+
+  const onDragLeaveBucket = (
+    _e: React.DragEvent<HTMLDivElement>,
+    targetEventId: number,
+    targetSlotId: string,
+  ) => {
+    const key = `${targetEventId}:${targetSlotId}`;
+    if (dropKey === key) setDropKey(null);
   };
-  const onDropOnGroup = async (e: React.DragEvent<HTMLDivElement>, targetEventId: number) => {
+
+  /**
+   * Drop handler. `targetSlotId` semantics:
+   *   - real slot id  → drop on a specific slot sub-bucket
+   *   - UNASSIGNED    → drop on the "no slot" sub-bucket
+   *   - ''            → drop on the whole event (single-slot mode)
+   */
+  const onDropOnBucket = async (
+    e: React.DragEvent<HTMLDivElement>,
+    targetEventId: number,
+    targetSlotId: string,
+  ) => {
     e.preventDefault();
-    setDropTargetEventId(null);
+    e.stopPropagation();
+    setDropKey(null);
+
     const raw = e.dataTransfer.getData('text/plain');
-    const [guestIdStr, sourceEventIdStr] = raw.split(':');
-    const guestId = Number(guestIdStr);
-    const sourceEventId = Number(sourceEventIdStr);
+    const parts = raw.split(':');
+    const guestId = Number(parts[0]);
+    const sourceEventId = Number(parts[1]);
+    const sourceSlotId = parts[2] ?? '';
     if (!Number.isFinite(guestId) || !Number.isFinite(sourceEventId)) return;
-    if (sourceEventId === targetEventId) return; // dropped on origin
+    if (sourceEventId === targetEventId && sourceSlotId === targetSlotId) return;
+
     const g = guests.find((x) => x.id === guestId);
     if (!g) return;
     const targetEvent = events.find((ev) => ev.id === targetEventId);
     if (!targetEvent) return;
-    // Figure out which link to update based on which group the row
-    // was dragged FROM. If the source was the main event link, we're
-    // reassigning the main; if it was the club link, the club.
-    const updatingClub = g.clubEventId === sourceEventId && g.eventId !== sourceEventId;
+
     try {
-      if (updatingClub) {
-        await upsertGuest({ ...g, clubEventId: targetEventId });
-      } else {
+      if (sourceEventId === targetEventId) {
+        // ── Same event → swap slot in `timeslotIds` ─────────
+        let newSlotIds = [...(g.timeslotIds || [])];
+        if (sourceSlotId && sourceSlotId !== UNASSIGNED) {
+          newSlotIds = newSlotIds.filter((id) => id !== sourceSlotId);
+        }
+        if (targetSlotId && targetSlotId !== UNASSIGNED) {
+          if (!newSlotIds.includes(targetSlotId)) newSlotIds.push(targetSlotId);
+        }
+        const venue = venues.find((v) => v.id === g.venueId);
+        const newSlotNames = newSlotIds
+          .map((id) => venue?.timeslots.find((ts) => ts.id === id)?.name || '')
+          .filter(Boolean);
         await upsertGuest({
           ...g,
-          eventId: targetEventId,
-          venueId: targetEvent.venueId ?? g.venueId,
-          eventDate: todayIso,
-          // The old main event's timeslot ids don't refer to anything
-          // on the new event — clear them. Promoter re-picks if needed.
-          timeslotIds: [],
-          timeslotNames: [],
+          timeslotIds: newSlotIds,
+          timeslotNames: newSlotNames,
         });
+        return;
       }
+
+      // ── Cross-event → reassign main or club, possibly pre-pick slot ──
+      // If we dragged from the guest's club bucket (and her main lives
+      // elsewhere) → rewrite clubEventId; otherwise rewrite the main.
+      const updatingClub =
+        g.clubEventId === sourceEventId && g.eventId !== sourceEventId;
+
+      if (updatingClub) {
+        await upsertGuest({ ...g, clubEventId: targetEventId });
+        return;
+      }
+
+      // Cross-event main reassignment. Pre-pick the target slot for
+      // her, if the user dropped on a specific one. Otherwise clear.
+      const targetVenue = venues.find((v) => v.id === targetEvent.venueId);
+      const newSlotIds =
+        targetSlotId && targetSlotId !== UNASSIGNED ? [targetSlotId] : [];
+      const newSlotNames = newSlotIds
+        .map((id) => targetVenue?.timeslots.find((ts) => ts.id === id)?.name || '')
+        .filter(Boolean);
+      await upsertGuest({
+        ...g,
+        eventId: targetEventId,
+        venueId: targetEvent.venueId ?? g.venueId,
+        eventDate: todayIso,
+        timeslotIds: newSlotIds,
+        timeslotNames: newSlotNames,
+      });
     } catch (err) {
       alert(`Couldn't move guest: ${(err as Error).message}`);
     }
@@ -216,9 +296,199 @@ export const GuestsPage: React.FC = () => {
     if (ok) toggleCancelled(id);
   };
 
-  // Track the index of the very first guest row across ALL groups
-  // so the hint demo plays exactly once on the topmost row.
+  // First-row-across-all-groups tracker for the swipe-hint demo.
   let firstRowAssigned = false;
+
+  // ── Render helpers ─────────────────────────────────────────
+  const renderGuestRow = (
+    g: Guest,
+    sourceEventId: number,
+    sourceSlotId: string,
+  ) => {
+    const isArrived = g.checked;
+    const isCancelled = !!g.cancelled;
+    const rowState = isArrived ? 'arrived' : isCancelled ? 'cancelled' : 'pending';
+    const isFirstRow = !firstRowAssigned;
+    if (isFirstRow) firstRowAssigned = true;
+    // Same g.id may appear in multiple groups/slots so the React key
+    // must be composite to stay unique within each list array.
+    const rowKey = `${sourceEventId}:${sourceSlotId}:${g.id}`;
+    return (
+      <IonItemSliding
+        key={rowKey}
+        ref={isFirstRow ? firstRowRef : undefined}
+        className={`guest-sliding-item state-${rowState}`}
+      >
+        <IonItemOptions
+          side="start"
+          onIonSwipe={(ev) => {
+            toggleArrived(g.id);
+            const ion = (ev.target as HTMLElement)
+              .closest('ion-item-sliding') as HTMLIonItemSlidingElement | null;
+            setTimeout(() => ion?.close(), 1000);
+          }}
+        >
+          <IonItemOption
+            expandable
+            color={isArrived ? 'medium' : 'primary'}
+            onClick={(ev) => {
+              toggleArrived(g.id);
+              const ion = ev.currentTarget
+                .closest('ion-item-sliding') as HTMLIonItemSlidingElement | null;
+              setTimeout(() => ion?.close(), 1000);
+            }}
+          >
+            {isArrived ? t('guests.markPending') : t('guests.markArrived')}
+          </IonItemOption>
+        </IonItemOptions>
+
+        <IonItem
+          button detail={false}
+          onClick={() => open('guestDetail', { id: g.id })}
+          className="guest-row"
+          lines="none"
+        >
+          <div className="list-row" style={{ flex: 1, padding: '8px 4px', borderBottom: 'none' }}>
+            <span className={`status-dot status-dot--${rowState}`} />
+            <Avatar name={g.name} handle={g.igHandle} platform={g.igPlatform} />
+            <div className="list-main">
+              <div className="list-name">
+                <StarBadge on={g.influencer} />
+                <span style={{ textDecoration: isCancelled ? 'line-through' : undefined }}>
+                  {g.name}
+                </span>
+                <SocialBadge handle={g.igHandle} platform={g.igPlatform} />
+              </div>
+              <div className="list-sub">
+                {(g.timeslotNames || []).join(' · ') || 'No slot'} · {g.pax} pax
+              </div>
+            </div>
+            <div className="list-right">
+              <div className={`list-right-sub state-label state-label--${rowState}`}>
+                {isArrived ? t('guests.arrived') : isCancelled ? t('guests.cancelled') : t('guests.pending')}
+              </div>
+              {g.clubEventId && (
+                <Pill tone="purple" style={{ fontSize: 10, marginTop: 3, display: 'inline-block' }}>
+                  🌙 Club
+                </Pill>
+              )}
+            </div>
+            {/* Drag handle. ONLY this is draggable — swipes anywhere
+                else stay with Ionic's gesture engine. Encodes the
+                source eventId + slotId so the drop handler can do the
+                right thing (intra-event slot swap vs cross-event). */}
+            <span
+              draggable
+              onDragStart={(e) => {
+                e.stopPropagation();
+                onDragStartGuest(e, g.id, sourceEventId, sourceSlotId);
+              }}
+              onClick={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
+              aria-label={`Drag ${g.name}`}
+              title="Drag to another event or slot"
+              style={{
+                cursor: 'grab',
+                padding: '6px 8px',
+                marginLeft: 6,
+                fontSize: 16,
+                color: 'var(--color-text-secondary)',
+                userSelect: 'none',
+                lineHeight: 1,
+              }}
+            >
+              ≡
+            </span>
+          </div>
+        </IonItem>
+
+        <IonItemOptions
+          side="end"
+          onIonSwipe={async (ev) => {
+            const ion = (ev.target as HTMLElement)
+              .closest('ion-item-sliding') as HTMLIonItemSlidingElement | null;
+            if (isCancelled) {
+              toggleCancelled(g.id);
+            } else {
+              await askCancel(g.id, g.name);
+            }
+            setTimeout(() => ion?.close(), 1000);
+          }}
+        >
+          <IonItemOption
+            expandable
+            color={isCancelled ? 'medium' : 'danger'}
+            onClick={async (ev) => {
+              const ion = ev.currentTarget
+                .closest('ion-item-sliding') as HTMLIonItemSlidingElement | null;
+              if (isCancelled) toggleCancelled(g.id);
+              else await askCancel(g.id, g.name);
+              setTimeout(() => ion?.close(), 1000);
+            }}
+          >
+            {isCancelled ? t('guests.restore') : t('guests.cancelInvite')}
+          </IonItemOption>
+        </IonItemOptions>
+      </IonItemSliding>
+    );
+  };
+
+  /** A drop-target wrapper around a slot sub-bucket. */
+  const renderBucket = (
+    eventId: number,
+    slotId: string,
+    label: React.ReactNode,
+    sublabel: React.ReactNode,
+    guestList: Guest[],
+    placeholder: string,
+  ) => {
+    const key = `${eventId}:${slotId}`;
+    const isTarget = dropKey === key;
+    const totalPax = guestList.filter((g) => !g.cancelled).reduce((a, g) => a + g.pax, 0);
+    return (
+      <div
+        key={key}
+        onDragOver={(e) => onDragOverBucket(e, eventId, slotId)}
+        onDragLeave={(e) => onDragLeaveBucket(e, eventId, slotId)}
+        onDrop={(e) => onDropOnBucket(e, eventId, slotId)}
+        style={{
+          borderTop: '0.5px solid var(--color-border-tertiary)',
+          background: isTarget ? 'rgba(249,115,22,.08)' : 'transparent',
+          transition: 'background-color 120ms',
+        }}
+      >
+        <div style={{
+          padding: '8px 14px',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          background: 'var(--color-background-primary)',
+          borderBottom: '0.5px solid var(--color-border-tertiary)',
+        }}>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>
+              {label}
+            </div>
+            {sublabel && (
+              <div style={{ fontSize: 10, color: 'var(--color-text-secondary)' }}>
+                {sublabel}
+              </div>
+            )}
+          </div>
+          <Pill tone="gray">{totalPax} pax</Pill>
+        </div>
+        {guestList.length === 0 ? (
+          <div style={{
+            padding: '12px', fontSize: 11,
+            color: 'var(--color-text-secondary)',
+            textAlign: 'center', fontStyle: 'italic',
+          }}>
+            {placeholder}
+          </div>
+        ) : (
+          guestList.map((g) => renderGuestRow(g, eventId, slotId))
+        )}
+      </div>
+    );
+  };
 
   return (
     <IonPage>
@@ -235,8 +505,9 @@ export const GuestsPage: React.FC = () => {
               >{t('guests.addBtn')}</button>
             </div>
             <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', padding: '8px 0 6px', lineHeight: 1.5 }}>
-              Today's guests, grouped by event. Swipe ← to cancel, → to mark arrived.
-              Drag the <span style={{ fontFamily: 'monospace', opacity: .8 }}>≡</span> handle to move someone to another event.
+              Today's guests, grouped by event (and by slot when an event has more than one).
+              Swipe ← to cancel, → to mark arrived. Drag the{' '}
+              <span style={{ fontFamily: 'monospace', opacity: .8 }}>≡</span> handle between groups or slots.
             </div>
           </div>
         </IonToolbar>
@@ -250,35 +521,38 @@ export const GuestsPage: React.FC = () => {
             {todayEvents.map((ev) => {
               const list = guestsByEvent.get(ev.id) ?? [];
               const v = ev.venueId != null ? venueById(ev.venueId, venues) : undefined;
-              const isDropTarget = dropTargetEventId === ev.id;
-              const totalPax = list.filter((g) => !g.cancelled).reduce((a, g) => a + g.pax, 0);
+              const division = divisionByEvent.get(ev.id) ?? { slots: [], single: true };
+              // De-duplicated unique guests for the header pax sum, so
+              // a guest in two slots doesn't get counted twice here.
+              const uniqueGuests = Array.from(new Map(list.map((g) => [g.id, g])).values());
+              const totalPax = uniqueGuests.filter((g) => !g.cancelled).reduce((a, g) => a + g.pax, 0);
+
               return (
                 <div
                   key={ev.id}
-                  onDragOver={(e) => onDragOverGroup(e, ev.id)}
-                  onDragLeave={(e) => onDragLeaveGroup(e, ev.id)}
-                  onDrop={(e) => onDropOnGroup(e, ev.id)}
                   style={{
                     margin: '0 0 18px',
-                    border: isDropTarget
-                      ? '2px dashed var(--color-primary)'
-                      : '0.5px solid var(--color-border-tertiary)',
+                    border: '0.5px solid var(--color-border-tertiary)',
                     borderRadius: 'var(--border-radius-md)',
-                    background: isDropTarget
-                      ? 'rgba(249,115,22,.05)'
-                      : 'var(--color-background-secondary)',
-                    transition: 'background-color 120ms, border-color 120ms',
+                    background: 'var(--color-background-secondary)',
                     overflow: 'hidden',
                   }}
                 >
+                  {/* Event header (not a drop target — slot sub-buckets
+                      take that role when subdivided, or the single
+                      bucket below when not). */}
                   <div style={{
                     padding: '10px 14px',
-                    borderBottom: '0.5px solid var(--color-border-tertiary)',
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   }}>
                     <div>
                       <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)' }}>
                         {ev.name}
+                        {ev.isLateClub && (
+                          <Pill tone="purple" style={{ fontSize: 9, marginLeft: 8, display: 'inline-block' }}>
+                            🌙 Late Club
+                          </Pill>
+                        )}
                       </div>
                       <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>
                         {v ? v.name : 'No venue'} · {totalPax} pax
@@ -288,147 +562,54 @@ export const GuestsPage: React.FC = () => {
                       <Pill tone="blue">{totalPax}/{ev.capacity}</Pill>
                     ) : null}
                   </div>
-                  {list.length === 0 ? (
-                    <div style={{
-                      padding: '14px', fontSize: 12,
-                      color: 'var(--color-text-secondary)',
-                      textAlign: 'center', fontStyle: 'italic',
-                    }}>
-                      No guests yet — drop someone here.
-                    </div>
-                  ) : (
-                    list.map((g) => {
-                      const isArrived = g.checked;
-                      const isCancelled = !!g.cancelled;
-                      const rowState = isArrived ? 'arrived' : isCancelled ? 'cancelled' : 'pending';
-                      const isFirstRow = !firstRowAssigned;
-                      if (isFirstRow) firstRowAssigned = true;
-                      return (
-                        <IonItemSliding
-                          key={g.id}
-                          ref={isFirstRow ? firstRowRef : undefined}
-                          className={`guest-sliding-item state-${rowState}`}
-                        >
-                          {/* Left side: arrived. Closes after 1s so the user
-                              sees the confirmation before sliding back. */}
-                          <IonItemOptions
-                            side="start"
-                            onIonSwipe={(ev) => {
-                              toggleArrived(g.id);
-                              const ion = (ev.target as HTMLElement)
-                                .closest('ion-item-sliding') as HTMLIonItemSlidingElement | null;
-                              setTimeout(() => ion?.close(), 1000);
-                            }}
-                          >
-                            <IonItemOption
-                              expandable
-                              color={isArrived ? 'medium' : 'primary'}
-                              onClick={(ev) => {
-                                toggleArrived(g.id);
-                                const ion = ev.currentTarget
-                                  .closest('ion-item-sliding') as HTMLIonItemSlidingElement | null;
-                                setTimeout(() => ion?.close(), 1000);
-                              }}
-                            >
-                              {isArrived ? t('guests.markPending') : t('guests.markArrived')}
-                            </IonItemOption>
-                          </IonItemOptions>
 
-                          <IonItem
-                            button detail={false}
-                            onClick={() => open('guestDetail', { id: g.id })}
-                            className="guest-row"
-                            lines="none"
-                          >
-                            <div className="list-row" style={{ flex: 1, padding: '8px 4px', borderBottom: 'none' }}>
-                              <span className={`status-dot status-dot--${rowState}`} />
-                              <Avatar name={g.name} handle={g.igHandle} platform={g.igPlatform} />
-                              <div className="list-main">
-                                <div className="list-name">
-                                  <StarBadge on={g.influencer} />
-                                  <span style={{ textDecoration: isCancelled ? 'line-through' : undefined }}>
-                                    {g.name}
-                                  </span>
-                                  <SocialBadge handle={g.igHandle} platform={g.igPlatform} />
-                                </div>
-                                <div className="list-sub">
-                                  {(g.timeslotNames || []).join(' · ') || 'No slot'} · {g.pax} pax
-                                </div>
-                              </div>
-                              <div className="list-right">
-                                <div className={`list-right-sub state-label state-label--${rowState}`}>
-                                  {isArrived ? t('guests.arrived') : isCancelled ? t('guests.cancelled') : t('guests.pending')}
-                                </div>
-                                {g.clubEventId && (
-                                  <Pill tone="purple" style={{ fontSize: 10, marginTop: 3, display: 'inline-block' }}>
-                                    🌙 Club
-                                  </Pill>
-                                )}
-                              </div>
-                              {/* Drag handle. ONLY this element is draggable —
-                                  swipes anywhere else on the row still go to
-                                  Ionic's gesture engine. Stops click + pointer
-                                  propagation so a tap on the handle doesn't
-                                  also open the guest detail. */}
-                              <span
-                                draggable
-                                onDragStart={(e) => {
-                                  e.stopPropagation();
-                                  // Pass the SOURCE group's eventId so the drop
-                                  // handler knows whether we're dragging the
-                                  // guest's main-event link or her club link.
-                                  onDragStartGuest(e, g.id, ev.id);
-                                }}
-                                onClick={(e) => e.stopPropagation()}
-                                onPointerDown={(e) => e.stopPropagation()}
-                                aria-label={`Drag ${g.name} to another event`}
-                                title="Drag to another event"
-                                style={{
-                                  cursor: 'grab',
-                                  padding: '6px 8px',
-                                  marginLeft: 6,
-                                  fontSize: 16,
-                                  color: 'var(--color-text-secondary)',
-                                  userSelect: 'none',
-                                  lineHeight: 1,
-                                }}
-                              >
-                                ≡
-                              </span>
-                            </div>
-                          </IonItem>
-
-                          {/* Right side: cancel (with confirmation). */}
-                          <IonItemOptions
-                            side="end"
-                            onIonSwipe={async (ev) => {
-                              const ion = (ev.target as HTMLElement)
-                                .closest('ion-item-sliding') as HTMLIonItemSlidingElement | null;
-                              if (isCancelled) {
-                                toggleCancelled(g.id);
-                              } else {
-                                await askCancel(g.id, g.name);
-                              }
-                              setTimeout(() => ion?.close(), 1000);
-                            }}
-                          >
-                            <IonItemOption
-                              expandable
-                              color={isCancelled ? 'medium' : 'danger'}
-                              onClick={async (ev) => {
-                                const ion = ev.currentTarget
-                                  .closest('ion-item-sliding') as HTMLIonItemSlidingElement | null;
-                                if (isCancelled) toggleCancelled(g.id);
-                                else await askCancel(g.id, g.name);
-                                setTimeout(() => ion?.close(), 1000);
-                              }}
-                            >
-                              {isCancelled ? t('guests.restore') : t('guests.cancelInvite')}
-                            </IonItemOption>
-                          </IonItemOptions>
-                        </IonItemSliding>
+                  {division.single ? (
+                    // ── Flat list (event with 0 or 1 slot) ──
+                    (() => {
+                      const onlySlotId = division.slots[0]?.id ?? '';
+                      return renderBucket(
+                        ev.id,
+                        onlySlotId,
+                        division.slots[0]?.name ?? 'Guests',
+                        division.slots[0]
+                          ? `${division.slots[0].startTime}–${division.slots[0].endTime}`
+                          : null,
+                        list,
+                        'No guests yet — drop someone here.',
                       );
-                    })
+                    })()
+                  ) : (
+                    // ── Subdivided by slot ──
+                    <>
+                      {division.slots.map((slot) => {
+                        const slotGuests = list.filter((g) =>
+                          (g.timeslotIds || []).includes(slot.id),
+                        );
+                        return renderBucket(
+                          ev.id,
+                          slot.id,
+                          slot.name,
+                          `${slot.startTime}–${slot.endTime}`,
+                          slotGuests,
+                          `No one in ${slot.name} yet — drop someone here.`,
+                        );
+                      })}
+                      {/* Catch-all for guests without a picked slot */}
+                      {(() => {
+                        const orphans = list.filter(
+                          (g) => !(g.timeslotIds || []).length,
+                        );
+                        if (!orphans.length) return null;
+                        return renderBucket(
+                          ev.id,
+                          UNASSIGNED,
+                          'Unassigned',
+                          'Drag into a slot to assign',
+                          orphans,
+                          'No unassigned guests.',
+                        );
+                      })()}
+                    </>
                   )}
                 </div>
               );
