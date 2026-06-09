@@ -104,6 +104,20 @@ export function getVipOptionsForPax(venueId: number, pax: number, venues: Venue[
 export const lateClubEvents = (events: PromEvent[]): PromEvent[] =>
   events.filter((e) => e.isLateClub);
 
+// ── Guest ↔ event attribution helper ────────────────────────
+//
+// A guest can carry TWO event links:
+//   - `eventId`     → the main event (dinner / show / etc.)
+//   - `clubEventId` → an optional late-club follow-on
+//
+// Both listings — the main event's and the club event's — must
+// show the same guest with the same pax. This helper is the single
+// source of truth so every filter site stays consistent.
+export const isGuestOnEvent = (
+  g: Pick<Guest, 'eventId' | 'clubEventId'>,
+  eventId: number,
+): boolean => g.eventId === eventId || g.clubEventId === eventId;
+
 // ── Occurrence helpers ─────────────────────────────────────
 //
 // An event "occurs on" a given ISO date when:
@@ -279,8 +293,10 @@ export function eventCapacity(
   const e = events.find((x) => x.id === eventId);
   // Cancelled guests free up their seats — they don't count toward the
   // used capacity, so the next swipe-cancel widens "left" again.
+  // Includes club-event guests (a guest going to the late club counts
+  // toward the club's capacity, not just their main event's).
   const used = guests
-    .filter((g) => g.eventId === eventId
+    .filter((g) => isGuestOnEvent(g, eventId)
       && !g.cancelled
       && (isoDate == null || g.eventDate === isoDate))
     .reduce((a, g) => a + g.pax, 0);

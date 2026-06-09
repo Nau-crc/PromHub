@@ -3,7 +3,7 @@ import { IonModal, IonContent, IonIcon } from '@ionic/react';
 import { shareSocialOutline } from 'ionicons/icons';
 import { useAppStore } from '@/store/useAppStore';
 import {
-  eventCapacity, venueById, commCalc,
+  eventCapacity, venueById, commCalc, isGuestOnEvent,
   occurs, nextOccurrence, previousOccurrence, eventScheduleLabel,
 } from '@/features/summary/calculations';
 import { Pill, SlotPill } from '@/components/Pill';
@@ -94,8 +94,11 @@ export const EventDetailModal: React.FC<Props> = ({ open, onClose, eventId, onEd
   const isPastPin = (rowDate: string | null) => !!rowDate && rowDate < todayKey;
   const dateMatches = (rowDate: string | null) =>
     !selectedDate || !rowDate || rowDate === selectedDate;
+  // Matches if the guest's MAIN event is this event OR their late-club
+  // event is — same person, same pax, surfaced in both listings so
+  // the promoter sees consistent numbers per event.
   const evG = guests.filter((g) =>
-    g.eventId === e.id && !isPastPin(g.eventDate) && dateMatches(g.eventDate),
+    isGuestOnEvent(g, e.id) && !isPastPin(g.eventDate) && dateMatches(g.eventDate),
   );
   const evR = reservations.filter((r) =>
     r.eventId === e.id && !isPastPin(r.eventDate) && dateMatches(r.eventDate),

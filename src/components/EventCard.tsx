@@ -1,7 +1,7 @@
 import React from 'react';
 import type { PromEvent } from '@/core/types';
 import { useAppStore } from '@/store/useAppStore';
-import { eventScheduleLabel, venueById } from '@/features/summary/calculations';
+import { eventScheduleLabel, venueById, isGuestOnEvent } from '@/features/summary/calculations';
 import { Pill, SlotPill } from './Pill';
 
 interface Props {
@@ -28,8 +28,11 @@ export const EventCard: React.FC<Props> = ({ event: e, occurrenceDate, onClick }
   const matchByDate = (date: string | null) =>
     !occurrenceDate || !date || date === occurrenceDate;
 
+  // A guest counts toward this card if her main event OR her
+  // late-club event is this one — same person flows through both
+  // listings the same night with the same pax.
   const gc = guests
-    .filter((g) => g.eventId === e.id && matchByDate(g.eventDate))
+    .filter((g) => isGuestOnEvent(g, e.id) && matchByDate(g.eventDate))
     .reduce((a, g) => a + g.pax, 0);
   const rc = reservations
     .filter((r) => r.eventId === e.id && matchByDate(r.eventDate))

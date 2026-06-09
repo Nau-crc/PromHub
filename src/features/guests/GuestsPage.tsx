@@ -8,7 +8,7 @@ import type { Guest, PromEvent } from '@/core/types';
 import { useAppStore } from '@/store/useAppStore';
 import { useUIStore } from '@/store/useUIStore';
 import { useConfirm } from '@/store/useConfirmStore';
-import { occurs, venueById } from '@/features/summary/calculations';
+import { occurs, venueById, isGuestOnEvent } from '@/features/summary/calculations';
 import { today } from '@/core/constants';
 import { isoDay } from '@/core/utils/date';
 import { StarBadge, SocialBadge } from '@/components/SocialBadge';
@@ -64,24 +64,32 @@ export const GuestsPage: React.FC = () => {
   }, [events, todayIso]);
   const todayEventIds = useMemo(() => new Set(todayEvents.map((e) => e.id)), [todayEvents]);
 
-  // Today's guests: assigned to a today-event, AND either explicitly
-  // pinned to today, or unpinned (legacy / pre-occurrence-pinning).
-  // Past-dated guests are filtered out per the product rule.
+  // Today's guests: at least one of their event links (main OR
+  // late-club) points to an event happening today, AND they're
+  // either pinned to today or unpinned (legacy). Past-dated guests
+  // are excluded per the product rule.
   const todayGuests = useMemo(() => {
     return guests.filter((g) => {
-      if (g.eventId == null) return false;
-      if (!todayEventIds.has(g.eventId)) return false;
+      const mainOnToday = g.eventId != null && todayEventIds.has(g.eventId);
+      const clubOnToday = g.clubEventId != null && todayEventIds.has(g.clubEventId);
+      if (!mainOnToday && !clubOnToday) return false;
       return !g.eventDate || g.eventDate === todayIso;
     });
   }, [guests, todayEventIds, todayIso]);
 
-  // Bucket by event id for rendering.
+  // Bucket guests under EVERY today-event they belong to (main +
+  // late-club). A guest with main event A and club event B appears
+  // in both A's group and B's group with the same pax — same person,
+  // shown wherever she's heading that night.
   const guestsByEvent = useMemo(() => {
     const map = new Map<number, Guest[]>();
     todayEvents.forEach((e) => map.set(e.id, []));
     for (const g of todayGuests) {
-      const arr = map.get(g.eventId!);
-      if (arr) arr.push(g);
+      for (const ev of todayEvents) {
+        if (isGuestOnEvent(g, ev.id)) {
+          map.get(ev.id)!.push(g);
+        }
+      }
     }
     return map;
   }, [todayEvents, todayGuests]);
@@ -136,10 +144,21 @@ export const GuestsPage: React.FC = () => {
   }, [todayGuests.length]);
 
   // ── Drag-and-drop wiring ───────────────────────────────────
+  // Since a single guest can appear in TWO groups (main event + late
+  // club), we encode the SOURCE group's eventId alongside the guest
+  // id in dataTransfer. On drop we decide which link to update:
+  //   - dragged from main event group → reassign `eventId`
+  //   - dragged from late-club group  → reassign `clubEventId`
+  // This keeps the other link intact: moving the club assignment
+  // doesn't blow away the main, and vice-versa.
   const [dropTargetEventId, setDropTargetEventId] = useState<number | null>(null);
 
-  const onDragStartGuest = (e: React.DragEvent<HTMLElement>, guestId: number) => {
-    e.dataTransfer.setData('text/plain', String(guestId));
+  const onDragStartGuest = (
+    e: React.DragEvent<HTMLElement>,
+    guestId: number,
+    sourceEventId: number,
+  ) => {
+    e.dataTransfer.setData('text/plain', `${guestId}:${sourceEventId}`);
     e.dataTransfer.effectAllowed = 'move';
   };
   const onDragOverGroup = (e: React.DragEvent<HTMLDivElement>, eventId: number) => {
@@ -154,23 +173,34 @@ export const GuestsPage: React.FC = () => {
     e.preventDefault();
     setDropTargetEventId(null);
     const raw = e.dataTransfer.getData('text/plain');
-    const guestId = Number(raw);
-    if (!Number.isFinite(guestId)) return;
+    const [guestIdStr, sourceEventIdStr] = raw.split(':');
+    const guestId = Number(guestIdStr);
+    const sourceEventId = Number(sourceEventIdStr);
+    if (!Number.isFinite(guestId) || !Number.isFinite(sourceEventId)) return;
+    if (sourceEventId === targetEventId) return; // dropped on origin
     const g = guests.find((x) => x.id === guestId);
-    if (!g || g.eventId === targetEventId) return;
+    if (!g) return;
     const targetEvent = events.find((ev) => ev.id === targetEventId);
     if (!targetEvent) return;
+    // Figure out which link to update based on which group the row
+    // was dragged FROM. If the source was the main event link, we're
+    // reassigning the main; if it was the club link, the club.
+    const updatingClub = g.clubEventId === sourceEventId && g.eventId !== sourceEventId;
     try {
-      await upsertGuest({
-        ...g,
-        eventId: targetEventId,
-        venueId: targetEvent.venueId ?? g.venueId,
-        eventDate: todayIso,
-        // The old event's timeslot ids don't refer to anything on
-        // the new event — clear them. Promoter re-picks if needed.
-        timeslotIds: [],
-        timeslotNames: [],
-      });
+      if (updatingClub) {
+        await upsertGuest({ ...g, clubEventId: targetEventId });
+      } else {
+        await upsertGuest({
+          ...g,
+          eventId: targetEventId,
+          venueId: targetEvent.venueId ?? g.venueId,
+          eventDate: todayIso,
+          // The old main event's timeslot ids don't refer to anything
+          // on the new event — clear them. Promoter re-picks if needed.
+          timeslotIds: [],
+          timeslotNames: [],
+        });
+      }
     } catch (err) {
       alert(`Couldn't move guest: ${(err as Error).message}`);
     }
@@ -344,7 +374,10 @@ export const GuestsPage: React.FC = () => {
                                 draggable
                                 onDragStart={(e) => {
                                   e.stopPropagation();
-                                  onDragStartGuest(e, g.id);
+                                  // Pass the SOURCE group's eventId so the drop
+                                  // handler knows whether we're dragging the
+                                  // guest's main-event link or her club link.
+                                  onDragStartGuest(e, g.id, ev.id);
                                 }}
                                 onClick={(e) => e.stopPropagation()}
                                 onPointerDown={(e) => e.stopPropagation()}
