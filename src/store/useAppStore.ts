@@ -190,8 +190,30 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   refresh: async () => {
     try {
-      const all = await api.listAll();
-      set({ ...all });
+      const fresh = await api.listAll();
+      // CRITICAL: only replace each slice if its content actually
+      // changed. `api.listAll()` always returns freshly-mapped arrays,
+      // so a naive `set({ ...fresh })` mints new array references on
+      // every poll — which re-fires useEffect hooks that subscribe to
+      // these slices (form-init effects in particular). That wiped
+      // mid-typing form state. Comparing serialised payloads is small
+      // enough at this scale and keeps refs stable when nothing moved.
+      set((state) => {
+        const out: Partial<typeof state> = {};
+        if (JSON.stringify(state.venues) !== JSON.stringify(fresh.venues)) {
+          out.venues = fresh.venues;
+        }
+        if (JSON.stringify(state.events) !== JSON.stringify(fresh.events)) {
+          out.events = fresh.events;
+        }
+        if (JSON.stringify(state.guests) !== JSON.stringify(fresh.guests)) {
+          out.guests = fresh.guests;
+        }
+        if (JSON.stringify(state.reservations) !== JSON.stringify(fresh.reservations)) {
+          out.reservations = fresh.reservations;
+        }
+        return out;
+      });
     } catch {
       // Stay quiet — the user is mid-task. Errors during background
       // polls shouldn't disrupt the UI.
