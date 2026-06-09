@@ -76,9 +76,17 @@ export interface Guest {
   timeslotNames: string[];
   pax: number;
   clubEventId: number | null;
+  /** Arrived flag for the MAIN event link (`eventId`). */
   checked: boolean;
-  /** Guest cancelled (no-show before the night, or expressly cancelled). */
+  /** Cancelled flag for the MAIN event link (`eventId`). */
   cancelled?: boolean;
+  /** Arrived flag for the LATE-CLUB event link (`clubEventId`).
+   *  Independent of `checked` — she can arrive at dinner but skip
+   *  the club, or vice versa. */
+  checkedClub?: boolean;
+  /** Cancelled flag for the LATE-CLUB event link. Independent of
+   *  `cancelled`. */
+  cancelledClub?: boolean;
   influencer: boolean;
   igHandle: string;
   igPlatform: Platform;

@@ -2,7 +2,7 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import type { PromEvent } from '@/core/types';
 import { useAppStore } from '@/store/useAppStore';
-import { eventScheduleLabel, venueById, isGuestOnEvent } from '@/features/summary/calculations';
+import { eventScheduleLabel, venueById, isGuestAttendingEvent } from '@/features/summary/calculations';
 import { Pill, SlotPill } from './Pill';
 
 interface Props {
@@ -30,11 +30,13 @@ export const EventCard: React.FC<Props> = ({ event: e, occurrenceDate, onClick }
   const matchByDate = (date: string | null) =>
     !occurrenceDate || !date || date === occurrenceDate;
 
-  // A guest counts toward this card if her main event OR her
-  // late-club event is this one — same person flows through both
-  // listings the same night with the same pax.
+  // A guest counts toward this card if she's ATTENDING the event
+  // — that is, linked via her main or club id AND not cancelled
+  // for THAT specific attendance. (A guest who cancelled the
+  // dinner but still plans to come to the after-club only counts
+  // once, on the club card.)
   const gc = guests
-    .filter((g) => isGuestOnEvent(g, e.id) && matchByDate(g.eventDate))
+    .filter((g) => isGuestAttendingEvent(g, e.id) && matchByDate(g.eventDate))
     .reduce((a, g) => a + g.pax, 0);
   const rc = reservations
     .filter((r) => r.eventId === e.id && matchByDate(r.eventDate))

@@ -64,17 +64,53 @@ export const GuestDetailModal: React.FC<Props> = ({ open, onClose, guestId, onEd
           <div className="detail-kv"><span className="dk">{t('guestDetail.venue')}</span><span className="dv">{venueName(g.venueId, venues)}</span></div>
           <div className="detail-kv"><span className="dk">{t('guestDetail.comingTo')}</span><span className="dv">{(g.timeslotNames || []).join(' · ') || '—'}</span></div>
           <div className="detail-kv"><span className="dk">{t('guestDetail.pax')}</span><span className="dv">{g.pax}</span></div>
-          <div className="detail-kv">
-            <span className="dk">{t('guestDetail.status')}</span>
-            <span className="dv" style={{ color: g.checked ? '#0F6E56' : 'var(--color-text-secondary)' }}>
-              {g.checked ? t('guests.arrived') : t('guests.pending')}
-            </span>
-          </div>
+          {/* Main-event attendance row. Status badge reflects the
+              main `checked` / `cancelled` flag (independent of the
+              club one — separate invitations). */}
           <div className="detail-kv">
             <span className="dk">{t('guestDetail.event')}</span>
-            <span className="dv">{g.eventId ? (events.find((x) => x.id === g.eventId)?.name ?? '?') : t('common.none')}</span>
+            <span className="dv" style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              {g.eventId ? (events.find((x) => x.id === g.eventId)?.name ?? '?') : t('common.none')}
+              {g.eventId && (
+                <span style={{
+                  fontSize: 10, padding: '1px 6px', borderRadius: 4,
+                  background: g.checked ? '#EAF3DE'
+                    : g.cancelled ? '#FDECEC'
+                    : 'var(--color-background-secondary)',
+                  color: g.checked ? '#0F6E56'
+                    : g.cancelled ? '#A32D2D'
+                    : 'var(--color-text-secondary)',
+                }}>
+                  {g.checked ? t('guests.arrived')
+                    : g.cancelled ? t('guests.cancelled')
+                    : t('guests.pending')}
+                </span>
+              )}
+            </span>
           </div>
-          <div className="detail-kv"><span className="dk">{t('guestDetail.clubLater')}</span><span className="dv">{clubEv ? `🌙 ${clubEv.name}` : t('common.no')}</span></div>
+          {/* Club attendance — same independent status badge if she
+              also has a club invite. */}
+          <div className="detail-kv">
+            <span className="dk">{t('guestDetail.clubLater')}</span>
+            <span className="dv" style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              {clubEv ? `🌙 ${clubEv.name}` : t('common.no')}
+              {clubEv && (
+                <span style={{
+                  fontSize: 10, padding: '1px 6px', borderRadius: 4,
+                  background: g.checkedClub ? '#EAF3DE'
+                    : g.cancelledClub ? '#FDECEC'
+                    : 'var(--color-background-secondary)',
+                  color: g.checkedClub ? '#0F6E56'
+                    : g.cancelledClub ? '#A32D2D'
+                    : 'var(--color-text-secondary)',
+                }}>
+                  {g.checkedClub ? t('guests.arrived')
+                    : g.cancelledClub ? t('guests.cancelled')
+                    : t('guests.pending')}
+                </span>
+              )}
+            </span>
+          </div>
           <div className="detail-kv"><span className="dk">{t('guestDetail.influencer')}</span><span className="dv">{g.influencer ? t('common.yes') : t('common.no')}</span></div>
           {g.influencer && (
             <div className="detail-kv">

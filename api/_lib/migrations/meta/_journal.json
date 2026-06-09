@@ -36,6 +36,13 @@
       "when": 1779480000000,
       "tag": "0004_night_records",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1779490000000,
+      "tag": "0005_per_attendance_status",
+      "breakpoints": true
     }
   ]
 }

@@ -96,8 +96,14 @@ interface AppState {
   // guests
   upsertGuest: (g: Guest | Omit<Guest, 'id'>) => Promise<Guest>;
   removeGuest: (id: number) => Promise<void>;
-  toggleArrived: (id: number) => Promise<void>;
-  toggleCancelled: (id: number) => Promise<void>;
+  /** Toggle the arrived flag for ONE of the guest's attendances.
+   *  Context `'main'` flips `checked`; `'club'` flips `checkedClub`.
+   *  Defaults to `'main'` for backward compat. */
+  toggleArrived: (id: number, context?: 'main' | 'club') => Promise<void>;
+  /** Toggle the cancelled flag for ONE of the guest's attendances.
+   *  Context `'main'` flips `cancelled`; `'club'` flips `cancelledClub`.
+   *  Defaults to `'main'` for backward compat. */
+  toggleCancelled: (id: number, context?: 'main' | 'club') => Promise<void>;
 
   // reservations
   upsertReservation: (r: Reservation | Omit<Reservation, 'id'>) => Promise<Reservation>;
@@ -337,23 +343,28 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((s) => ({ guests: s.guests.filter((x) => x.id !== id) }));
   },
 
-  toggleArrived: async (id) => {
+  toggleArrived: async (id, context = 'main') => {
     const g = get().guests.find((x) => x.id === id);
     if (!g) return;
-    const row = await api.updateGuest(id, {
-      checked: !g.checked,
-      cancelled: false,
-    });
+    // Flip arrived for the targeted attendance and clear the
+    // cancelled flag on the SAME attendance (you can't be both
+    // arrived and cancelled for the same event). The other
+    // attendance's flags are left untouched — that's the whole
+    // point of independent main vs club status.
+    const patch = context === 'club'
+      ? { checkedClub: !g.checkedClub, cancelledClub: false }
+      : { checked: !g.checked, cancelled: false };
+    const row = await api.updateGuest(id, patch);
     set((s) => ({ guests: s.guests.map((x) => x.id === id ? row : x) }));
   },
 
-  toggleCancelled: async (id) => {
+  toggleCancelled: async (id, context = 'main') => {
     const g = get().guests.find((x) => x.id === id);
     if (!g) return;
-    const row = await api.updateGuest(id, {
-      cancelled: !g.cancelled,
-      checked: false,
-    });
+    const patch = context === 'club'
+      ? { cancelledClub: !g.cancelledClub, checkedClub: false }
+      : { cancelled: !g.cancelled, checked: false };
+    const row = await api.updateGuest(id, patch);
     set((s) => ({ guests: s.guests.map((x) => x.id === id ? row : x) }));
   },
 

@@ -103,8 +103,17 @@ export const guests = pgTable('guests', {
    *  if a venue's timeslot is later renamed/deleted. */
   timeslotNames: text('timeslot_names').array().default([]).notNull(),
   pax: integer('pax').default(1).notNull(),
+  /** Arrived flag for the MAIN event link (`event_id`). */
   checked: boolean('checked').default(false).notNull(),
+  /** Cancelled flag for the MAIN event link (`event_id`). */
   cancelled: boolean('cancelled').default(false).notNull(),
+  /** Arrived flag for the LATE-CLUB event link (`club_event_id`).
+   *  Independent of `checked` — a guest can arrive at the dinner
+   *  but skip the club, or the other way round. */
+  checkedClub: boolean('checked_club').default(false).notNull(),
+  /** Cancelled flag for the LATE-CLUB event link. Independent of
+   *  `cancelled`. */
+  cancelledClub: boolean('cancelled_club').default(false).notNull(),
   influencer: boolean('influencer').default(false).notNull(),
   igHandle: text('ig_handle').default('').notNull(),
   igPlatform: text('ig_platform', { enum: ['instagram', 'tiktok'] }).default('instagram').notNull(),

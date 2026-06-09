@@ -22,8 +22,17 @@ export function buildNightSummary(
   venues: Venue[],
 ): NightRecordSummary {
   // ── Aggregate totals ─────────────────────────────────────
+  // Per-attendance cancellation: a guest still counts toward the
+  // night's total if she's coming to at LEAST ONE event tonight.
+  // Cancellation of just the main OR just the club doesn't pull
+  // her from the night's total — she's still in the venue.
+  const isAttendingTonight = (g: Guest): boolean => {
+    const mainOk = g.eventId != null && !g.cancelled;
+    const clubOk = g.clubEventId != null && !g.cancelledClub;
+    return mainOk || clubOk;
+  };
   const totalGuests = guests
-    .filter((g) => !g.cancelled)
+    .filter(isAttendingTonight)
     .reduce((sum, g) => sum + g.pax, 0);
   const totalReservations = reservations.length;
 
@@ -39,12 +48,13 @@ export function buildNightSummary(
   paidToInviters = round2(paidToInviters);
   const netCommission = round2(grossCommission - paidToInviters);
 
-  const influencerCount = guests.filter((g) => g.influencer && !g.cancelled).length;
+  const influencerCount = guests
+    .filter((g) => g.influencer && isAttendingTonight(g)).length;
 
   // ── Per-dimension breakdowns ─────────────────────────────
   const byInviteType: Record<string, number> = {};
   for (const g of guests) {
-    if (g.cancelled) continue;
+    if (!isAttendingTonight(g)) continue;
     for (const slotName of g.timeslotNames || []) {
       byInviteType[slotName] = (byInviteType[slotName] ?? 0) + g.pax;
     }
@@ -52,7 +62,7 @@ export function buildNightSummary(
 
   const byVenue: Record<string, { guests: number; tables: number }> = {};
   for (const g of guests) {
-    if (g.cancelled) continue;
+    if (!isAttendingTonight(g)) continue;
     const name = venueName(g.venueId, venues);
     byVenue[name] ??= { guests: 0, tables: 0 };
     byVenue[name].guests += g.pax;

@@ -118,6 +118,52 @@ export const isGuestOnEvent = (
   eventId: number,
 ): boolean => g.eventId === eventId || g.clubEventId === eventId;
 
+// ── Per-attendance helpers ─────────────────────────────────
+//
+// A guest's main-event link and her late-club link are tracked
+// independently — she may cancel one without cancelling the other.
+// These helpers return the right `cancelled` / `checked` flag for a
+// given attendance, so capacity / arrival counts stay consistent.
+
+/** Is this guest LINKED to `eventId` via her main attendance? */
+export const isMainAttendance = (
+  g: Pick<Guest, 'eventId'>,
+  eventId: number,
+): boolean => g.eventId === eventId;
+
+/** Is this guest LINKED to `eventId` via her late-club attendance? */
+export const isClubAttendance = (
+  g: Pick<Guest, 'eventId' | 'clubEventId'>,
+  eventId: number,
+): boolean => g.clubEventId === eventId && g.eventId !== eventId;
+
+/** Has the guest cancelled her attendance at THIS event specifically? */
+export const isCancelledFor = (
+  g: Pick<Guest, 'eventId' | 'clubEventId' | 'cancelled' | 'cancelledClub'>,
+  eventId: number,
+): boolean => {
+  if (isClubAttendance(g, eventId)) return !!g.cancelledClub;
+  if (isMainAttendance(g, eventId)) return !!g.cancelled;
+  return false;
+};
+
+/** Has the guest arrived/checked-in for THIS event specifically? */
+export const isCheckedFor = (
+  g: Pick<Guest, 'eventId' | 'clubEventId' | 'checked' | 'checkedClub'>,
+  eventId: number,
+): boolean => {
+  if (isClubAttendance(g, eventId)) return !!g.checkedClub;
+  if (isMainAttendance(g, eventId)) return !!g.checked;
+  return false;
+};
+
+/** Is this guest ATTENDING the event — i.e. linked to it AND not
+ *  cancelled for THAT specific attendance? */
+export const isGuestAttendingEvent = (
+  g: Pick<Guest, 'eventId' | 'clubEventId' | 'cancelled' | 'cancelledClub'>,
+  eventId: number,
+): boolean => isGuestOnEvent(g, eventId) && !isCancelledFor(g, eventId);
+
 // ── Occurrence helpers ─────────────────────────────────────
 //
 // An event "occurs on" a given ISO date when:
@@ -295,9 +341,13 @@ export function eventCapacity(
   // used capacity, so the next swipe-cancel widens "left" again.
   // Includes club-event guests (a guest going to the late club counts
   // toward the club's capacity, not just their main event's).
+  // Cancellation is per-attendance: a guest cancelled-main-only
+  // still counts toward her club event's capacity. `isCancelledFor`
+  // reads the correct flag based on which attendance ties her to
+  // `eventId`.
   const used = guests
     .filter((g) => isGuestOnEvent(g, eventId)
-      && !g.cancelled
+      && !isCancelledFor(g, eventId)
       && (isoDate == null || g.eventDate === isoDate))
     .reduce((a, g) => a + g.pax, 0);
   const capacity = e?.capacity ?? 0;

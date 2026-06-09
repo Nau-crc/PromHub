@@ -8,7 +8,10 @@ import type { Guest, PromEvent, Timeslot } from '@/core/types';
 import { useAppStore } from '@/store/useAppStore';
 import { useUIStore } from '@/store/useUIStore';
 import { useConfirm } from '@/store/useConfirmStore';
-import { occurs, venueById, isGuestOnEvent } from '@/features/summary/calculations';
+import {
+  occurs, venueById, isGuestOnEvent,
+  isMainAttendance, isCancelledFor, isCheckedFor,
+} from '@/features/summary/calculations';
 import { today } from '@/core/constants';
 import { isoDay } from '@/core/utils/date';
 import { StarBadge, SocialBadge } from '@/components/SocialBadge';
@@ -286,14 +289,18 @@ export const GuestsPage: React.FC = () => {
     }
   };
 
-  const askCancel = async (id: number, name: string) => {
+  const askCancel = async (
+    id: number,
+    name: string,
+    context: 'main' | 'club',
+  ) => {
     const ok = await confirm({
       title: t('guests.cancelTitle', { name }),
       message: t('guests.cancelMessage'),
       confirmLabel: t('guests.cancelConfirm'),
       destructive: true,
     });
-    if (ok) toggleCancelled(id);
+    if (ok) toggleCancelled(id, context);
   };
 
   // First-row-across-all-groups tracker for the swipe-hint demo.
@@ -305,8 +312,14 @@ export const GuestsPage: React.FC = () => {
     sourceEventId: number,
     sourceSlotId: string,
   ) => {
-    const isArrived = g.checked;
-    const isCancelled = !!g.cancelled;
+    // The same guest can appear in two buckets (main + club). The
+    // arrived / cancelled state shown HERE is the one tied to THIS
+    // bucket's attendance — so swiping a club-bucket row affects
+    // only her club status, never the main one.
+    const context: 'main' | 'club' = isMainAttendance(g, sourceEventId)
+      ? 'main' : 'club';
+    const isArrived = isCheckedFor(g, sourceEventId);
+    const isCancelled = isCancelledFor(g, sourceEventId);
     const rowState = isArrived ? 'arrived' : isCancelled ? 'cancelled' : 'pending';
     const isFirstRow = !firstRowAssigned;
     if (isFirstRow) firstRowAssigned = true;
@@ -322,7 +335,7 @@ export const GuestsPage: React.FC = () => {
         <IonItemOptions
           side="start"
           onIonSwipe={(ev) => {
-            toggleArrived(g.id);
+            toggleArrived(g.id, context);
             const ion = (ev.target as HTMLElement)
               .closest('ion-item-sliding') as HTMLIonItemSlidingElement | null;
             setTimeout(() => ion?.close(), 1000);
@@ -332,7 +345,7 @@ export const GuestsPage: React.FC = () => {
             expandable
             color={isArrived ? 'medium' : 'primary'}
             onClick={(ev) => {
-              toggleArrived(g.id);
+              toggleArrived(g.id, context);
               const ion = ev.currentTarget
                 .closest('ion-item-sliding') as HTMLIonItemSlidingElement | null;
               setTimeout(() => ion?.close(), 1000);
@@ -408,9 +421,9 @@ export const GuestsPage: React.FC = () => {
             const ion = (ev.target as HTMLElement)
               .closest('ion-item-sliding') as HTMLIonItemSlidingElement | null;
             if (isCancelled) {
-              toggleCancelled(g.id);
+              toggleCancelled(g.id, context);
             } else {
-              await askCancel(g.id, g.name);
+              await askCancel(g.id, g.name, context);
             }
             setTimeout(() => ion?.close(), 1000);
           }}
@@ -421,8 +434,8 @@ export const GuestsPage: React.FC = () => {
             onClick={async (ev) => {
               const ion = ev.currentTarget
                 .closest('ion-item-sliding') as HTMLIonItemSlidingElement | null;
-              if (isCancelled) toggleCancelled(g.id);
-              else await askCancel(g.id, g.name);
+              if (isCancelled) toggleCancelled(g.id, context);
+              else await askCancel(g.id, g.name, context);
               setTimeout(() => ion?.close(), 1000);
             }}
           >

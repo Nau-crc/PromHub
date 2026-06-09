@@ -76,6 +76,10 @@ export const guestInputSchema = z.object({
   pax: z.number().int().min(1).max(50).default(1),
   checked: z.boolean().default(false),
   cancelled: z.boolean().default(false),
+  // Per-attendance flags for the late-club link (independent of
+  // the main-event flags above).
+  checkedClub: z.boolean().default(false),
+  cancelledClub: z.boolean().default(false),
   influencer: z.boolean().default(false),
   igHandle: z.string().max(60).default(''),
   igPlatform: platform.default('instagram'),
