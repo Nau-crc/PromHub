@@ -18,9 +18,9 @@ export const VenuesPage: React.FC = () => {
 
   const onDelete = async (id: number, name: string) => {
     const ok = await confirm({
-      title: `Delete ${name}?`,
-      message: 'Future events at this venue and their guests will be removed. Past events stay for reporting.',
-      confirmLabel: 'Delete',
+      title: t('venues.deleteConfirm', { name }),
+      message: t('venues.deleteMessage'),
+      confirmLabel: t('actions.delete'),
       destructive: true,
     });
     if (ok) removeVenue(id);
@@ -51,10 +51,10 @@ export const VenuesPage: React.FC = () => {
               const gc = venueGuestCount(v.id, guests);
               const gcap = v.guestCapacity || 0;
               const gpct = gcap ? Math.min(100, Math.round((gc / gcap) * 100)) : 0;
-              const slots = (v.timeslots || []).map((s) => `${s.name} ${s.startTime}–${s.endTime}`).join(', ') || 'No timeslots';
+              const slots = (v.timeslots || []).map((s) => `${s.name} ${s.startTime}–${s.endTime}`).join(', ') || t('venues.noTimeslots');
               const vips = (v.vipTypes || []).map(
-                (t) => `${t.name}(${t.minPax}-${t.maxPax}pax €${t.price}/${t.tableCapacity || 0}tbls)`,
-              ).join(', ') || 'No VIP types';
+                (vp) => `${vp.name}(${vp.minPax}-${vp.maxPax}pax €${vp.price}/${vp.tableCapacity || 0}tbls)`,
+              ).join(', ') || t('venues.noVipTypes');
               return (
                 <div key={v.id} className="venue-row-item">
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -65,15 +65,15 @@ export const VenuesPage: React.FC = () => {
                     {gcap > 0 && (
                       <>
                         <div style={{ fontSize: 10, color: 'var(--color-text-secondary)', marginTop: 5 }}>
-                          Guests {gc}/{gcap}
+                          {t('summary.guests')} {gc}/{gcap}
                         </div>
                         <CapacityBar pct={gpct} warnAt={80} />
                       </>
                     )}
                   </div>
                   <div className="venue-acts">
-                    <button className="tag-btn" onClick={() => open('editVenue', { id: v.id })}>Edit</button>
-                    <button className="tag-btn" style={{ color: '#A32D2D' }} onClick={() => onDelete(v.id, v.name)}>Del</button>
+                    <button className="tag-btn" onClick={() => open('editVenue', { id: v.id })}>{t('actions.edit')}</button>
+                    <button className="tag-btn" style={{ color: '#A32D2D' }} onClick={() => onDelete(v.id, v.name)}>{t('actions.deleteShort')}</button>
                   </div>
                 </div>
               );

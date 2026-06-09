@@ -1,5 +1,6 @@
 import React from 'react';
 import { IonAlert } from '@ionic/react';
+import { useTranslation } from 'react-i18next';
 import { useConfirmStore } from '@/store/useConfirmStore';
 
 // ─────────────────────────────────────────────────────────────
@@ -8,6 +9,7 @@ import { useConfirmStore } from '@/store/useConfirmStore';
 //  consistent styling.
 // ─────────────────────────────────────────────────────────────
 export const ConfirmHost: React.FC = () => {
+  const { t } = useTranslation();
   const { pending, resolve } = useConfirmStore((s) => ({
     pending: s.pending, resolve: s.resolve,
   }));
@@ -20,12 +22,12 @@ export const ConfirmHost: React.FC = () => {
       onDidDismiss={() => resolve(false)}
       buttons={[
         {
-          text: pending?.cancelLabel ?? 'Cancel',
+          text: pending?.cancelLabel ?? t('actions.cancel'),
           role: 'cancel',
           handler: () => resolve(false),
         },
         {
-          text: pending?.confirmLabel ?? 'Confirm',
+          text: pending?.confirmLabel ?? t('actions.confirm'),
           role: pending?.destructive ? 'destructive' : 'confirm',
           cssClass: pending?.destructive ? 'confirm-destructive' : 'confirm-primary',
           handler: () => resolve(true),

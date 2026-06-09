@@ -50,7 +50,7 @@ export const ReservationsPage: React.FC = () => {
                     </div>
                     <div className="list-sub">
                       {venueName(r.venueId, venues)} · {r.vipType || '—'}
-                      {c.price ? ` (€${c.price})` : ''} · {r.pax} pax
+                      {c.price ? ` (€${c.price})` : ''} · {r.pax} {t('common.paxShort')}
                       {r.time ? ` · ${r.time}` : ''}
                     </div>
                   </div>
@@ -59,7 +59,7 @@ export const ReservationsPage: React.FC = () => {
                       +€{c.promoter}
                     </div>
                     <div className="list-right-sub">
-                      {r.fromInvite ? <span style={{ color: '#F97316' }}>Via invitation</span> : 'Direct'}
+                      {r.fromInvite ? <span style={{ color: '#F97316' }}>{t('reservations.viaInvitation')}</span> : t('reservations.direct')}
                     </div>
                   </div>
                 </div>

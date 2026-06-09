@@ -282,15 +282,15 @@ export const GuestsPage: React.FC = () => {
         timeslotNames: newSlotNames,
       });
     } catch (err) {
-      alert(`Couldn't move guest: ${(err as Error).message}`);
+      alert(t('guests.couldntMove', { message: (err as Error).message }));
     }
   };
 
   const askCancel = async (id: number, name: string) => {
     const ok = await confirm({
-      title: `Cancel ${name}'s spot?`,
-      message: "The invitation will stay visible (struck through) and the seats free up for someone else.",
-      confirmLabel: 'Cancel invitation',
+      title: t('guests.cancelTitle', { name }),
+      message: t('guests.cancelMessage'),
+      confirmLabel: t('guests.cancelConfirm'),
       destructive: true,
     });
     if (ok) toggleCancelled(id);
@@ -385,8 +385,8 @@ export const GuestsPage: React.FC = () => {
               }}
               onClick={(e) => e.stopPropagation()}
               onPointerDown={(e) => e.stopPropagation()}
-              aria-label={`Drag ${g.name}`}
-              title="Drag to another event or slot"
+              aria-label={t('guests.dragAria', { name: g.name })}
+              title={t('guests.dragTitle')}
               style={{
                 cursor: 'grab',
                 padding: '6px 8px',
@@ -505,9 +505,7 @@ export const GuestsPage: React.FC = () => {
               >{t('guests.addBtn')}</button>
             </div>
             <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', padding: '8px 0 6px', lineHeight: 1.5 }}>
-              Today's guests, grouped by event (and by slot when an event has more than one).
-              Swipe ← to cancel, → to mark arrived. Drag the{' '}
-              <span style={{ fontFamily: 'monospace', opacity: .8 }}>≡</span> handle between groups or slots.
+              {t('guests.todayHint', { handle: '≡' })}
             </div>
           </div>
         </IonToolbar>
@@ -515,7 +513,7 @@ export const GuestsPage: React.FC = () => {
       <IonContent>
         <div className="spacer" />
         {todayEvents.length === 0 ? (
-          <EmptyBox>No events scheduled for today.</EmptyBox>
+          <EmptyBox>{t('guests.noEventsToday')}</EmptyBox>
         ) : (
           <div style={{ padding: '0 16px' }}>
             {todayEvents.map((ev) => {
@@ -559,10 +557,10 @@ export const GuestsPage: React.FC = () => {
                           {ev.name}
                         </span>
                         {ev.isPrivate && (
-                          <Pill tone="pink" style={{ fontSize: 9 }}>Private</Pill>
+                          <Pill tone="pink" style={{ fontSize: 9 }}>{t('common.private')}</Pill>
                         )}
                         {ev.isLateClub && (
-                          <Pill tone="purple" style={{ fontSize: 9 }}>🌙 Late Club</Pill>
+                          <Pill tone="purple" style={{ fontSize: 9 }}>{t('common.lateClub')}</Pill>
                         )}
                       </div>
                     </div>
@@ -580,12 +578,12 @@ export const GuestsPage: React.FC = () => {
                       return renderBucket(
                         ev.id,
                         onlySlotId,
-                        division.slots[0]?.name ?? 'Guests',
+                        division.slots[0]?.name ?? t('eventDetail.guests'),
                         division.slots[0]
                           ? `${division.slots[0].startTime}–${division.slots[0].endTime}`
                           : null,
                         list,
-                        'No guests yet — drop someone here.',
+                        t('guests.dropHere'),
                       );
                     })()
                   ) : (
@@ -601,7 +599,7 @@ export const GuestsPage: React.FC = () => {
                           slot.name,
                           `${slot.startTime}–${slot.endTime}`,
                           slotGuests,
-                          `No one in ${slot.name} yet — drop someone here.`,
+                          t('guests.dropSlotHere', { slot: slot.name }),
                         );
                       })}
                       {/* Catch-all for guests without a picked slot */}
@@ -613,10 +611,10 @@ export const GuestsPage: React.FC = () => {
                         return renderBucket(
                           ev.id,
                           UNASSIGNED,
-                          'Unassigned',
-                          'Drag into a slot to assign',
+                          t('guests.unassigned'),
+                          t('guests.unassignedHint'),
                           orphans,
-                          'No unassigned guests.',
+                          t('guests.noUnassigned'),
                         );
                       })()}
                     </>

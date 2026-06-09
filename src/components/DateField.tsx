@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { IonModal, IonContent } from '@ionic/react';
+import { useTranslation } from 'react-i18next';
 import { Calendar } from './Calendar';
 
 // ─────────────────────────────────────────────────────────────
@@ -44,6 +45,7 @@ const fmt = (iso: string) =>
   });
 
 export const DateField: React.FC<Props> = (props) => {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
 
   const display = (() => {
@@ -78,9 +80,9 @@ export const DateField: React.FC<Props> = (props) => {
             position: 'sticky', top: 0, background: 'var(--color-background-primary)', zIndex: 10,
           }}>
             <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--color-text-primary)' }}>
-              {props.label ?? 'Pick a date'}
+              {props.label ?? t('common.pickADate')}
             </div>
-            <button className="btn-ghost" onClick={() => setOpen(false)}>Done</button>
+            <button className="btn-ghost" onClick={() => setOpen(false)}>{t('actions.done')}</button>
           </div>
           <div style={{ padding: 16 }}>
             {props.mode === 'single' ? (

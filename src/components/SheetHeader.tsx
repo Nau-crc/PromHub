@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface Props {
   title: React.ReactNode;
@@ -6,7 +7,9 @@ interface Props {
   rightExtras?: React.ReactNode;
 }
 
-export const SheetHeader: React.FC<Props> = ({ title, onClose, rightExtras }) => (
+export const SheetHeader: React.FC<Props> = ({ title, onClose, rightExtras }) => {
+  const { t } = useTranslation();
+  return (
   <div
     style={{
       padding: '14px 16px 10px',
@@ -23,7 +26,8 @@ export const SheetHeader: React.FC<Props> = ({ title, onClose, rightExtras }) =>
     <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--color-text-primary)' }}>{title}</div>
     <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
       {rightExtras}
-      <button type="button" className="btn-close" aria-label="Close" onClick={onClose}>✕</button>
+      <button type="button" className="btn-close" aria-label={t('components.closeAria')} onClick={onClose}>✕</button>
     </div>
   </div>
-);
+  );
+};

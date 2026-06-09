@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { IonModal, IonContent } from '@ionic/react';
+import { useTranslation } from 'react-i18next';
 
 // ─────────────────────────────────────────────────────────────
 //  Wheel-style time picker (Trainline / iOS-like) with TRUE
@@ -27,8 +28,9 @@ const LOOPS = 7;          // odd so we can sit on the middle copy
 const CENTER_LOOP = 3;    // (LOOPS - 1) / 2
 
 export const TimePicker: React.FC<Props> = ({
-  value, onChange, open, onClose, title = 'Pick time', minuteStep = 5,
+  value, onChange, open, onClose, title, minuteStep = 5,
 }) => {
+  const { t } = useTranslation();
   const [h0, m0] = parseTime(value);
   const minuteValues = Array.from({ length: Math.ceil(60 / minuteStep) }, (_, i) => i * minuteStep);
 
@@ -102,9 +104,9 @@ export const TimePicker: React.FC<Props> = ({
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           background: 'var(--color-background-primary)',
         }}>
-          <button className="btn-ghost" onClick={onClose} style={{ fontSize: 14 }}>Cancel</button>
-          <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--color-text-primary)' }}>{title}</div>
-          <button className="btn-ghost" onClick={commit} style={{ fontWeight: 600, fontSize: 14 }}>Done</button>
+          <button className="btn-ghost" onClick={onClose} style={{ fontSize: 14 }}>{t('components.timePickerCancel')}</button>
+          <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--color-text-primary)' }}>{title ?? t('reservationForm.time')}</div>
+          <button className="btn-ghost" onClick={commit} style={{ fontWeight: 600, fontSize: 14 }}>{t('components.timePickerDone')}</button>
         </div>
 
         <div className="time-wheel-wrap">

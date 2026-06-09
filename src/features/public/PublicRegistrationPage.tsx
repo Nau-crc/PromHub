@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
 import { IonPage, IonContent } from '@ionic/react';
+import { useTranslation } from 'react-i18next';
 import { fetchEvent, submitRegistration, type PublicEventMeta } from '@/services/shareApi';
 import { NumberField } from '@/components/NumberField';
 import { PlatformPicker } from '@/components/PlatformPicker';
@@ -30,6 +31,7 @@ type Phase = 'loading' | 'ready' | 'submitting' | 'done' | 'not-found';
 // friends from the same device.
 
 export const PublicRegistrationPage: React.FC = () => {
+  const { t } = useTranslation();
   const { token } = useParams<{ token: string }>();
   const location = useLocation();
   // Pull the optional `?d=` pin out of the URL. We accept both
@@ -59,7 +61,7 @@ export const PublicRegistrationPage: React.FC = () => {
   const submit = async () => {
     setErrorMsg(null);
     const trimmed = name.trim();
-    if (!trimmed) { setErrorMsg('Your name is required.'); return; }
+    if (!trimmed) { setErrorMsg(t('publicForm.nameRequired')); return; }
     if (!token) return;
     setPhase('submitting');
     try {
@@ -114,20 +116,20 @@ export const PublicRegistrationPage: React.FC = () => {
 
           {phase === 'loading' && (
             <div style={{ padding: 40, textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-              Loading…
+              {t('publicForm.loading')}
             </div>
           )}
 
           {phase === 'not-found' && (
             <div className="empty-box" style={{ margin: 0 }}>
-              This registration link has expired or doesn't exist.
+              {t('publicForm.notFound')}
             </div>
           )}
 
           {(phase === 'ready' || phase === 'submitting') && meta && (
             <>
               <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>
-                Sign up for
+                {t('publicForm.signUpFor')}
               </div>
               <div style={{ fontSize: 22, fontWeight: 600, marginBottom: 10 }}>{meta.name}</div>
 
@@ -145,7 +147,7 @@ export const PublicRegistrationPage: React.FC = () => {
                   <span style={{ fontSize: 18 }}>📅</span>
                   <div>
                     <div style={{ fontSize: 10, fontWeight: 500, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '.06em' }}>
-                      Date
+                      {t('publicForm.date')}
                     </div>
                     <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)' }}>
                       {eventDateLabel}
@@ -156,7 +158,7 @@ export const PublicRegistrationPage: React.FC = () => {
 
               {meta.venueName && (
                 <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 18, lineHeight: 1.5 }}>
-                  at {meta.venueName}
+                  {t('publicForm.at')} {meta.venueName}
                 </div>
               )}
 
@@ -167,24 +169,23 @@ export const PublicRegistrationPage: React.FC = () => {
                   padding: '10px 12px', borderRadius: 'var(--border-radius-sm)',
                   marginBottom: 14,
                 }}>
-                  ⚠︎ This link is missing the specific date. Ask the
-                  promoter to share a dated link.
+                  {t('publicForm.missingDate')}
                 </div>
               )}
 
               <div className="form-group">
-                <label className="form-label">Your name *</label>
+                <label className="form-label">{t('publicForm.yourName')}</label>
                 <input
                   className="form-input"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="Full name"
+                  placeholder={t('publicForm.namePlaceholder')}
                   autoComplete="name"
                 />
               </div>
 
               <div className="form-group">
-                <label className="form-label">How many of you?</label>
+                <label className="form-label">{t('publicForm.howMany')}</label>
                 <NumberField
                   className="form-input" min={1} max={20}
                   value={pax} onChange={setPax}
@@ -192,13 +193,13 @@ export const PublicRegistrationPage: React.FC = () => {
               </div>
 
               <div className="form-group">
-                <label className="form-label">Instagram / TikTok (optional)</label>
+                <label className="form-label">{t('publicForm.socials')}</label>
                 <PlatformPicker value={platform} onChange={setPlatform} />
                 <input
                   className="form-input"
                   value={igHandle}
                   onChange={(e) => setIgHandle(e.target.value)}
-                  placeholder="Handle (without @)"
+                  placeholder={t('publicForm.handlePlaceholder')}
                   autoComplete="off"
                   autoCapitalize="off"
                 />
@@ -216,7 +217,7 @@ export const PublicRegistrationPage: React.FC = () => {
                 onClick={submit}
                 disabled={phase === 'submitting' || !!missingDate}
               >
-                {phase === 'submitting' ? 'Sending…' : 'Sign me up'}
+                {phase === 'submitting' ? t('publicForm.submitting') : t('publicForm.submit')}
               </button>
             </>
           )}
@@ -229,11 +230,11 @@ export const PublicRegistrationPage: React.FC = () => {
                 fontSize: 32,
               }}>✓</div>
               <div style={{ fontSize: 22, fontWeight: 600, textAlign: 'center', marginBottom: 8 }}>
-                Your submission has been sent.
+                {t('publicForm.submitted')}
               </div>
               {eventDateLabel && (
                 <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', textAlign: 'center', marginBottom: 14 }}>
-                  for <strong style={{ color: 'var(--color-text-primary)' }}>{eventDateLabel}</strong>
+                  {t('publicForm.for')} <strong style={{ color: 'var(--color-text-primary)' }}>{eventDateLabel}</strong>
                 </div>
               )}
               {/* Echo the event description back so the guest leaves
@@ -251,13 +252,13 @@ export const PublicRegistrationPage: React.FC = () => {
                   whiteSpace: 'pre-wrap',
                 }}>
                   <strong style={{ color: 'var(--color-text-secondary)', fontWeight: 600 }}>
-                    Remember:
+                    {t('publicForm.remember')}
                   </strong>{' '}
                   {meta.description.trim()}
                 </div>
               ) : (
                 <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', textAlign: 'center', lineHeight: 1.5 }}>
-                  The promoter will see your details on their side. See you there.
+                  {t('publicForm.seeYou')}
                 </div>
               )}
             </>

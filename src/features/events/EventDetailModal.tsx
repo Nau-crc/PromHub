@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { IonModal, IonContent, IonIcon } from '@ionic/react';
 import { shareSocialOutline } from 'ionicons/icons';
+import { useTranslation } from 'react-i18next';
 import { useAppStore } from '@/store/useAppStore';
 import {
   eventCapacity, venueById, commCalc, isGuestOnEvent,
@@ -27,6 +28,7 @@ interface Props {
 }
 
 export const EventDetailModal: React.FC<Props> = ({ open, onClose, eventId, onEdit, onAddGuest, onAddRes }) => {
+  const { t } = useTranslation();
   const {
     events, venues, guests, reservations,
     togglePrivateInvite, upsertEvent, importSubmissionsAsGuests,
@@ -138,27 +140,23 @@ export const EventDetailModal: React.FC<Props> = ({ open, onClose, eventId, onEd
         <SheetHeader
           title={e.name}
           onClose={onClose}
-          rightExtras={<button className="btn-ghost" onClick={() => onEdit(e.id)}>Edit</button>}
+          rightExtras={<button className="btn-ghost" onClick={() => onEdit(e.id)}>{t('actions.edit')}</button>}
         />
         <div style={{ padding: '16px 16px 32px' }}>
-          {/* Venue is data (not a category tag) — surface it under the
-              title as a plain "at <venue>" subtitle instead of in the
-              chip row next to Private / Late Club / etc. */}
           {v && (
             <div style={{
               fontSize: 12, color: 'var(--color-text-secondary)',
               marginBottom: 10,
             }}>
-              at {v.name}
+              {t('eventDetail.at')} {v.name}
             </div>
           )}
-          {/* Pills row: schedule, slots, flags */}
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>
             <Pill tone="gray">{scheduleLabel}</Pill>
             {ids.map((id) => <SlotPill key={id} slotId={id} />)}
-            {e.isOneTime && <Pill tone="blue">One-time</Pill>}
-            {e.isPrivate && <Pill tone="pink">Private</Pill>}
-            {e.isLateClub && <Pill tone="purple">🌙 Late Club</Pill>}
+            {e.isOneTime && <Pill tone="blue">{t('common.oneTime')}</Pill>}
+            {e.isPrivate && <Pill tone="pink">{t('common.private')}</Pill>}
+            {e.isLateClub && <Pill tone="purple">{t('common.lateClub')}</Pill>}
           </div>
 
           {/* ── Date picker for recurring events ──────────────── */}
@@ -172,7 +170,7 @@ export const EventDetailModal: React.FC<Props> = ({ open, onClose, eventId, onEd
                 >‹</button>
                 <div style={{ textAlign: 'center', flex: 1 }}>
                   <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '.04em' }}>
-                    Occurrence
+                    {t('eventDetail.occurrence')}
                   </div>
                   <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-text-primary)' }}>
                     {occurrenceLabel}
@@ -206,7 +204,7 @@ export const EventDetailModal: React.FC<Props> = ({ open, onClose, eventId, onEd
                 />
                 {selectedDate && !occurs(e, selectedDate) && (
                   <div style={{ fontSize: 11, color: '#A32D2D', marginTop: 4 }}>
-                    ⚠︎ Not a scheduled occurrence (will show empty lists).
+                    {t('eventDetail.notScheduled')}
                   </div>
                 )}
               </div>
@@ -216,7 +214,7 @@ export const EventDetailModal: React.FC<Props> = ({ open, onClose, eventId, onEd
           {/* ── Capacity for this occurrence ──────────────────── */}
           {cap.capacity > 0 ? (
             <div className="summary-block" style={{ margin: '0 0 14px' }}>
-              <div className="summary-head">Capacity for {occurrenceLabel}</div>
+              <div className="summary-head">{t('eventDetail.capacityFor', { date: occurrenceLabel })}</div>
               <div style={{ padding: '12px 14px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                   <span style={{ fontSize: 13, color: 'var(--color-text-primary)', fontWeight: 500 }}>
@@ -248,7 +246,7 @@ export const EventDetailModal: React.FC<Props> = ({ open, onClose, eventId, onEd
                 <span style={{
                   fontSize: 11, fontWeight: 500, color: 'var(--color-text-secondary)',
                   textTransform: 'uppercase', letterSpacing: '.04em',
-                }}>Description</span>
+                }}>{t('eventDetail.description')}</span>
                 <CopyButton text={e.description} />
               </div>
               <p style={{
@@ -259,7 +257,7 @@ export const EventDetailModal: React.FC<Props> = ({ open, onClose, eventId, onEd
           )}
 
           {/* ── Guests for this occurrence ─────────────────────── */}
-          <SectionHead>Guests on {occurrenceLabel} ({evG.reduce((a, g) => a + g.pax, 0)} pax)</SectionHead>
+          <SectionHead>{t('eventDetail.guests')} ({evG.reduce((a, g) => a + g.pax, 0)} {t('common.paxShort')})</SectionHead>
           {evG.length ? (
             <div className="list-card" style={{ margin: '0 0 14px' }}>
               {evG.map((g) => (
@@ -267,19 +265,18 @@ export const EventDetailModal: React.FC<Props> = ({ open, onClose, eventId, onEd
                   <Avatar name={g.name} handle={g.igHandle} platform={g.igPlatform} />
                   <div className="list-main">
                     <div className="list-name"><StarBadge on={g.influencer} /><span>{g.name}</span></div>
-                    <div className="list-sub">{(g.timeslotNames || []).join(' · ') || 'No slot'} · {g.pax} pax</div>
+                    <div className="list-sub">{(g.timeslotNames || []).join(' · ') || t('common.noSlot')} · {g.pax} {t('common.paxShort')}</div>
                   </div>
                 </div>
               ))}
             </div>
           ) : (
             <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 14 }}>
-              No guests on this date.
+              {t('eventDetail.noGuestsOnDate')}
             </p>
           )}
 
-          {/* ── Reservations for this occurrence ───────────────── */}
-          <SectionHead>Reservations on {occurrenceLabel} ({evR.length})</SectionHead>
+          <SectionHead>{t('eventDetail.reservations')} ({evR.length})</SectionHead>
           {evR.length ? (
             <div className="list-card" style={{ margin: '0 0 14px' }}>
               {evR.map((r) => {
@@ -307,14 +304,13 @@ export const EventDetailModal: React.FC<Props> = ({ open, onClose, eventId, onEd
             </div>
           ) : (
             <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 14 }}>
-              No reservations on this date.
+              {t('eventDetail.noResOnDate')}
             </p>
           )}
 
-          {/* ── Private party invite list ──────────────────────── */}
           {e.isPrivate && (
             <>
-              <SectionHead>Invite to private party</SectionHead>
+              <SectionHead>{t('eventDetail.inviteToPrivate')}</SectionHead>
               <div className="list-card" style={{ margin: '0 0 14px' }}>
                 {guests.length ? guests.map((g) => {
                   const inv = (e.invitedGuests || []).includes(g.name);
@@ -324,12 +320,12 @@ export const EventDetailModal: React.FC<Props> = ({ open, onClose, eventId, onEd
                       <div className="list-main">
                         <div className="list-name"><StarBadge on={g.influencer} /><span>{g.name}</span></div>
                       </div>
-                      {inv && <Pill tone="teal">Invited</Pill>}
+                      {inv && <Pill tone="teal">{t('common.invited')}</Pill>}
                     </div>
                   );
                 }) : (
                   <div style={{ padding: 14, fontSize: 13, color: 'var(--color-text-secondary)' }}>
-                    No guests yet.
+                    {t('guests.empty')}
                   </div>
                 )}
               </div>
@@ -347,8 +343,8 @@ export const EventDetailModal: React.FC<Props> = ({ open, onClose, eventId, onEd
           />
 
           <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-            <button className="btn-secondary" style={{ flex: 1 }} onClick={() => onAddGuest(e.id)}>+ Guest</button>
-            <button className="btn-primary" style={{ flex: 1 }} onClick={() => onAddRes(e.id)}>+ Reservation</button>
+            <button className="btn-secondary" style={{ flex: 1 }} onClick={() => onAddGuest(e.id)}>{t('eventDetail.addGuest')}</button>
+            <button className="btn-primary" style={{ flex: 1 }} onClick={() => onAddRes(e.id)}>{t('eventDetail.addRes')}</button>
           </div>
         </div>
       </IonContent>
@@ -380,6 +376,7 @@ interface SharePanelProps {
 }
 
 const SharePanel: React.FC<SharePanelProps> = ({ event, occurrenceDate, onPublish, onSync }) => {
+  const { t } = useTranslation();
   const [working, setWorking] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
 
@@ -397,9 +394,9 @@ const SharePanel: React.FC<SharePanelProps> = ({ event, occurrenceDate, onPublis
     try {
       const token = event.shareToken ?? safeUuid();
       onPublish({ ...event, shareToken: token });
-      showFeedback('Link ready ✓');
+      showFeedback(t('eventDetail.publicLinkReady'));
     } catch (err) {
-      showFeedback(`Couldn't generate: ${(err as Error).message}`);
+      showFeedback(t('eventDetail.publicLinkCouldnt', { message: (err as Error).message }));
     } finally {
       setWorking(false);
     }
@@ -418,7 +415,7 @@ const SharePanel: React.FC<SharePanelProps> = ({ event, occurrenceDate, onPublis
     const url = buildShareUrl(event.shareToken, linkDate);
     try {
       await navigator.clipboard.writeText(url);
-      showFeedback('Link copied ✓');
+      showFeedback(t('eventDetail.publicLinkCopied'));
     } catch {
       showFeedback(url);
     }
@@ -433,7 +430,7 @@ const SharePanel: React.FC<SharePanelProps> = ({ event, occurrenceDate, onPublis
       catch { /* user cancelled */ }
     } else {
       await navigator.clipboard.writeText(text);
-      showFeedback('Copied to clipboard');
+      showFeedback(t('actions.copied'));
     }
   };
 
@@ -444,9 +441,9 @@ const SharePanel: React.FC<SharePanelProps> = ({ event, occurrenceDate, onPublis
     setWorking(true);
     try {
       const added = await onSync(event.shareToken);
-      showFeedback(added > 0 ? `Imported ${added} new sign-ups` : 'No new sign-ups');
+      showFeedback(added > 0 ? t('eventDetail.publicLinkImported', { count: added }) : t('eventDetail.publicLinkNoNew'));
     } catch (err) {
-      showFeedback(`Couldn't refresh: ${(err as Error).message}`);
+      showFeedback(t('eventDetail.publicLinkCouldntRefresh', { message: (err as Error).message }));
     } finally {
       setWorking(false);
     }
@@ -464,9 +461,9 @@ const SharePanel: React.FC<SharePanelProps> = ({ event, occurrenceDate, onPublis
         borderRadius: 'var(--border-radius-md)',
         border: '0.5px solid var(--color-border-tertiary)',
       }}>
-        <SectionHead>Public registration link</SectionHead>
+        <SectionHead>{t('eventDetail.publicLink')}</SectionHead>
         <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 10, lineHeight: 1.5 }}>
-          Generate a public link so guests can sign up themselves.
+          {t('eventDetail.publicLinkGenerate')}
         </div>
         <button
           type="button"
@@ -476,7 +473,7 @@ const SharePanel: React.FC<SharePanelProps> = ({ event, occurrenceDate, onPublis
           disabled={working}
         >
           <IonIcon icon={shareSocialOutline} style={{ fontSize: 16 }} />
-          {working ? 'Generating…' : 'Create registration link'}
+          {working ? t('eventDetail.publicLinkGenerating') : t('eventDetail.publicLinkCreate')}
         </button>
         {feedback && (
           <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 8 }}>
@@ -505,7 +502,7 @@ const SharePanel: React.FC<SharePanelProps> = ({ event, occurrenceDate, onPublis
       }}>
         <IonIcon icon={shareSocialOutline} style={{ fontSize: 18, color: 'var(--color-primary)' }} />
         <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>
-          Registration link
+          {t('eventDetail.registrationLink')}
         </div>
       </div>
 
@@ -531,14 +528,12 @@ const SharePanel: React.FC<SharePanelProps> = ({ event, occurrenceDate, onPublis
           padding: '8px 10px', borderRadius: 'var(--border-radius-sm)',
           marginBottom: 10,
         }}>
-          ⚠︎ Pick the occurrence above before sharing — the link must
-          point at a specific night.
+          {t('eventDetail.publicLinkPickFirst')}
         </div>
       )}
 
       <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 10, lineHeight: 1.5 }}>
-        Share this so guests fill in their own details for the date above.
-        Submissions appear here when you tap "Refresh".
+        {t('eventDetail.publicLinkInfo')}
       </div>
 
       {canShare && (
@@ -563,7 +558,7 @@ const SharePanel: React.FC<SharePanelProps> = ({ event, occurrenceDate, onPublis
           onClick={copyLink}
           disabled={!canShare}
         >
-          📋 Copy
+          📋 {t('actions.copy')}
         </button>
         <button
           className="btn-primary"
@@ -571,7 +566,7 @@ const SharePanel: React.FC<SharePanelProps> = ({ event, occurrenceDate, onPublis
           onClick={shareNative}
           disabled={!canShare}
         >
-          <IonIcon icon={shareSocialOutline} style={{ fontSize: 14 }} /> Share
+          <IonIcon icon={shareSocialOutline} style={{ fontSize: 14 }} /> {t('actions.share')}
         </button>
         <button
           className="btn-secondary"
@@ -579,7 +574,7 @@ const SharePanel: React.FC<SharePanelProps> = ({ event, occurrenceDate, onPublis
           onClick={pullSignups}
           disabled={working}
         >
-          {working ? 'Refreshing…' : '↻ Refresh sign-ups'}
+          {working ? t('eventDetail.publicLinkRefreshing') : t('eventDetail.publicLinkRefresh')}
         </button>
       </div>
 

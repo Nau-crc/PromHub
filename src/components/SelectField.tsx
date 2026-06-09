@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { IonModal, IonContent } from '@ionic/react';
+import { useTranslation } from 'react-i18next';
 
 // ─────────────────────────────────────────────────────────────
 //  Custom select field rendered as a button + sheet picker.
@@ -42,9 +43,11 @@ export interface SelectFieldProps<V extends string | number> {
 
 export function SelectField<V extends string | number>({
   value, onChange, options, placeholder = '—',
-  title = 'Select', className = 'form-select', style, disabled,
+  title, className = 'form-select', style, disabled,
 }: SelectFieldProps<V>) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
+  const resolvedTitle = title ?? t('common.pickAVenue');
   const current = options.find((o) => o.value === value);
   const display = current?.label ?? placeholder;
 
@@ -87,9 +90,9 @@ export function SelectField<V extends string | number>({
             position: 'sticky', top: 0, background: 'var(--color-background-primary)', zIndex: 10,
           }}>
             <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--color-text-primary)' }}>
-              {title}
+              {resolvedTitle}
             </div>
-            <button className="btn-close" aria-label="Close" onClick={() => setOpen(false)}>✕</button>
+            <button className="btn-close" aria-label={t('components.closeAria')} onClick={() => setOpen(false)}>✕</button>
           </div>
 
           <div style={{ padding: 16 }}>

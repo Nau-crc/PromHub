@@ -1,5 +1,6 @@
 import React from 'react';
 import { IonModal, IonContent } from '@ionic/react';
+import { useTranslation } from 'react-i18next';
 import { useAppStore } from '@/store/useAppStore';
 import { profileUrl } from '@/core/utils/format';
 import { venueName } from '@/features/summary/calculations';
@@ -16,6 +17,7 @@ interface Props {
 }
 
 export const GuestDetailModal: React.FC<Props> = ({ open, onClose, guestId, onEdit }) => {
+  const { t } = useTranslation();
   const { guests, venues, events } = useAppStore((s) => ({
     guests: s.guests, venues: s.venues, events: s.events,
   }));
@@ -52,31 +54,31 @@ export const GuestDetailModal: React.FC<Props> = ({ open, onClose, guestId, onEd
                   @{g.igHandle}
                 </a>
               ) : (
-                <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>No profile</span>
+                <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>{t('common.noProfile')}</span>
               )}
             </div>
           </div>
-          <button className="btn-close" onClick={onClose} aria-label="Close">✕</button>
+          <button className="btn-close" onClick={onClose} aria-label={t('components.closeAria')}>✕</button>
         </div>
         <div style={{ padding: '16px 16px 32px' }}>
-          <div className="detail-kv"><span className="dk">Venue</span><span className="dv">{venueName(g.venueId, venues)}</span></div>
-          <div className="detail-kv"><span className="dk">Coming to</span><span className="dv">{(g.timeslotNames || []).join(' · ') || '—'}</span></div>
-          <div className="detail-kv"><span className="dk">Pax</span><span className="dv">{g.pax}</span></div>
+          <div className="detail-kv"><span className="dk">{t('guestDetail.venue')}</span><span className="dv">{venueName(g.venueId, venues)}</span></div>
+          <div className="detail-kv"><span className="dk">{t('guestDetail.comingTo')}</span><span className="dv">{(g.timeslotNames || []).join(' · ') || '—'}</span></div>
+          <div className="detail-kv"><span className="dk">{t('guestDetail.pax')}</span><span className="dv">{g.pax}</span></div>
           <div className="detail-kv">
-            <span className="dk">Status</span>
+            <span className="dk">{t('guestDetail.status')}</span>
             <span className="dv" style={{ color: g.checked ? '#0F6E56' : 'var(--color-text-secondary)' }}>
-              {g.checked ? 'Arrived' : 'Pending'}
+              {g.checked ? t('guests.arrived') : t('guests.pending')}
             </span>
           </div>
           <div className="detail-kv">
-            <span className="dk">Event</span>
-            <span className="dv">{g.eventId ? (events.find((x) => x.id === g.eventId)?.name ?? '?') : 'None'}</span>
+            <span className="dk">{t('guestDetail.event')}</span>
+            <span className="dv">{g.eventId ? (events.find((x) => x.id === g.eventId)?.name ?? '?') : t('common.none')}</span>
           </div>
-          <div className="detail-kv"><span className="dk">Club later</span><span className="dv">{clubEv ? `🌙 ${clubEv.name}` : 'No'}</span></div>
-          <div className="detail-kv"><span className="dk">Influencer</span><span className="dv">{g.influencer ? 'Yes' : 'No'}</span></div>
+          <div className="detail-kv"><span className="dk">{t('guestDetail.clubLater')}</span><span className="dv">{clubEv ? `🌙 ${clubEv.name}` : t('common.no')}</span></div>
+          <div className="detail-kv"><span className="dk">{t('guestDetail.influencer')}</span><span className="dv">{g.influencer ? t('common.yes') : t('common.no')}</span></div>
           {g.influencer && (
             <div className="detail-kv">
-              <span className="dk">Times visited</span>
+              <span className="dk">{t('guestDetail.timesVisited')}</span>
               <span className="dv" style={{ color: '#F97316', fontWeight: 600 }}>{visitCount}×</span>
             </div>
           )}
@@ -86,18 +88,12 @@ export const GuestDetailModal: React.FC<Props> = ({ open, onClose, guestId, onEd
               style={{ width: '100%', marginTop: 16, padding: 12 }}
               onClick={sendDescription}
             >
-              ✈️ Send event description on {g.igPlatform === 'tiktok' ? 'TikTok' : 'Instagram'}
+              ✈️ {g.igPlatform === 'tiktok' ? 'TikTok' : 'Instagram'}
             </button>
           )}
-          <div style={{
-            fontSize: 11, color: 'var(--color-text-secondary)',
-            marginTop: 12, fontStyle: 'italic',
-          }}>
-            Tip: swipe right on a guest in the list to mark arrived/pending.
-          </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
             <button className="btn-primary" style={{ flex: 1, padding: 13, fontSize: 14 }} onClick={() => onEdit(g.id)}>
-              Edit
+              {t('actions.edit')}
             </button>
           </div>
         </div>

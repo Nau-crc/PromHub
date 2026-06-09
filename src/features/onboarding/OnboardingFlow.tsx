@@ -20,6 +20,7 @@ type StepId = 'welcome' | 'venue' | 'event' | 'legend' | 'done';
 const STEPS: StepId[] = ['welcome', 'venue', 'event', 'legend', 'done'];
 
 export const OnboardingFlow: React.FC<{ open: boolean; onDone: () => void }> = ({ open, onDone }) => {
+  const { t } = useTranslation();
   const [stepIdx, setStepIdx] = useState(0);
   const step = STEPS[stepIdx];
   const next = () => setStepIdx((i) => Math.min(STEPS.length - 1, i + 1));
@@ -38,7 +39,7 @@ export const OnboardingFlow: React.FC<{ open: boolean; onDone: () => void }> = (
             <button
               type="button"
               onClick={back}
-              aria-label="Back"
+              aria-label={t('actions.back')}
               style={{
                 background: 'transparent', border: 'none', cursor: 'pointer',
                 fontSize: 22, color: 'var(--color-text-primary)', lineHeight: 1, padding: 0,
@@ -110,6 +111,7 @@ const WelcomeStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
 
 // ── Step 1: Venue ──────────────────────────────────────────
 const VenueStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
+  const { t } = useTranslation();
   const upsertVenue = useAppStore((s) => s.upsertVenue);
   const [name, setName] = useState('');
   const [guestCap, setGuestCap] = useState<number | ''>('');
@@ -129,9 +131,9 @@ const VenueStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
   const phoneOk = !phoneDigits || isValidPhone(phoneCode, phoneDigits);
 
   const save = async () => {
-    if (!name.trim()) { alert('Enter a venue name.'); return; }
+    if (!name.trim()) { alert(t('venueForm.errNameRequired')); return; }
     if (phoneDigits && !phoneOk) {
-      alert(`Phone number doesn't match the format for ${phoneCode}.`);
+      alert(t('venueForm.errPhoneFmt', { code: phoneCode }));
       return;
     }
     const newTs = tsRows.filter((r) => r.name.trim()).map((r) => ({ ...r, name: r.name.trim() }));
@@ -156,23 +158,23 @@ const VenueStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
   return (
     <>
       <div style={{ marginTop: 24 }} />
-      <div className="onboard-step-label">Step 1 of 2</div>
+      <div className="onboard-step-label">{t('onboarding.step1of2')}</div>
       <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 6 }}>
-        Add your first venue
+        {t('onboarding.addFirstVenue')}
       </div>
       <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 16, lineHeight: 1.5 }}>
-        Set timeslots, VIP table types with pax ranges & table capacity, and invitation types. VIP prices are per table.
+        {t('onboarding.addFirstVenueSub')}
       </div>
       <div className="form-group">
-        <label className="form-label">Venue name *</label>
-        <input className="form-input" placeholder="e.g. Carpe Diem" value={name} onChange={(e) => setName(e.target.value)} />
+        <label className="form-label">{t('venueForm.name')} *</label>
+        <input className="form-input" placeholder={t('venueForm.namePlaceholder')} value={name} onChange={(e) => setName(e.target.value)} />
       </div>
       <div className="form-group">
-        <label className="form-label">Guest capacity</label>
+        <label className="form-label">{t('venueForm.guestCapacity')}</label>
         <input
           className="form-input"
           type="number"
-          placeholder="e.g. 200"
+          placeholder={t('venueForm.guestCapacityPlaceholder')}
           min={0}
           value={guestCap}
           onChange={(e) => setGuestCap(e.target.value === '' ? '' : (parseInt(e.target.value) || 0))}
@@ -180,7 +182,7 @@ const VenueStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
       </div>
 
       <div className="form-group">
-        <label className="form-label">Phone (optional)</label>
+        <label className="form-label">{t('venueForm.phone')}</label>
         <div className="phone-row">
           <SelectField
             value={phoneCode}
@@ -189,7 +191,7 @@ const VenueStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
               const limited = onlyDigits(phoneNum).slice(0, maxDigits(code));
               setPhoneNum(formatPhone(code, limited));
             }}
-            title="Country code"
+            title={t('venueForm.countryCode')}
             style={{ minWidth: 110, flexShrink: 0 }}
             options={COUNTRY_CODES.map((c) => ({
               value: c.code,
@@ -211,21 +213,22 @@ const VenueStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
         </div>
         {phoneDigits.length > 0 && !phoneOk && (
           <div style={{ fontSize: 11, color: 'var(--color-danger)', marginTop: 4 }}>
-            ⚠︎ Format for {phoneCode} doesn't match. Expected like: {placeholderForCode(phoneCode)}
+            {t('venueForm.phoneFmtError', { code: phoneCode, example: placeholderForCode(phoneCode) })}
           </div>
         )}
       </div>
 
       <TimeslotRows rows={tsRows} setRows={setTsRows} />
       <VipRows rows={vipRows} setRows={setVipRows} />
-      <button className="onboard-btn" onClick={save}>Save venue & continue →</button>
-      <button className="onboard-btn-secondary" onClick={onNext}>Skip for now</button>
+      <button className="onboard-btn" onClick={save}>{t('onboarding.saveVenueContinue')}</button>
+      <button className="onboard-btn-secondary" onClick={onNext}>{t('actions.skip')}</button>
     </>
   );
 };
 
 // ── Step 2: Event ─────────────────────────────────────────
 const EventStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
+  const { t } = useTranslation();
   const { venues, upsertEvent } = useAppStore((s) => ({
     venues: s.venues, upsertEvent: s.upsertEvent,
   }));
@@ -261,13 +264,13 @@ const EventStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
   const save = async () => {
     if (noVenues) { onNext(); return; }
     if (!name.trim()) { onNext(); return; }
-    if (!slotIds.length) { alert('Select at least one timeslot.'); return; }
+    if (!slotIds.length) { alert(t('eventForm.errSelectSlot')); return; }
     if (isOneTime) {
-      if (!eventDate) { alert('Pick a date.'); return; }
+      if (!eventDate) { alert(t('eventForm.errPickDate')); return; }
     } else {
-      if (!days.length) { alert('Select at least one day.'); return; }
+      if (!days.length) { alert(t('eventForm.errSelectDay')); return; }
       if (seasonStart && seasonEnd && seasonEnd < seasonStart) {
-        alert('Season end must be on or after season start.');
+        alert(t('eventForm.errSeasonOrder'));
         return;
       }
     }
@@ -295,38 +298,38 @@ const EventStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
   return (
     <>
       <div style={{ marginTop: 24 }} />
-      <div className="onboard-step-label">Step 2 of 2</div>
+      <div className="onboard-step-label">{t('onboarding.step2of2')}</div>
       <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 6 }}>
-        Create your first event
+        {t('onboarding.createFirstEvent')}
       </div>
       <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 16, lineHeight: 1.5 }}>
-        Events are recurring nights. They can run on multiple days of the week.
+        {t('onboarding.createFirstEventSub')}
       </div>
       {noVenues ? (
-        <div className="empty-box" style={{ margin: '0 0 16px' }}>No venues added yet.</div>
+        <div className="empty-box" style={{ margin: '0 0 16px' }}>{t('onboarding.noVenuesYet')}</div>
       ) : (
         <>
           <div className="form-group">
-            <label className="form-label">Event name *</label>
-            <input className="form-input" placeholder="e.g. The Sailor" value={name} onChange={(e) => setName(e.target.value)} />
+            <label className="form-label">{t('eventForm.name')} *</label>
+            <input className="form-input" placeholder={t('eventForm.namePlaceholder')} value={name} onChange={(e) => setName(e.target.value)} />
           </div>
           <div className="form-group">
-            <label className="form-label">Venue</label>
+            <label className="form-label">{t('eventForm.venue')}</label>
             <SelectField
               value={venueId}
               onChange={(v) => onVenueChange(Number(v))}
-              title="Pick a venue"
+              title={t('common.pickAVenue')}
               options={venues.map((v) => ({ value: v.id, label: v.name }))}
             />
           </div>
           <div className="form-group">
-            <label className="form-label">Schedule</label>
+            <label className="form-label">{t('eventForm.schedule')}</label>
             <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
               <button type="button" className={`tog-btn ${!isOneTime ? 'on' : ''}`} onClick={() => setIsOneTime(false)}>
-                Recurring
+                {t('eventForm.recurring')}
               </button>
               <button type="button" className={`tog-btn ${isOneTime ? 'on' : ''}`} onClick={() => setIsOneTime(true)}>
-                One-time
+                {t('eventForm.oneTime')}
               </button>
             </div>
 
@@ -341,9 +344,9 @@ const EventStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
               <>
                 <DayChips selected={days} onToggle={toggleDay} />
                 <div style={{ marginTop: 12 }}>
-                  <div className="form-label" style={{ marginBottom: 6 }}>Season (optional)</div>
+                  <div className="form-label" style={{ marginBottom: 6 }}>{t('eventForm.season')}</div>
                   <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 8 }}>
-                    Tap the start date, then the end date.
+                    {t('eventForm.seasonHint')}
                   </div>
                   <Calendar
                     mode="range"
@@ -358,7 +361,7 @@ const EventStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
                       className="btn-sm"
                       style={{ marginTop: 8, width: '100%' }}
                       onClick={() => { setSeasonStart(''); setSeasonEnd(''); }}
-                    >Clear range (open-ended)</button>
+                    >{t('eventForm.clearRange')}</button>
                   )}
                 </div>
               </>
@@ -366,41 +369,41 @@ const EventStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
           </div>
 
           <div className="form-group">
-            <label className="form-label">Timeslots</label>
+            <label className="form-label">{t('eventForm.timeslots')}</label>
             <SlotChips venueId={venueId} selected={slotIds} onToggle={toggleSlot} />
           </div>
 
           <div className="form-group">
-            <label className="form-label">Capacity (max guests, optional)</label>
+            <label className="form-label">{t('eventForm.capacity')}</label>
             <NumberField
-              className="form-input" placeholder="e.g. 20" min={0}
+              className="form-input" placeholder={t('eventForm.capacityPlaceholder')} min={0}
               value={capacity} onChange={setCapacity}
             />
           </div>
           <div className="form-group">
-            <label className="form-label">Description (optional)</label>
+            <label className="form-label">{t('eventForm.description')}</label>
             <textarea
               className="form-textarea"
               value={desc}
               onChange={(e) => setDesc(e.target.value)}
-              placeholder="What's special about this night?"
+              placeholder={t('eventForm.descPlaceholder')}
             />
           </div>
           <div className="form-group">
-            <label className="form-label">Event type</label>
+            <label className="form-label">{t('eventForm.eventType')}</label>
             <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 4 }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, cursor: 'pointer' }}>
-                <input type="checkbox" style={{ accentColor: '#F97316', width: 18, height: 18 }} checked={isPriv} onChange={(e) => setPriv(e.target.checked)} /> Private
+                <input type="checkbox" style={{ accentColor: '#F97316', width: 18, height: 18 }} checked={isPriv} onChange={(e) => setPriv(e.target.checked)} /> {t('eventForm.eventTypePrivate')}
               </label>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, cursor: 'pointer' }}>
-                <input type="checkbox" style={{ accentColor: '#F97316', width: 18, height: 18 }} checked={isLate} onChange={(e) => setLate(e.target.checked)} /> 🌙 Late-night club
+                <input type="checkbox" style={{ accentColor: '#F97316', width: 18, height: 18 }} checked={isLate} onChange={(e) => setLate(e.target.checked)} /> {t('eventForm.eventTypeLateClub')}
               </label>
             </div>
           </div>
         </>
       )}
-      <button className="onboard-btn" onClick={save}>{noVenues ? 'Skip →' : 'Save event & finish →'}</button>
-      <button className="onboard-btn-secondary" onClick={onNext}>Skip for now</button>
+      <button className="onboard-btn" onClick={save}>{noVenues ? t('actions.skipArrow') : t('onboarding.saveEventFinish')}</button>
+      <button className="onboard-btn-secondary" onClick={onNext}>{t('actions.skip')}</button>
     </>
   );
 };
@@ -422,68 +425,68 @@ const LegendStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
       {t('onboarding.legendSub')}
     </div>
 
-    <LegendSection title="Event cards">
+    <LegendSection title={t('onboarding.legend.eventCards')}>
       <LegendRow
         sample={<div style={{
           width: 26, height: 26, background: 'var(--color-background-primary)',
           borderRadius: 6, borderLeft: '3px solid #D4537E',
         }} />}
-        label="Pink left border"
-        sub="Private event — invite-only guest list."
+        label={t('onboarding.legend.pinkBorder')}
+        sub={t('onboarding.legend.pinkBorderSub')}
       />
       <LegendRow
         sample={<div style={{
           width: 26, height: 26, background: 'var(--color-background-primary)',
           borderRadius: 6, borderLeft: '3px solid #7C3AED',
         }} />}
-        label="Purple left border"
-        sub="Late-night club — runs after midnight."
+        label={t('onboarding.legend.purpleBorder')}
+        sub={t('onboarding.legend.purpleBorderSub')}
       />
     </LegendSection>
 
-    <LegendSection title="Guest list">
+    <LegendSection title={t('onboarding.legend.guestList')}>
       <LegendRow
         sample={<span style={{ color: '#F97316', fontSize: 18 }}>★</span>}
-        label="Orange star"
-        sub="Influencer (10k+ followers). Counts in the influencer summary."
+        label={t('onboarding.legend.orangeStar')}
+        sub={t('onboarding.legend.orangeStarSub')}
       />
       <LegendRow
         sample={<div className="arrived-dot" style={{ width: 9, height: 9 }} />}
-        label="Green dot"
-        sub="Arrived (checked in tonight)."
+        label={t('onboarding.legend.greenDot')}
+        sub={t('onboarding.legend.greenDotSub')}
       />
       <LegendRow
         sample={<div className="pending-dot" style={{ width: 9, height: 9 }} />}
-        label="Gray dot"
-        sub="Pending (still expected). Swipe right on a guest to toggle."
+        label={t('onboarding.legend.grayDot')}
+        sub={t('onboarding.legend.grayDotSub')}
       />
       <LegendRow
         sample={<span className="ig-badge">IG</span>}
-        label="IG / TT badge"
-        sub="Instagram or TikTok handle. Tap to open the profile."
+        label={t('onboarding.legend.socialBadge')}
+        sub={t('onboarding.legend.socialBadgeSub')}
       />
     </LegendSection>
 
-    <LegendSection title="Pills & status">
-      <LegendRow sample={<span className="pill pill-blue">3/20 guests</span>} label="Blue pill" sub="Guests on this date / capacity." />
-      <LegendRow sample={<span className="pill pill-green">2 res.</span>} label="Green pill" sub="Reservations on this date." />
-      <LegendRow sample={<span className="pill pill-teal">5 invited</span>} label="Teal pill" sub="Invitations sent for a private event." />
-      <LegendRow sample={<span className="pill pill-purple">🌙 Club</span>} label="Purple pill" sub="Linked late-night club event." />
-      <LegendRow sample={<span className="pill pill-pink">Private</span>} label="Pink pill" sub="Private event marker." />
+    <LegendSection title={t('onboarding.legend.pillsStatus')}>
+      <LegendRow sample={<span className="pill pill-blue">{t('onboarding.legend.sampleGuests', { used: 3, capacity: 20 })}</span>} label={t('onboarding.legend.bluePill')} sub={t('onboarding.legend.bluePillSub')} />
+      <LegendRow sample={<span className="pill pill-green">{t('onboarding.legend.sampleReservations', { count: 2 })}</span>} label={t('onboarding.legend.greenPill')} sub={t('onboarding.legend.greenPillSub')} />
+      <LegendRow sample={<span className="pill pill-teal">{t('onboarding.legend.sampleInvited', { count: 5 })}</span>} label={t('onboarding.legend.tealPill')} sub={t('onboarding.legend.tealPillSub')} />
+      <LegendRow sample={<span className="pill pill-purple">{t('onboarding.legend.sampleClub')}</span>} label={t('onboarding.legend.purplePill')} sub={t('onboarding.legend.purplePillSub')} />
+      <LegendRow sample={<span className="pill pill-pink">{t('onboarding.legend.samplePrivate')}</span>} label={t('onboarding.legend.pinkPill')} sub={t('onboarding.legend.pinkPillSub')} />
     </LegendSection>
 
-    <LegendSection title="Capacity bar">
+    <LegendSection title={t('onboarding.legend.capacityBar')}>
       <div style={{ padding: '4px 0' }}>
         <div className="capacity-bar"><div className="capacity-fill" style={{ width: '40%' }} /></div>
-        <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 4 }}>Orange — comfortably under capacity.</div>
+        <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 4 }}>{t('onboarding.legend.capacityLow')}</div>
       </div>
       <div style={{ padding: '4px 0' }}>
         <div className="capacity-bar"><div className="capacity-fill warn" style={{ width: '85%' }} /></div>
-        <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 4 }}>Amber — close to full (75%+).</div>
+        <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 4 }}>{t('onboarding.legend.capacityWarn')}</div>
       </div>
       <div style={{ padding: '4px 0' }}>
         <div className="capacity-bar"><div className="capacity-fill full" style={{ width: '100%' }} /></div>
-        <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 4 }}>Red — full or over capacity.</div>
+        <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 4 }}>{t('onboarding.legend.capacityFull')}</div>
       </div>
     </LegendSection>
 
@@ -532,13 +535,13 @@ const DoneStep: React.FC<{ onFinish: () => void }> = ({ onFinish }) => {
         padding: '12px 14px', marginTop: 16,
       }}>
         <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 8, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.04em' }}>
-          What's next
+          {t('onboarding.doneWhatsNext')}
         </div>
         <div style={{ fontSize: 13, color: 'var(--color-text-primary)', lineHeight: 2.1 }}>
-          ♀ &nbsp;Add guests → <b>Guest list</b><br />
-          ▤ &nbsp;Log VIP tables → <b>Reservations</b><br />
-          ⊞ &nbsp;Add venues → <b>More → Venues</b><br />
-          ◉ &nbsp;See earnings → <b>More → Summary</b>
+          ♀ &nbsp;{t('onboarding.doneTip1')}<b>{t('onboarding.doneTip1Bold')}</b><br />
+          ▤ &nbsp;{t('onboarding.doneTip2')}<b>{t('onboarding.doneTip2Bold')}</b><br />
+          ⊞ &nbsp;{t('onboarding.doneTip3')}<b>{t('onboarding.doneTip3Bold')}</b><br />
+          ◉ &nbsp;{t('onboarding.doneTip4')}<b>{t('onboarding.doneTip4Bold')}</b>
         </div>
       </div>
       <button className="onboard-btn" onClick={onFinish}>{t('onboarding.doneCta')}</button>

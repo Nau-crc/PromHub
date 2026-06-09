@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { IonModal, IonContent } from '@ionic/react';
+import { useTranslation } from 'react-i18next';
 import type { PromEvent } from '@/core/types';
 import { useAppStore } from '@/store/useAppStore';
 import { useConfirm } from '@/store/useConfirmStore';
@@ -24,6 +25,7 @@ const NO_VENUE = '__none__';
 const NEW_VENUE = '__new__';
 
 export const EventFormModal: React.FC<Props> = ({ open, onClose, editing, onRequestNewVenue }) => {
+  const { t } = useTranslation();
   const { venues, upsertEvent, removeEvent } = useAppStore((s) => ({
     venues: s.venues,
     upsertEvent: s.upsertEvent,
@@ -34,9 +36,9 @@ export const EventFormModal: React.FC<Props> = ({ open, onClose, editing, onRequ
   const askDelete = async () => {
     if (!editing) return;
     const ok = await confirm({
-      title: `Delete "${editing.name}"?`,
-      message: 'All guests linked to this event will be removed too. Reservations stay (they belong to the venue).',
-      confirmLabel: 'Delete',
+      title: t('eventForm.deleteTitle', { name: editing.name }),
+      message: t('eventForm.deleteMessage'),
+      confirmLabel: t('actions.delete'),
       destructive: true,
     });
     if (ok) { removeEvent(editing.id); onClose(); }
@@ -111,21 +113,21 @@ export const EventFormModal: React.FC<Props> = ({ open, onClose, editing, onRequ
 
   const save = async () => {
     const trimmed = name.trim();
-    if (!trimmed) { alert('Event name is required.'); return; }
+    if (!trimmed) { alert(t('eventForm.errNameRequired')); return; }
 
     if (isOneTime) {
-      if (!eventDate) { alert('Pick a date.'); return; }
+      if (!eventDate) { alert(t('eventForm.errPickDate')); return; }
     } else {
-      if (!days.length) { alert('Select at least one day.'); return; }
+      if (!days.length) { alert(t('eventForm.errSelectDay')); return; }
       if (seasonStart && seasonEnd && seasonEnd < seasonStart) {
-        alert('Season end must be on or after season start.');
+        alert(t('eventForm.errSeasonOrder'));
         return;
       }
     }
 
     // Timeslots only required when a venue is set (otherwise the event has none)
     if (venueId != null && !slotIds.length) {
-      alert('Pick at least one timeslot, or remove the venue.');
+      alert(t('eventForm.errSelectSlot'));
       return;
     }
 
@@ -160,42 +162,42 @@ export const EventFormModal: React.FC<Props> = ({ open, onClose, editing, onRequ
       await upsertEvent(entry as PromEvent | Omit<PromEvent, 'id'>);
       onClose();
     } catch (err) {
-      alert(`Couldn't save event: ${(err as Error).message}`);
+      alert(t('eventForm.couldntSave', { message: (err as Error).message }));
     }
   };
 
   return (
     <IonModal isOpen={open} onDidDismiss={onClose}>
       <IonContent>
-        <SheetHeader title={editing ? 'Edit event' : 'New event'} onClose={onClose} />
+        <SheetHeader title={editing ? t('eventForm.titleEdit') : t('eventForm.titleNew')} onClose={onClose} />
         <div style={{ padding: '16px 16px 32px' }}>
           <div className="form-group">
-            <label className="form-label">Event name</label>
-            <input className="form-input" placeholder="e.g. The Sailor" value={name} onChange={(e) => setName(e.target.value)} />
+            <label className="form-label">{t('eventForm.name')}</label>
+            <input className="form-input" placeholder={t('eventForm.namePlaceholder')} value={name} onChange={(e) => setName(e.target.value)} />
           </div>
 
           <div className="form-group">
-            <label className="form-label">Venue (optional)</label>
+            <label className="form-label">{t('eventForm.venue')}</label>
             <SelectField
               value={venueId == null ? NO_VENUE : String(venueId)}
               onChange={(v) => onVenueChange(v)}
-              title="Pick a venue"
+              title={t('common.pickAVenue')}
               options={[
-                { value: NO_VENUE, label: '— No venue —' },
+                { value: NO_VENUE, label: t('eventForm.noVenueOption') },
                 ...venues.map((v) => ({ value: String(v.id), label: v.name })),
-                { value: NEW_VENUE, label: '+ Add new venue…' },
+                { value: NEW_VENUE, label: t('eventForm.newVenue') },
               ]}
             />
           </div>
 
           <div className="form-group">
-            <label className="form-label">Schedule</label>
+            <label className="form-label">{t('eventForm.schedule')}</label>
             <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
               <button type="button" className={`tog-btn ${!isOneTime ? 'on' : ''}`} onClick={() => setIsOneTime(false)}>
-                Recurring
+                {t('eventForm.recurring')}
               </button>
               <button type="button" className={`tog-btn ${isOneTime ? 'on' : ''}`} onClick={() => setIsOneTime(true)}>
-                One-time
+                {t('eventForm.oneTime')}
               </button>
             </div>
 
@@ -211,10 +213,10 @@ export const EventFormModal: React.FC<Props> = ({ open, onClose, editing, onRequ
                 <DayChips selected={days} onToggle={toggleDay} />
                 <div style={{ marginTop: 12 }}>
                   <div className="form-label" style={{ marginBottom: 6 }}>
-                    Season (optional)
+                    {t('eventForm.season')}
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 8 }}>
-                    Tap the start date, then the end date. Tap any date again to reset.
+                    {t('eventForm.seasonHint')}
                   </div>
                   <Calendar
                     mode="range"
@@ -230,7 +232,7 @@ export const EventFormModal: React.FC<Props> = ({ open, onClose, editing, onRequ
                       style={{ flex: 1 }}
                       onClick={() => { setSeasonStart(''); setSeasonEnd(''); }}
                     >
-                      Clear range (open-ended)
+                      {t('eventForm.clearRange')}
                     </button>
                   </div>
                 </div>
@@ -240,16 +242,16 @@ export const EventFormModal: React.FC<Props> = ({ open, onClose, editing, onRequ
 
           {venueId != null && (
             <div className="form-group">
-              <label className="form-label">Timeslots for this event</label>
+              <label className="form-label">{t('eventForm.timeslots')}</label>
               <SlotChips venueId={venueId} selected={slotIds} onToggle={toggleSlot} />
             </div>
           )}
 
           <div className="form-group">
-            <label className="form-label">Capacity (max guests, optional)</label>
+            <label className="form-label">{t('eventForm.capacity')}</label>
             <NumberField
               className="form-input"
-              placeholder="e.g. 20"
+              placeholder={t('eventForm.capacityPlaceholder')}
               min={0}
               value={capacity}
               onChange={setCapacity}
@@ -257,25 +259,25 @@ export const EventFormModal: React.FC<Props> = ({ open, onClose, editing, onRequ
           </div>
 
           <div className="form-group">
-            <label className="form-label">Description</label>
-            <textarea className="form-textarea" value={desc} onChange={(e) => setDesc(e.target.value)} />
+            <label className="form-label">{t('eventForm.description')}</label>
+            <textarea className="form-textarea" placeholder={t('eventForm.descPlaceholder')} value={desc} onChange={(e) => setDesc(e.target.value)} />
           </div>
           <div className="check-row">
             <input id="evPrivate" type="checkbox" checked={isPriv} onChange={(e) => setPriv(e.target.checked)} />
-            <label htmlFor="evPrivate">Private event</label>
+            <label htmlFor="evPrivate">{t('eventForm.privateLabel')}</label>
           </div>
           <div className="check-row">
             <input id="evLate" type="checkbox" checked={isLate} onChange={(e) => setLate(e.target.checked)} />
-            <label htmlFor="evLate">🌙 Late-night club event</label>
+            <label htmlFor="evLate">{t('eventForm.lateClubLabel')}</label>
           </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
             {editing && (
               <button className="btn-danger" onClick={askDelete}>
-                Delete
+                {t('actions.delete')}
               </button>
             )}
             <button className="btn-primary" style={{ flex: 1, padding: 13, fontSize: 14 }} onClick={save}>
-              Save
+              {t('actions.save')}
             </button>
           </div>
         </div>

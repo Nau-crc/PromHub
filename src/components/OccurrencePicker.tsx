@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import type { PromEvent } from '@/core/types';
 import { nextOccurrence, occurs, previousOccurrence } from '@/features/summary/calculations';
 import { isoDay } from '@/core/utils/date';
@@ -19,6 +20,7 @@ interface Props {
 }
 
 export const OccurrencePicker: React.FC<Props> = ({ event, value, onChange }) => {
+  const { t } = useTranslation();
   const stepBackward = () => {
     const seed = value || isoDay(new Date());
     // Go to the day before so we don't loop on the same date
@@ -60,10 +62,10 @@ export const OccurrencePicker: React.FC<Props> = ({ event, value, onChange }) =>
         weekday: 'long', month: 'long', day: 'numeric',
       })
     : placeholder
-      ? `Tap → to pick ${new Date(placeholder + 'T00:00:00').toLocaleDateString(undefined, {
+      ? `→ ${new Date(placeholder + 'T00:00:00').toLocaleDateString(undefined, {
           month: 'short', day: 'numeric',
         })}`
-      : 'No upcoming occurrences';
+      : t('common.dash');
 
   return (
     <div className="occ-picker">
@@ -72,10 +74,10 @@ export const OccurrencePicker: React.FC<Props> = ({ event, value, onChange }) =>
         className="cal-nav-btn"
         onClick={stepBackward}
         disabled={!canBack}
-        aria-label="Previous occurrence"
+        aria-label={t('components.prevOccurrence')}
       >‹</button>
       <div className="occ-picker-display">
-        <div className="occ-picker-label">Event date</div>
+        <div className="occ-picker-label">{t('components.eventDate')}</div>
         <div className="occ-picker-value">{display}</div>
       </div>
       <button
@@ -86,7 +88,7 @@ export const OccurrencePicker: React.FC<Props> = ({ event, value, onChange }) =>
           else stepForward();
         }}
         disabled={!value && !placeholder}
-        aria-label="Next occurrence"
+        aria-label={t('components.nextOccurrence')}
       >›</button>
     </div>
   );

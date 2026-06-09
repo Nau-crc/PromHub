@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { IonModal, IonContent } from '@ionic/react';
+import { useTranslation } from 'react-i18next';
 import type { Platform, Reservation } from '@/core/types';
 import { useAppStore } from '@/store/useAppStore';
 import { useConfirm } from '@/store/useConfirmStore';
@@ -26,6 +27,7 @@ interface Props {
 }
 
 export const ReservationFormModal: React.FC<Props> = ({ open, onClose, editing, seedEventId }) => {
+  const { t } = useTranslation();
   const { venues, events, reservations, upsertReservation, removeReservation } = useAppStore((s) => ({
     venues: s.venues, events: s.events, reservations: s.reservations,
     upsertReservation: s.upsertReservation, removeReservation: s.removeReservation,
@@ -35,8 +37,8 @@ export const ReservationFormModal: React.FC<Props> = ({ open, onClose, editing, 
   const askDelete = async () => {
     if (!editing) return;
     const ok = await confirm({
-      title: `Delete reservation for ${editing.name}?`,
-      confirmLabel: 'Delete',
+      title: t('reservationForm.deleteTitle', { name: editing.name }),
+      confirmLabel: t('actions.delete'),
       destructive: true,
     });
     if (ok) { removeReservation(editing.id); onClose(); }
@@ -176,13 +178,13 @@ export const ReservationFormModal: React.FC<Props> = ({ open, onClose, editing, 
 
   const save = async () => {
     const trimmed = name.trim();
-    if (!trimmed) { alert('Contact name is required.'); return; }
-    if (venueId == null) { alert('Pick a venue.'); return; }
-    if (!pax || pax < 1) { alert('Number of pax is required.'); return; }
-    if (!vipType) { alert('Pick a VIP type.'); return; }
-    if (!eventDate) { alert('Reservation date is required.'); return; }
+    if (!trimmed) { alert(t('reservationForm.errNameRequired')); return; }
+    if (venueId == null) { alert(t('reservationForm.errPickVenue')); return; }
+    if (!pax || pax < 1) { alert(t('reservationForm.errPaxRequired')); return; }
+    if (!vipType) { alert(t('reservationForm.errPickVipType')); return; }
+    if (!eventDate) { alert(t('eventForm.errPickDate')); return; }
     if (phoneDigits && !phoneOk) {
-      alert(`Phone number doesn't match the format for ${phoneCode}.`);
+      alert(t('venueForm.errPhoneFmt', { code: phoneCode }));
       return;
     }
     const entry = {
@@ -215,22 +217,22 @@ export const ReservationFormModal: React.FC<Props> = ({ open, onClose, editing, 
       await upsertReservation(entry as Reservation | Omit<Reservation, 'id'>);
       onClose();
     } catch (err) {
-      alert(`Couldn't save reservation: ${(err as Error).message}`);
+      alert(t('reservationForm.couldntSave', { message: (err as Error).message }));
     }
   };
 
   return (
     <IonModal isOpen={open} onDidDismiss={onClose}>
       <IonContent>
-        <SheetHeader title={editing ? 'Edit reservation' : 'Add reservation'} onClose={onClose} />
+        <SheetHeader title={editing ? t('reservationForm.titleEdit') : t('reservationForm.titleNew')} onClose={onClose} />
         <div style={{ padding: '16px 16px 32px' }}>
           <div className="form-group">
-            <label className="form-label">Contact name</label>
-            <input className="form-input" placeholder="Full name" value={name} onChange={(e) => setName(e.target.value)} />
+            <label className="form-label">{t('reservationForm.contactName')}</label>
+            <input className="form-input" placeholder={t('guestForm.namePlaceholder')} value={name} onChange={(e) => setName(e.target.value)} />
           </div>
 
           <div className="form-group">
-            <label className="form-label">Phone</label>
+            <label className="form-label">{t('reservationForm.phone')}</label>
             <div className="phone-row">
               <SelectField
                 value={phoneCode}
@@ -239,7 +241,7 @@ export const ReservationFormModal: React.FC<Props> = ({ open, onClose, editing, 
                   const limited = onlyDigits(phoneNum).slice(0, maxDigits(code));
                   setPhoneNum(formatPhone(code, limited));
                 }}
-                title="Country code"
+                title={t('venueForm.countryCode')}
                 style={{ minWidth: 110, flexShrink: 0 }}
                 options={COUNTRY_CODES.map((c) => ({
                   value: c.code,
@@ -261,43 +263,39 @@ export const ReservationFormModal: React.FC<Props> = ({ open, onClose, editing, 
             </div>
             {phoneDigits.length > 0 && !phoneOk && (
               <div style={{ fontSize: 11, color: 'var(--color-danger)', marginTop: 4 }}>
-                ⚠︎ Format for {phoneCode} doesn't match. Expected like: {placeholderForCode(phoneCode)}
+                {t('venueForm.phoneFmtError', { code: phoneCode, example: placeholderForCode(phoneCode) })}
               </div>
             )}
           </div>
 
           <div className="form-row">
             <div className="form-group">
-              <label className="form-label">Venue *</label>
+              <label className="form-label">{t('reservationForm.venue')} *</label>
               <SelectField
                 value={venueId}
                 onChange={(v) => setVenueId(Number(v))}
-                title="Pick a venue"
-                placeholder="— Select venue —"
+                title={t('common.pickAVenue')}
+                placeholder={t('actions.selectVenue')}
                 options={venues.map((vv) => ({ value: vv.id, label: vv.name }))}
               />
             </div>
             <div className="form-group">
-              <label className="form-label">Pax</label>
+              <label className="form-label">{t('reservationForm.pax')}</label>
               <NumberField
-                className="form-input" min={1} placeholder="# people"
+                className="form-input" min={1} placeholder={t('reservationForm.paxPlaceholder')}
                 value={pax} onChange={setPax}
               />
             </div>
           </div>
 
-          <div className="info-box">
-            VIP options filter by pax. Price is per table. Available tables shown.
-          </div>
-
           <div className="form-row">
             <div className="form-group">
-              <label className="form-label">VIP type *</label>
+              <label className="form-label">VIP *</label>
               <SelectField
                 value={vipType || null}
                 onChange={(v) => setVipType(String(v))}
-                title="Pick a VIP table"
-                placeholder={vipOpts.length ? '— Select VIP type —' : '— Enter pax above —'}
+                title="VIP"
+                placeholder={vipOpts.length ? '— VIP —' : '—'}
                 disabled={!vipOpts.length}
                 options={vipOpts.map((t) => {
                   const left = venueVipSlotsLeft(venueId!, t.name, venues, reservations);
@@ -312,7 +310,7 @@ export const ReservationFormModal: React.FC<Props> = ({ open, onClose, editing, 
               />
             </div>
             <div className="form-group">
-              <label className="form-label">Time</label>
+              <label className="form-label">{t('reservationForm.time')}</label>
               <button
                 type="button"
                 className="form-input"
@@ -325,9 +323,9 @@ export const ReservationFormModal: React.FC<Props> = ({ open, onClose, editing, 
           </div>
 
           <div className="form-group">
-            <label className="form-label">Reservation date *</label>
+            <label className="form-label">{t('reservationForm.eventNight')} *</label>
             <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 8 }}>
-              Pick the night this table is for. The list shows nights with an event at this venue.
+              {t('reservationForm.pickEventNightHint')}
             </div>
             {eventNightsAtVenue.length ? (
               <div>
@@ -354,14 +352,9 @@ export const ReservationFormModal: React.FC<Props> = ({ open, onClose, editing, 
                   );
                 })}
               </div>
-            ) : (
-              <div className="info-box">
-                No upcoming event nights at this venue. Add an event first
-                (or pick a custom date below).
-              </div>
-            )}
+            ) : null}
             <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', margin: '8px 0 4px' }}>
-              Or pick a custom date:
+              {t('common.pickADate')}:
             </div>
             <input
               className="form-input"
@@ -392,7 +385,7 @@ export const ReservationFormModal: React.FC<Props> = ({ open, onClose, editing, 
           )}
 
           <div className="form-group">
-            <label className="form-label">Your commission %</label>
+            <label className="form-label">{t('reservationForm.yourCommission')}</label>
             <NumberField
               className="form-input" min={0} max={100} decimal
               value={commissionPct} onChange={setCommissionPct}
@@ -401,27 +394,27 @@ export const ReservationFormModal: React.FC<Props> = ({ open, onClose, editing, 
 
           <div className="check-row">
             <input id="rFromInv" type="checkbox" checked={fromInvite} onChange={(e) => setFromInvite(e.target.checked)} />
-            <label htmlFor="rFromInv">Via invitation — split commission</label>
+            <label htmlFor="rFromInv">{t('reservationForm.viaInvitation')}</label>
           </div>
 
           {fromInvite && (
             <>
-              <div className="info-box">Someone invited this contact. They earn a % of your commission.</div>
+              <div className="info-box">{t('reservationForm.viaInviteInfo')}</div>
               <div className="form-group">
-                <label className="form-label">Inviter's platform</label>
+                <label className="form-label">{t('reservationForm.inviterPlatform')}</label>
                 <PlatformPicker value={inviterPlatform} onChange={setInviterPlatform} />
                 <input
-                  className="form-input" placeholder="Inviter's handle (no @)"
+                  className="form-input" placeholder={t('reservationForm.inviterHandle')}
                   value={inviterHandle} onChange={(e) => setInviterHandle(e.target.value)}
                 />
               </div>
               <div className="form-group">
-                <label className="form-label">Inviter's name</label>
-                <input className="form-input" placeholder="Full name"
+                <label className="form-label">{t('reservationForm.inviterName')}</label>
+                <input className="form-input" placeholder={t('guestForm.namePlaceholder')}
                   value={commissionEarner} onChange={(e) => setCommissionEarner(e.target.value)} />
               </div>
               <div className="form-group">
-                <label className="form-label">Their % of your commission</label>
+                <label className="form-label">{t('reservationForm.inviterPct')}</label>
                 <NumberField
                   className="form-input" min={0} max={100} decimal
                   value={womanPct} onChange={setWomanPct}
@@ -431,18 +424,14 @@ export const ReservationFormModal: React.FC<Props> = ({ open, onClose, editing, 
           )}
 
           <div className="comm-breakdown">
-            {!price ? (
-              <span style={{ fontSize: 12 }}>
-                Set a price for this VIP type in Venues to see breakdown.
-              </span>
-            ) : (
+            {price > 0 && (
               <>
-                Table price: <b>€{price}</b> · {paxN || 1} pax<br />
-                Your commission ({commissionPctN}%): <b style={{ color: '#3B6D11' }}>€{promoter}</b>
+                €{price} · {paxN || 1} {t('common.paxShort')}<br />
+                {t('reservationForm.yourCommission')} ({commissionPctN}%): <b style={{ color: '#3B6D11' }}>€{promoter}</b>
                 {fromInvite && womanPctN > 0 && (
                   <>
-                    <br />{(commissionEarner || 'Inviter')}'s cut ({womanPctN}%): <b style={{ color: '#F97316' }}>€{woman}</b>
-                    <br />Net to you: <b style={{ color: '#3B6D11' }}>€{net}</b>
+                    <br />{commissionEarner || '—'} ({womanPctN}%): <b style={{ color: '#F97316' }}>€{woman}</b>
+                    <br />{t('reservationForm.netToYou')}: <b style={{ color: '#3B6D11' }}>€{net}</b>
                   </>
                 )}
               </>
@@ -452,11 +441,11 @@ export const ReservationFormModal: React.FC<Props> = ({ open, onClose, editing, 
           <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
             {editing && (
               <button className="btn-danger" onClick={askDelete}>
-                Delete
+                {t('actions.delete')}
               </button>
             )}
             <button className="btn-primary" style={{ flex: 1, padding: 13, fontSize: 14 }} onClick={save}>
-              Save
+              {t('actions.save')}
             </button>
           </div>
         </div>

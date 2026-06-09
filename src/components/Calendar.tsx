@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { DAYS_SHORT, MONTHS_FULL } from '@/core/constants';
 import { isoDay } from '@/core/utils/date';
 
@@ -40,6 +41,7 @@ interface RangeProps extends BaseProps {
 type Props = SingleProps | RangeProps;
 
 export const Calendar: React.FC<Props> = (props) => {
+  const { t } = useTranslation();
   const initial = props.initialMonth ?? new Date();
   const [month, setMonth] = useState(() => new Date(initial.getFullYear(), initial.getMonth(), 1));
 
@@ -141,12 +143,12 @@ export const Calendar: React.FC<Props> = (props) => {
       {props.mode === 'range' && (
         <div className="cal-range-summary">
           <div>
-            <div className="cal-range-lbl">From</div>
+            <div className="cal-range-lbl">{t('components.from')}</div>
             <div className="cal-range-val">{props.start ? prettyDate(props.start) : '—'}</div>
           </div>
           <div style={{ flex: 1, textAlign: 'center', color: 'var(--color-text-secondary)' }}>→</div>
           <div style={{ textAlign: 'right' }}>
-            <div className="cal-range-lbl">To</div>
+            <div className="cal-range-lbl">{t('components.to')}</div>
             <div className="cal-range-val">{props.end ? prettyDate(props.end) : '—'}</div>
           </div>
         </div>

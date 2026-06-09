@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import type { PromEvent } from '@/core/types';
 import { useAppStore } from '@/store/useAppStore';
 import { eventScheduleLabel, venueById, isGuestOnEvent } from '@/features/summary/calculations';
@@ -16,6 +17,7 @@ interface Props {
 }
 
 export const EventCard: React.FC<Props> = ({ event: e, occurrenceDate, onClick }) => {
+  const { t } = useTranslation();
   const { venues, guests, reservations } = useAppStore((s) => ({
     venues: s.venues, guests: s.guests, reservations: s.reservations,
   }));
@@ -59,10 +61,10 @@ export const EventCard: React.FC<Props> = ({ event: e, occurrenceDate, onClick }
           <div className="event-thumb-name">{e.name}</div>
         </div>
         {e.isPrivate && (
-          <span style={{ position: 'absolute', right: 8, top: 8 }} className="pill pill-pink">Private</span>
+          <span style={{ position: 'absolute', right: 8, top: 8 }} className="pill pill-pink">{t('common.private')}</span>
         )}
         {e.isLateClub && (
-          <span style={{ position: 'absolute', right: 8, top: 8 }} className="pill pill-purple">🌙 Club</span>
+          <span style={{ position: 'absolute', right: 8, top: 8 }} className="pill pill-purple">{t('common.club')}</span>
         )}
       </div>
       <div className="event-body">
@@ -73,18 +75,18 @@ export const EventCard: React.FC<Props> = ({ event: e, occurrenceDate, onClick }
               Club / etc. as if it were one of them. */}
           {gc > 0 && (
             <Pill tone="blue">
-              {e.capacity ? `${gc}/${e.capacity} guests` : `${gc} guests`}
+              {e.capacity ? `${gc}/${e.capacity}` : `${gc}`} {t('summary.guests').toLowerCase()}
             </Pill>
           )}
-          {rc > 0 && <Pill tone="green">{rc} res.</Pill>}
-          {inv > 0 && <Pill tone="teal">{inv} invited</Pill>}
+          {rc > 0 && <Pill tone="green">{t('onboarding.legend.sampleReservations', { count: rc })}</Pill>}
+          {inv > 0 && <Pill tone="teal">{t('onboarding.legend.sampleInvited', { count: inv })}</Pill>}
         </div>
         {v && (
           <div style={{
             fontSize: 11, color: 'var(--color-text-secondary)',
             marginTop: 4,
           }}>
-            at {v.name}
+            {t('eventDetail.at')} {v.name}
           </div>
         )}
       </div>

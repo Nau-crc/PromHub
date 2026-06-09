@@ -50,6 +50,7 @@ export const SummaryPage: React.FC = () => {
 
 // ── Today panel ─────────────────────────────────────────────
 const TodayPanel: React.FC<{ onJumpInfluencers: () => void }> = ({ onJumpInfluencers }) => {
+  const { t } = useTranslation();
   const { guests, reservations, venues } = useAppStore((s) => ({
     guests: s.guests, reservations: s.reservations, venues: s.venues,
   }));
@@ -59,7 +60,7 @@ const TodayPanel: React.FC<{ onJumpInfluencers: () => void }> = ({ onJumpInfluen
   const todayRes = reservations.filter((r) => r.createdAt === todayKey);
 
   if (!todayGuests.length && !todayRes.length) {
-    return <><div className="spacer" /><EmptyBox>Nothing logged yet today.</EmptyBox><div className="spacer" /></>;
+    return <><div className="spacer" /><EmptyBox>{t('summary.noGuestsYet')}</EmptyBox><div className="spacer" /></>;
   }
   // Use the day-scoped data instead of the all-time snapshot
   const summary = summarizeToday(todayGuests, todayRes, venues);
@@ -72,7 +73,7 @@ const TodayPanel: React.FC<{ onJumpInfluencers: () => void }> = ({ onJumpInfluen
       {/* ── Today's guests list (NEW) ───────────────────────── */}
       {todayGuests.length > 0 && (
         <div className="summary-block">
-          <div className="summary-head">Today's guests ({todayGuests.reduce((a, g) => a + g.pax, 0)} pax)</div>
+          <div className="summary-head">{t('summary.today')} — {t('summary.guests')} ({todayGuests.reduce((a, g) => a + g.pax, 0)} {t('common.paxShort')})</div>
           {todayGuests.map((g) => (
             <div key={g.id} className="list-row" onClick={() => open('guestDetail', { id: g.id })}>
               <div className={g.checked ? 'arrived-dot' : 'pending-dot'} />
@@ -83,11 +84,11 @@ const TodayPanel: React.FC<{ onJumpInfluencers: () => void }> = ({ onJumpInfluen
                   <span>{g.name}</span>
                 </div>
                 <div className="list-sub">
-                  {venueName(g.venueId, venues)} · {(g.timeslotNames || []).join(' · ') || 'No slot'} · {g.pax} pax
+                  {venueName(g.venueId, venues)} · {(g.timeslotNames || []).join(' · ') || t('common.noSlot')} · {g.pax} {t('common.paxShort')}
                 </div>
               </div>
               <div className="list-right-sub" style={{ color: g.checked ? '#0F6E56' : undefined }}>
-                {g.checked ? 'Arrived' : 'Pending'}
+                {g.checked ? t('guests.arrived') : t('guests.pending')}
               </div>
             </div>
           ))}
@@ -95,18 +96,18 @@ const TodayPanel: React.FC<{ onJumpInfluencers: () => void }> = ({ onJumpInfluen
       )}
 
       <div className="summary-block">
-        <div className="summary-head">Guests by timeslot</div>
+        <div className="summary-head">{t('summary.byTimeslot')}</div>
         {Object.keys(summary.guestsByTimeslot).length ? (
-          Object.entries(summary.guestsByTimeslot).map(([t, n]) => (
-            <div key={t} className="detail-kv" style={{ padding: '8px 14px' }}>
-              <span className="dk">{t}</span><span className="dv">{n} guests</span>
+          Object.entries(summary.guestsByTimeslot).map(([slot, n]) => (
+            <div key={slot} className="detail-kv" style={{ padding: '8px 14px' }}>
+              <span className="dk">{slot}</span><span className="dv">{n} {t('summary.guests').toLowerCase()}</span>
             </div>
           ))
         ) : (
-          <div style={{ padding: '10px 14px', fontSize: 13, color: 'var(--color-text-secondary)' }}>No guests yet</div>
+          <div style={{ padding: '10px 14px', fontSize: 13, color: 'var(--color-text-secondary)' }}>{t('summary.noGuestsYet')}</div>
         )}
         <div className="detail-kv" style={{ padding: '8px 14px', borderBottom: 'none' }}>
-          <span className="dk">★ Influencers</span>
+          <span className="dk">{t('summary.starInfluencers')}</span>
           <span className="dv" style={{ color: '#F97316', cursor: 'pointer' }} onClick={onJumpInfluencers}>
             {summary.influencerCount} →
           </span>
@@ -115,7 +116,7 @@ const TodayPanel: React.FC<{ onJumpInfluencers: () => void }> = ({ onJumpInfluen
 
       {vipCap.length > 0 && (
         <div className="summary-block">
-          <div className="summary-head">VIP table capacity</div>
+          <div className="summary-head">VIP</div>
           {vipCap.map((row) => (
             <div key={`${row.venueId}-${row.vipName}`} style={{ padding: '8px 14px', borderBottom: '0.5px solid var(--color-border-tertiary)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
@@ -133,7 +134,7 @@ const TodayPanel: React.FC<{ onJumpInfluencers: () => void }> = ({ onJumpInfluen
       )}
 
       <div className="summary-block">
-        <div className="summary-head">Reservations & commissions</div>
+        <div className="summary-head">{t('summary.reservations')}</div>
         {todayRes.length ? todayRes.map((r) => {
           const c = commCalc(r, venues);
           const net = round2(c.promoter - c.woman);
@@ -143,25 +144,25 @@ const TodayPanel: React.FC<{ onJumpInfluencers: () => void }> = ({ onJumpInfluen
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>{r.name}</div>
                   <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>
-                    {venueName(r.venueId, venues)} · {r.vipType} · {r.pax} pax
+                    {venueName(r.venueId, venues)} · {r.vipType} · {r.pax} {t('common.paxShort')}
                   </div>
                 </div>
-                <div style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>table €{c.price}</div>
+                <div style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>€{c.price}</div>
               </div>
               <div className="comm-breakdown">
-                Table: <b>€{c.tableTotal}</b><br />
-                Your commission ({r.commissionPct}%): <b style={{ color: '#3B6D11' }}>€{c.promoter}</b>
+                €{c.tableTotal}<br />
+                {t('reservationForm.yourCommission')} ({r.commissionPct}%): <b style={{ color: '#3B6D11' }}>€{c.promoter}</b>
                 {r.fromInvite && r.womanPct > 0 && (
                   <>
-                    <br />Inviter's cut ({r.womanPct}%): <b style={{ color: '#F97316' }}>€{c.woman}</b>
-                    <br />Net to you: <b style={{ color: '#3B6D11' }}>€{net}</b>
+                    <br />— ({r.womanPct}%): <b style={{ color: '#F97316' }}>€{c.woman}</b>
+                    <br />{t('reservationForm.netToYou')}: <b style={{ color: '#3B6D11' }}>€{net}</b>
                   </>
                 )}
               </div>
             </div>
           );
         }) : (
-          <div style={{ padding: 14, fontSize: 13, color: 'var(--color-text-secondary)' }}>No reservations</div>
+          <div style={{ padding: 14, fontSize: 13, color: 'var(--color-text-secondary)' }}>{t('reservations.noReservations')}</div>
         )}
         {todayRes.length > 0 && (
           <TotalsBlock totP={summary.totP} totW={summary.totW} net={summary.net} />
@@ -175,6 +176,7 @@ const TodayPanel: React.FC<{ onJumpInfluencers: () => void }> = ({ onJumpInfluen
 
 // ── Monthly panel ──────────────────────────────────────────
 const MonthlyPanel: React.FC = () => {
+  const { t } = useTranslation();
   const { guests, reservations, venues } = useAppStore((s) => ({
     guests: s.guests, reservations: s.reservations, venues: s.venues,
   }));
@@ -255,10 +257,10 @@ const MonthlyPanel: React.FC = () => {
             <>
               {dayDigest.guests.length > 0 && (
                 <div style={{ padding: '8px 14px', borderBottom: '0.5px solid var(--color-border-tertiary)' }}>
-                  <div className="dk" style={{ marginBottom: 6 }}>Guests</div>
+                  <div className="dk" style={{ marginBottom: 6 }}>{t('summary.guests')}</div>
                   {dayDigest.guests.map((g) => (
                     <div key={g.id} style={{ fontSize: 13, padding: '3px 0' }}>
-                      <StarBadge on={g.influencer} /> {g.name} · {g.pax} pax
+                      <StarBadge on={g.influencer} /> {g.name} · {g.pax} {t('common.paxShort')}
                       <span style={{ color: 'var(--color-text-secondary)', fontSize: 11 }}> ({venueName(g.venueId, venues)})</span>
                     </div>
                   ))}
@@ -266,12 +268,12 @@ const MonthlyPanel: React.FC = () => {
               )}
               {dayDigest.reservations.length > 0 && (
                 <div style={{ padding: '8px 14px', borderBottom: '0.5px solid var(--color-border-tertiary)' }}>
-                  <div className="dk" style={{ marginBottom: 6 }}>Reservations</div>
+                  <div className="dk" style={{ marginBottom: 6 }}>{t('summary.reservations')}</div>
                   {dayDigest.reservations.map((r) => {
                     const c = commCalc(r, venues);
                     return (
                       <div key={r.id} style={{ fontSize: 13, padding: '3px 0' }}>
-                        {r.name} · {r.vipType} · {r.pax} pax
+                        {r.name} · {r.vipType} · {r.pax} {t('common.paxShort')}
                         <span style={{ color: '#3B6D11' }}> +€{c.promoter}</span>
                       </div>
                     );
@@ -284,21 +286,20 @@ const MonthlyPanel: React.FC = () => {
         </div>
       )}
 
-      {/* Monthly totals */}
       <div className="summary-block">
-        <div className="summary-head">{MONTHS_FULL[month]} totals</div>
+        <div className="summary-head">{MONTHS_FULL[month]}</div>
         <div className="detail-kv" style={{ padding: '8px 14px' }}>
-          <span className="dk">Guests (pax)</span><span className="dv">{monthDigest.guestPax}</span>
+          <span className="dk">{t('summary.guestsPax')}</span><span className="dv">{monthDigest.guestPax}</span>
         </div>
         <div className="detail-kv" style={{ padding: '8px 14px' }}>
-          <span className="dk">Reservations</span><span className="dv">{monthDigest.reservations.length}</span>
+          <span className="dk">{t('summary.reservations')}</span><span className="dv">{monthDigest.reservations.length}</span>
         </div>
         <TotalsBlock totP={monthDigest.totP} totW={monthDigest.totW} net={monthDigest.net} />
       </div>
 
       {Object.keys(monthDigest.vipTablesByType).length > 0 && (
         <div className="summary-block">
-          <div className="summary-head">VIP tables sold this month</div>
+          <div className="summary-head">VIP</div>
           {Object.entries(monthDigest.vipTablesByType)
             .sort((a, b) => b[1] - a[1])
             .map(([key, count]) => (
@@ -321,28 +322,32 @@ const formatLongDay = (iso: string) =>
   });
 
 // ── Reusable totals block ──────────────────────────────────
-const TotalsBlock: React.FC<{ totP: number; totW: number; net: number }> = ({ totP, totW, net }) => (
-  <div style={{
-    padding: '10px 14px', borderTop: '0.5px solid var(--color-border-tertiary)',
-    display: 'flex', flexDirection: 'column', gap: 4,
-  }}>
-    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-      <span style={{ color: 'var(--color-text-secondary)' }}>Total earnings</span>
-      <span style={{ color: '#3B6D11', fontWeight: 500 }}>€{totP}</span>
+const TotalsBlock: React.FC<{ totP: number; totW: number; net: number }> = ({ totP, totW, net }) => {
+  const { t } = useTranslation();
+  return (
+    <div style={{
+      padding: '10px 14px', borderTop: '0.5px solid var(--color-border-tertiary)',
+      display: 'flex', flexDirection: 'column', gap: 4,
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+        <span style={{ color: 'var(--color-text-secondary)' }}>{t('summary.totalEarnings')}</span>
+        <span style={{ color: '#3B6D11', fontWeight: 500 }}>€{totP}</span>
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+        <span style={{ color: 'var(--color-text-secondary)' }}>{t('summary.toPayViaInvitation')}</span>
+        <span style={{ color: '#F97316', fontWeight: 500 }}>€{totW}</span>
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 500, marginTop: 2 }}>
+        <span>{t('summary.netEarnings')}</span>
+        <span style={{ color: '#3B6D11' }}>€{net}</span>
+      </div>
     </div>
-    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-      <span style={{ color: 'var(--color-text-secondary)' }}>To pay via invitation</span>
-      <span style={{ color: '#F97316', fontWeight: 500 }}>€{totW}</span>
-    </div>
-    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 500, marginTop: 2 }}>
-      <span>Net earnings</span>
-      <span style={{ color: '#3B6D11' }}>€{net}</span>
-    </div>
-  </div>
-);
+  );
+};
 
 // ── Yearly panel ───────────────────────────────────────────
 const YearlyPanel: React.FC = () => {
+  const { t } = useTranslation();
   const { guests, reservations } = useAppStore((s) => ({
     guests: s.guests, reservations: s.reservations,
   }));
@@ -353,8 +358,8 @@ const YearlyPanel: React.FC = () => {
   return (
     <>
       <div className="spacer" />
-      <YearlyChart title={`${year} — Guests per month`} data={guestsByMonth} barColor="#F97316" />
-      <YearlyChart title={`${year} — Reservations per month`} data={resByMonth} barColor="#3B6D11" />
+      <YearlyChart title={`${year} — ${t('summary.guests')}`} data={guestsByMonth} barColor="#F97316" />
+      <YearlyChart title={`${year} — ${t('summary.reservations')}`} data={resByMonth} barColor="#3B6D11" />
       <div className="spacer" />
     </>
   );
@@ -393,19 +398,20 @@ const YearlyChart: React.FC<{ title: string; data: number[]; barColor: string }>
 
 // ── Influencers panel ──────────────────────────────────────
 const InfluencersPanel: React.FC = () => {
+  const { t } = useTranslation();
   const { guests, venues } = useAppStore((s) => ({ guests: s.guests, venues: s.venues }));
   const open = useUIStore((s) => s.open);
   const rows = summarizeInfluencers(guests);
 
   if (!rows.length) {
-    return <><div className="spacer" /><EmptyBox>No influencers yet.</EmptyBox><div className="spacer" /></>;
+    return <><div className="spacer" /><EmptyBox>{t('summary.noInfluencers')}</EmptyBox><div className="spacer" /></>;
   }
 
   return (
     <>
       <div className="spacer" />
       <div className="summary-block">
-        <div className="summary-head">Influencers</div>
+        <div className="summary-head">{t('summary.influencers')}</div>
         {rows.map(({ guest: g, visits }) => (
           <div key={g.id} className="list-row" onClick={() => open('guestDetail', { id: g.id })}>
             <div className="list-avatar" style={{ background: '#FFF7ED', color: '#F97316', fontSize: 16 }}>★</div>

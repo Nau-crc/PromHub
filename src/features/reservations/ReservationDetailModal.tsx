@@ -1,6 +1,7 @@
 import React from 'react';
 import { IonModal, IonContent, IonIcon } from '@ionic/react';
 import { logoWhatsapp } from 'ionicons/icons';
+import { useTranslation } from 'react-i18next';
 import { useAppStore } from '@/store/useAppStore';
 import { useConfirm } from '@/store/useConfirmStore';
 import { initials } from '@/core/utils/format';
@@ -16,6 +17,7 @@ interface Props {
 }
 
 export const ReservationDetailModal: React.FC<Props> = ({ open, onClose, reservationId, onEdit }) => {
+  const { t } = useTranslation();
   const { reservations, venues, removeReservation } = useAppStore((s) => ({
     reservations: s.reservations, venues: s.venues, removeReservation: s.removeReservation,
   }));
@@ -75,13 +77,13 @@ export const ReservationDetailModal: React.FC<Props> = ({ open, onClose, reserva
               </div>
             </div>
           </div>
-          <button className="btn-close" onClick={onClose} aria-label="Close">✕</button>
+          <button className="btn-close" onClick={onClose} aria-label={t('components.closeAria')}>✕</button>
         </div>
         <div style={{ padding: '16px 16px 32px' }}>
-          <div className="detail-kv"><span className="dk">Venue</span><span className="dv">{venueName(r.venueId, venues)}</span></div>
-          <div className="detail-kv"><span className="dk">VIP type</span><span className="dv">{r.vipType} · €{c.price}/table</span></div>
+          <div className="detail-kv"><span className="dk">{t('reservationDetail.venue')}</span><span className="dv">{venueName(r.venueId, venues)}</span></div>
+          <div className="detail-kv"><span className="dk">VIP</span><span className="dv">{r.vipType} · €{c.price}/{t('reservationDetail.tableTotal').toLowerCase()}</span></div>
           <div className="detail-kv">
-            <span className="dk">When</span>
+            <span className="dk">{t('reservationDetail.when')}</span>
             <span className="dv">
               {r.eventDate
                 ? new Date(r.eventDate + 'T00:00:00').toLocaleDateString(undefined, {
@@ -91,26 +93,26 @@ export const ReservationDetailModal: React.FC<Props> = ({ open, onClose, reserva
               {r.time ? ` · ${r.time}` : ''}
             </span>
           </div>
-          <div className="detail-kv"><span className="dk">Pax</span><span className="dv">{r.pax}</span></div>
-          <div className="detail-kv"><span className="dk">Table total</span><span className="dv">€{c.tableTotal}</span></div>
+          <div className="detail-kv"><span className="dk">{t('reservationDetail.pax')}</span><span className="dv">{r.pax}</span></div>
+          <div className="detail-kv"><span className="dk">{t('reservationDetail.tableTotal')}</span><span className="dv">€{c.tableTotal}</span></div>
           <div className="detail-kv">
-            <span className="dk">Your commission ({r.commissionPct}%)</span>
+            <span className="dk">{t('reservationForm.yourCommission')} ({r.commissionPct}%)</span>
             <span className="dv" style={{ color: '#3B6D11' }}>€{c.promoter}</span>
           </div>
           {r.fromInvite && (
             <>
               <div className="detail-kv">
-                <span className="dk">Via invitation</span>
+                <span className="dk">{t('reservationDetail.viaInvitation')}</span>
                 <span className="dv">
                   {r.commissionEarner} <SocialBadge handle={r.inviterHandle} platform={r.inviterPlatform} />
                 </span>
               </div>
               <div className="detail-kv">
-                <span className="dk">Their cut ({r.womanPct}%)</span>
+                <span className="dk">{t('reservationForm.inviterPct')} ({r.womanPct}%)</span>
                 <span className="dv" style={{ color: '#F97316' }}>€{c.woman}</span>
               </div>
               <div className="detail-kv">
-                <span className="dk">Net to you</span>
+                <span className="dk">{t('reservationDetail.netToYou')}</span>
                 <span className="dv" style={{ color: '#3B6D11' }}>€{netToYou(c)}</span>
               </div>
             </>
@@ -128,12 +130,8 @@ export const ReservationDetailModal: React.FC<Props> = ({ open, onClose, reserva
               }}
             >
               <IonIcon icon={logoWhatsapp} style={{ fontSize: 18 }} />
-              Send to {v!.name} on WhatsApp
+              {t('actions.sendOnWhatsApp')}
             </button>
-          ) : v ? (
-            <div className="info-box" style={{ marginTop: 16 }}>
-              Add a phone number to <b>{v.name}</b> to send reservations via WhatsApp.
-            </div>
           ) : null}
 
           <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
@@ -141,14 +139,14 @@ export const ReservationDetailModal: React.FC<Props> = ({ open, onClose, reserva
               className="btn-secondary"
               onClick={async () => {
                 const ok = await confirm({
-                  title: `Delete reservation for ${r.name}?`,
-                  confirmLabel: 'Delete',
+                  title: t('reservationDetail.deleteTitle', { name: r.name }),
+                  confirmLabel: t('actions.delete'),
                   destructive: true,
                 });
                 if (ok) { removeReservation(r.id); onClose(); }
               }}
-            >Delete</button>
-            <button className="btn-primary" style={{ flex: 1, padding: 13, fontSize: 14 }} onClick={() => onEdit(r.id)}>Edit</button>
+            >{t('actions.delete')}</button>
+            <button className="btn-primary" style={{ flex: 1, padding: 13, fontSize: 14 }} onClick={() => onEdit(r.id)}>{t('actions.edit')}</button>
           </div>
         </div>
       </IonContent>

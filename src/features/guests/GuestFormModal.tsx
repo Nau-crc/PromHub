@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { IonModal, IonContent } from '@ionic/react';
+import { useTranslation } from 'react-i18next';
 import type { Guest, Platform, PromEvent } from '@/core/types';
 import { useAppStore } from '@/store/useAppStore';
 import { useConfirm } from '@/store/useConfirmStore';
@@ -25,6 +26,7 @@ interface Props {
 }
 
 export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEventId }) => {
+  const { t } = useTranslation();
   const { venues, events, guests, upsertGuest, removeGuest } = useAppStore((s) => ({
     venues: s.venues, events: s.events, guests: s.guests,
     upsertGuest: s.upsertGuest, removeGuest: s.removeGuest,
@@ -34,8 +36,8 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
   const askDelete = async () => {
     if (!editing) return;
     const ok = await confirm({
-      title: `Delete ${editing.name}?`,
-      confirmLabel: 'Delete',
+      title: t('guestForm.deleteTitle', { name: editing.name }),
+      confirmLabel: t('actions.delete'),
       destructive: true,
     });
     if (ok) { removeGuest(editing.id); onClose(); }
@@ -193,20 +195,20 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
 
   const save = async () => {
     const trimmed = name.trim();
-    if (!trimmed) { alert('Name is required.'); return; }
+    if (!trimmed) { alert(t('guestForm.errNameRequired')); return; }
     // Per the data model a guest belongs to an event. We block saving
     // until the user has picked one — no "uncategorised" guests.
-    if (eventId == null) { alert('Pick an event for this guest.'); return; }
-    if (venueId == null) { alert('Pick a venue.'); return; }
-    if (!pax || pax < 1) { alert('At least 1 pax is required.'); return; }
+    if (eventId == null) { alert(t('guestForm.errPickEvent')); return; }
+    if (venueId == null) { alert(t('guestForm.errPickVenue')); return; }
+    if (!pax || pax < 1) { alert(t('guestForm.errAtLeastOnePax')); return; }
     if (selectedEvent && !eventDateValid) {
-      alert('The event date you picked is not a valid occurrence of this event.');
+      alert(t('guestForm.errInvalidDate'));
       return;
     }
 
     const cleanHandle = handle.trim().replace(/^@+/, '');
     if (influencer && !cleanHandle) {
-      alert('Influencers must have an Instagram or TikTok handle.');
+      alert(t('guestForm.errInfluencerHandle'));
       return;
     }
 
@@ -238,7 +240,7 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
     try {
       saved = await upsertGuest(entry as Guest | Omit<Guest, 'id'>);
     } catch (err) {
-      alert(`Couldn't save guest: ${(err as Error).message}`);
+      alert(t('guestForm.couldntSave', { message: (err as Error).message }));
       return;
     }
     void saved; // (retained for future hooks, e.g. analytics)
@@ -254,9 +256,9 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
       if (desc) {
         const platformLabel = platform === 'tiktok' ? 'TikTok' : 'Instagram';
         const ok = await confirm({
-          title: `Send to @${cleanHandle} on ${platformLabel}?`,
-          message: `The event description will be copied to your clipboard and ${platformLabel} will open at her profile — just tap the airplane icon and paste.`,
-          confirmLabel: 'Send',
+          title: t('guestForm.sendConfirmTitle', { handle: cleanHandle, platform: platformLabel }),
+          message: t('guestForm.sendConfirmMessage', { platform: platformLabel }),
+          confirmLabel: t('guestForm.sendConfirmCta'),
         });
         if (ok) {
           await sendViaSocial(platform, cleanHandle, desc);
@@ -270,25 +272,25 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
   return (
     <IonModal isOpen={open} onDidDismiss={onClose}>
       <IonContent>
-        <SheetHeader title={editing ? 'Edit guest' : 'Add guest'} onClose={onClose} />
+        <SheetHeader title={editing ? t('guestForm.titleEdit') : t('guestForm.titleNew')} onClose={onClose} />
         <div style={{ padding: '16px 16px 32px' }}>
           <div className="form-group">
-            <label className="form-label">Name</label>
-            <input className="form-input" placeholder="Full name" value={name} onChange={(e) => setName(e.target.value)} />
+            <label className="form-label">{t('guestForm.name')}</label>
+            <input className="form-input" placeholder={t('guestForm.namePlaceholder')} value={name} onChange={(e) => setName(e.target.value)} />
           </div>
           <div className="form-row">
             <div className="form-group">
-              <label className="form-label">Venue</label>
+              <label className="form-label">{t('guestForm.venue')}</label>
               <SelectField
                 value={venueId}
                 onChange={(v) => onVenueChange(Number(v))}
-                title="Pick a venue"
+                title={t('common.pickAVenue')}
                 options={venues.map((vv) => ({ value: vv.id, label: vv.name }))}
-                placeholder="— Select venue —"
+                placeholder={t('actions.selectVenue')}
               />
             </div>
             <div className="form-group">
-              <label className="form-label">Pax</label>
+              <label className="form-label">{t('guestForm.pax')}</label>
               <NumberField
                 className="form-input" min={1}
                 value={pax} onChange={setPax}
@@ -297,10 +299,9 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
           </div>
 
           <div className="form-group">
-            <label className="form-label">Select event *</label>
+            <label className="form-label">{t('guestForm.selectEventTitle')}</label>
             <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 6 }}>
-              Only events at the selected venue. Sorted by next date —
-              the next upcoming one is pre-selected.
+              {t('guestForm.selectEventHint')}
             </div>
             {venueEvents.length === 0 ? (
               <div style={{
@@ -310,7 +311,7 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
                 border: '0.5px solid var(--color-border-tertiary)',
                 borderRadius: 'var(--border-radius-sm)',
               }}>
-                No events at this venue yet. Create one in the Events tab.
+                {t('guestForm.noEventsAtVenue')}
               </div>
             ) : venueEvents.map((e) => {
               const sched = e.isOneTime && e.eventDate
@@ -345,9 +346,9 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
 
           {selectedEvent && !selectedEvent.isOneTime && (
             <div className="form-group">
-              <label className="form-label">Event date</label>
+              <label className="form-label">{t('guestForm.eventDate')}</label>
               <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 6 }}>
-                Use the arrows to step through this event's scheduled occurrences.
+                {t('guestForm.eventDateHint')}
               </div>
               <OccurrencePicker
                 event={selectedEvent}
@@ -359,19 +360,17 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
 
           {selectedEvent?.isOneTime && selectedEvent.eventDate && (
             <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', margin: '-6px 0 12px' }}>
-              Event date: <b>{selectedEvent.eventDate}</b>
+              {t('guestForm.eventDateFixed')}: <b>{selectedEvent.eventDate}</b>
             </div>
           )}
 
           {/* What is she coming to? — chips driven by the EVENT's
-              selected timeslots (resolved against the venue). Shows
-              the same UX the old "Invitation type(s)" picker did but
-              the data now lives on the event, not on the venue. */}
+              selected timeslots (resolved against the venue). */}
           {selectedEvent && (
             <div className="form-group">
-              <label className="form-label">Coming to</label>
+              <label className="form-label">{t('guestForm.comingTo')}</label>
               <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 6 }}>
-                Which of the event's timeslots is she attending?
+                {t('guestForm.comingToHint')}
               </div>
               {eventTimeslots.length ? (
                 <div className="chip-picker">
@@ -387,8 +386,7 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
                 </div>
               ) : (
                 <div style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
-                  This event has no timeslots selected. Edit the event to
-                  pick one or more from the venue's schedule.
+                  {t('guestForm.noSlotsSelected')}
                 </div>
               )}
             </div>
@@ -396,13 +394,13 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
 
           <div className="form-group">
             <label className="form-label">
-              Social platform {influencer && <span style={{ color: '#A32D2D' }}>*</span>}
+              {t('guestForm.socialPlatform')} {influencer && <span style={{ color: '#A32D2D' }}>*</span>}
             </label>
             <PlatformPicker value={platform} onChange={setPlatform} />
             <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
               <input
                 className="form-input"
-                placeholder="Handle (without @)"
+                placeholder={t('guestForm.handlePlaceholder')}
                 value={handle}
                 onChange={(e) => setHandle(e.target.value)}
                 style={{ flex: 1 }}
@@ -418,29 +416,29 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
             </div>
             {influencer && !handle.trim() && (
               <div style={{ fontSize: 11, color: '#A32D2D', marginTop: 4 }}>
-                ⚠︎ Influencers must have an Instagram or TikTok handle.
+                {t('guestForm.influencerHandleRequired')}
               </div>
             )}
           </div>
 
           <div className="check-row">
             <input id="gInf" type="checkbox" checked={influencer} onChange={(e) => setInfluencer(e.target.checked)} />
-            <label htmlFor="gInf">Influencer (10k+) ★</label>
+            <label htmlFor="gInf">{t('guestForm.influencer')}</label>
           </div>
 
           <div className="check-row">
             <input id="gClub" type="checkbox" checked={goingToClub} onChange={(e) => setGoingToClub(e.target.checked)} />
-            <label htmlFor="gClub">Going to club later</label>
+            <label htmlFor="gClub">{t('guestForm.goingToClub')}</label>
           </div>
 
           {goingToClub && (
             <>
-              <div className="info-box" style={{ marginBottom: 8 }}>Only 🌙 Late Club events are shown.</div>
+              <div className="info-box" style={{ marginBottom: 8 }}>{t('guestForm.onlyLateClubs')}</div>
               <div
                 className={`event-picker-item none-opt ${clubEventId == null ? 'sel' : ''}`}
                 onClick={() => setClubEventId(null)}
               >
-                <div className="event-picker-info"><div className="event-picker-name">— No club event</div></div>
+                <div className="event-picker-info"><div className="event-picker-name">{t('guestForm.noClubEvent')}</div></div>
                 <div className="event-picker-check">{clubEventId == null ? '✓' : ''}</div>
               </div>
               {lateEvents.map((e) => {
@@ -463,7 +461,7 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
               })}
               {!lateEvents.length && (
                 <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', padding: '6px 0' }}>
-                  No late-night club events yet.
+                  {t('guestForm.noLateClubs')}
                 </div>
               )}
             </>
@@ -472,11 +470,11 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
           <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
             {editing && (
               <button className="btn-danger" onClick={askDelete}>
-                Delete
+                {t('actions.delete')}
               </button>
             )}
             <button className="btn-primary" style={{ flex: 1, padding: 13, fontSize: 14 }} onClick={save}>
-              Save
+              {t('actions.save')}
             </button>
           </div>
         </div>

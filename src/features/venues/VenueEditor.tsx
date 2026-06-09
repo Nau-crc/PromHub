@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { Timeslot, VipType } from '@/core/types';
 import { useAppStore } from '@/store/useAppStore';
 import { PaxStepper } from '@/components/PaxStepper';
@@ -11,6 +12,7 @@ interface TsRowsProps {
   setRows: (rows: Timeslot[]) => void;
 }
 export const TimeslotRows: React.FC<TsRowsProps> = ({ rows, setRows }) => {
+  const { t } = useTranslation();
   const nextId = useAppStore((s) => s.nextId);
   const [openPicker, setOpenPicker] = useState<{ idx: number; field: 'startTime' | 'endTime' } | null>(null);
   const update = (i: number, patch: Partial<Timeslot>) =>
@@ -31,12 +33,12 @@ export const TimeslotRows: React.FC<TsRowsProps> = ({ rows, setRows }) => {
   return (
     <div className="form-group">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <label className="form-label" style={{ margin: 0 }}>Timeslots</label>
-        <button type="button" className="btn-sm" onClick={add}>+ Add</button>
+        <label className="form-label" style={{ margin: 0 }}>{t('venueEditor.timeslots')}</label>
+        <button type="button" className="btn-sm" onClick={add}>{t('venueEditor.addTimeslot')}</button>
       </div>
       {!rows.length && (
         <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', padding: '4px 0' }}>
-          No timeslots yet. Tap + Add.
+          {t('venueEditor.noTimeslots')}
         </div>
       )}
       {rows.map((r, i) => (
@@ -44,15 +46,15 @@ export const TimeslotRows: React.FC<TsRowsProps> = ({ rows, setRows }) => {
           <div className="ts-block-head">
             <input
               className="ts-block-name"
-              placeholder="Timeslot name e.g. Tardeo"
+              placeholder={t('venueEditor.timeslotPlaceholder')}
               value={r.name}
               onChange={(e) => update(i, { name: e.target.value })}
             />
-            <button type="button" className="row-del-btn" aria-label="Delete" onClick={() => remove(i)}>✕</button>
+            <button type="button" className="row-del-btn" aria-label={t('actions.delete')} onClick={() => remove(i)}>✕</button>
           </div>
           <div className="ts-block-row">
             <div>
-              <div className="ts-label">Start (24h)</div>
+              <div className="ts-label">{t('venueEditor.start24h')}</div>
               <button
                 type="button"
                 className="form-input"
@@ -63,7 +65,7 @@ export const TimeslotRows: React.FC<TsRowsProps> = ({ rows, setRows }) => {
               </button>
             </div>
             <div>
-              <div className="ts-label">End (24h)</div>
+              <div className="ts-label">{t('venueEditor.end24h')}</div>
               <button
                 type="button"
                 className="form-input"
@@ -74,7 +76,7 @@ export const TimeslotRows: React.FC<TsRowsProps> = ({ rows, setRows }) => {
               </button>
             </div>
             <div>
-              <div className="ts-label">Guest cap.</div>
+              <div className="ts-label">{t('venueEditor.guestCap')}</div>
               <NumberField
                 className="form-input"
                 style={{ fontSize: 13, padding: '9px 8px' }}
@@ -90,7 +92,7 @@ export const TimeslotRows: React.FC<TsRowsProps> = ({ rows, setRows }) => {
       <TimePicker
         open={openPicker !== null}
         value={openPicker ? rows[openPicker.idx]?.[openPicker.field] ?? '20:00' : '20:00'}
-        title={openPicker?.field === 'endTime' ? 'End time' : 'Start time'}
+        title={openPicker?.field === 'endTime' ? t('venueEditor.end24h') : t('venueEditor.start24h')}
         onClose={() => setOpenPicker(null)}
         onChange={(v) => {
           if (openPicker) update(openPicker.idx, { [openPicker.field]: v });
@@ -106,6 +108,7 @@ interface VipRowsProps {
   setRows: (rows: VipType[]) => void;
 }
 export const VipRows: React.FC<VipRowsProps> = ({ rows, setRows }) => {
+  const { t } = useTranslation();
   const nextId = useAppStore((s) => s.nextId);
   const update = (i: number, patch: Partial<VipType>) =>
     setRows(rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
@@ -126,15 +129,12 @@ export const VipRows: React.FC<VipRowsProps> = ({ rows, setRows }) => {
   return (
     <div className="form-group">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-        <label className="form-label" style={{ margin: 0 }}>VIP table types</label>
-        <button type="button" className="btn-sm" onClick={add}>+ Add</button>
-      </div>
-      <div className="info-box" style={{ marginBottom: 8 }}>
-        Price = per table. Pax range = who can book it. Tables available = how many tables of this type exist.
+        <label className="form-label" style={{ margin: 0 }}>{t('venueEditor.vipTypes')}</label>
+        <button type="button" className="btn-sm" onClick={add}>{t('venueEditor.addVip')}</button>
       </div>
       {!rows.length && (
         <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', padding: '4px 0' }}>
-          No VIP types yet. Tap + Add.
+          {t('venueEditor.noVipTypes')}
         </div>
       )}
       {rows.map((r, i) => (
@@ -142,15 +142,15 @@ export const VipRows: React.FC<VipRowsProps> = ({ rows, setRows }) => {
           <div className="vip-block-head">
             <input
               className="vip-block-name"
-              placeholder="VIP type name e.g. SUPER VIP"
+              placeholder={t('venueEditor.vipPlaceholder')}
               value={r.name}
               onChange={(e) => update(i, { name: e.target.value })}
             />
-            <button type="button" className="row-del-btn" aria-label="Delete" onClick={() => remove(i)}>✕</button>
+            <button type="button" className="row-del-btn" aria-label={t('actions.delete')} onClick={() => remove(i)}>✕</button>
           </div>
           <div className="vip-block-row">
             <div>
-              <div className="vip-sub-label">Price (€ / table)</div>
+              <div className="vip-sub-label">{t('venueEditor.pricePerTable')}</div>
               <NumberField
                 className="form-input"
                 style={{ fontSize: 13, padding: '9px 8px' }}
@@ -162,7 +162,7 @@ export const VipRows: React.FC<VipRowsProps> = ({ rows, setRows }) => {
               />
             </div>
             <div>
-              <div className="vip-sub-label">Pax range</div>
+              <div className="vip-sub-label">{t('venueEditor.paxRange')}</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
                 <NumberField
                   className="form-input"
@@ -187,7 +187,7 @@ export const VipRows: React.FC<VipRowsProps> = ({ rows, setRows }) => {
               </div>
             </div>
             <div>
-              <div className="vip-sub-label">Tables available</div>
+              <div className="vip-sub-label">{t('venueEditor.tablesAvailable')}</div>
               <div style={{ marginTop: 2 }}>
                 <PaxStepper
                   value={r.tableCapacity || 0}

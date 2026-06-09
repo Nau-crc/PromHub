@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { IonModal, IonContent } from '@ionic/react';
+import { useTranslation } from 'react-i18next';
 import type { Venue, Timeslot, VipType } from '@/core/types';
 import { useAppStore } from '@/store/useAppStore';
 import { useConfirm } from '@/store/useConfirmStore';
@@ -18,6 +19,7 @@ interface Props {
 }
 
 export const VenueFormModal: React.FC<Props> = ({ open, onClose, editing }) => {
+  const { t } = useTranslation();
   const { upsertVenue, removeVenue } = useAppStore((s) => ({
     upsertVenue: s.upsertVenue, removeVenue: s.removeVenue,
   }));
@@ -41,19 +43,17 @@ export const VenueFormModal: React.FC<Props> = ({ open, onClose, editing }) => {
   }, [open, editing]);
 
   const phoneDigits = onlyDigits(phoneNum);
-  // Empty phone is OK (it's optional). If there's any digit, it must match
-  // the country format — same rule as the reservation phone.
   const phoneOk = !phoneDigits || isValidPhone(phoneCode, phoneDigits);
 
   const save = async () => {
     const trimmed = name.trim();
-    if (!trimmed) { alert('Venue name is required.'); return; }
+    if (!trimmed) { alert(t('venueForm.errNameRequired')); return; }
     if (!tsRows.filter((r) => r.name.trim()).length) {
-      alert('Add at least one timeslot.');
+      alert(t('venueForm.errAddTimeslot'));
       return;
     }
     if (phoneDigits && !phoneOk) {
-      alert(`Phone number doesn't match the format for ${phoneCode}.`);
+      alert(t('venueForm.errPhoneFmt', { code: phoneCode }));
       return;
     }
     const newTs = tsRows.filter((r) => r.name.trim()).map((r) => ({
@@ -66,9 +66,6 @@ export const VenueFormModal: React.FC<Props> = ({ open, onClose, editing }) => {
       maxPax: r.maxPax || 10,
       tableCapacity: r.tableCapacity || 0,
     }));
-    // Top-level entity IDs come from the backend (Postgres SERIAL).
-    // We pass the editing.id only when updating; new venues omit it
-    // and upsertVenue handles the create-vs-update branch.
     const entry = {
       ...(editing?.id != null ? { id: editing.id } : {}),
       name: trimmed,
@@ -82,16 +79,16 @@ export const VenueFormModal: React.FC<Props> = ({ open, onClose, editing }) => {
       await upsertVenue(entry);
       onClose();
     } catch (err) {
-      alert(`Couldn't save venue: ${(err as Error).message}`);
+      alert(t('venueForm.couldntSave', { message: (err as Error).message }));
     }
   };
 
   const confirmDelete = async () => {
     if (!editing) return;
     const ok = await confirm({
-      title: `Delete ${editing.name}?`,
-      message: 'Future events at this venue and their guests will be removed. Past events stay for reporting.',
-      confirmLabel: 'Delete',
+      title: t('venues.deleteConfirm', { name: editing.name }),
+      message: t('venues.deleteMessage'),
+      confirmLabel: t('actions.delete'),
       destructive: true,
     });
     if (ok) {
@@ -103,25 +100,25 @@ export const VenueFormModal: React.FC<Props> = ({ open, onClose, editing }) => {
   return (
     <IonModal isOpen={open} onDidDismiss={onClose}>
       <IonContent>
-        <SheetHeader title={editing ? 'Edit venue' : 'Add venue'} onClose={onClose} />
+        <SheetHeader title={editing ? t('venueForm.titleEdit') : t('venueForm.titleNew')} onClose={onClose} />
         <div style={{ padding: '16px 16px 32px' }}>
           <div className="form-group">
-            <label className="form-label">Venue name</label>
-            <input className="form-input" placeholder="e.g. Carpe Diem" value={name} onChange={(e) => setName(e.target.value)} />
+            <label className="form-label">{t('venueForm.name')}</label>
+            <input className="form-input" placeholder={t('venueForm.namePlaceholder')} value={name} onChange={(e) => setName(e.target.value)} />
           </div>
           <div className="form-group">
-            <label className="form-label">Guest capacity (total)</label>
+            <label className="form-label">{t('venueForm.guestCapacity')}</label>
             <input
-              className="form-input" type="number" min={0} placeholder="e.g. 200"
+              className="form-input" type="number" min={0} placeholder={t('venueForm.guestCapacityPlaceholder')}
               value={guestCap}
               onChange={(e) => setGuestCap(e.target.value === '' ? '' : (parseInt(e.target.value) || 0))}
             />
           </div>
 
           <div className="form-group">
-            <label className="form-label">Phone (optional)</label>
+            <label className="form-label">{t('venueForm.phone')}</label>
             <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 6 }}>
-              Used to send reservation details to the venue on WhatsApp.
+              {t('venueForm.phoneHint')}
             </div>
             <div className="phone-row">
               <SelectField
@@ -131,7 +128,7 @@ export const VenueFormModal: React.FC<Props> = ({ open, onClose, editing }) => {
                   const limited = onlyDigits(phoneNum).slice(0, maxDigits(code));
                   setPhoneNum(formatPhone(code, limited));
                 }}
-                title="Country code"
+                title={t('venueForm.countryCode')}
                 style={{ minWidth: 110, flexShrink: 0 }}
                 options={COUNTRY_CODES.map((c) => ({
                   value: c.code,
@@ -153,7 +150,7 @@ export const VenueFormModal: React.FC<Props> = ({ open, onClose, editing }) => {
             </div>
             {phoneDigits.length > 0 && !phoneOk && (
               <div style={{ fontSize: 11, color: 'var(--color-danger)', marginTop: 4 }}>
-                ⚠︎ Format for {phoneCode} doesn't match. Expected like: {placeholderForCode(phoneCode)}
+                {t('venueForm.phoneFmtError', { code: phoneCode, example: placeholderForCode(phoneCode) })}
               </div>
             )}
           </div>
@@ -163,10 +160,10 @@ export const VenueFormModal: React.FC<Props> = ({ open, onClose, editing }) => {
 
           <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
             {editing && (
-              <button className="btn-danger" onClick={confirmDelete}>Delete</button>
+              <button className="btn-danger" onClick={confirmDelete}>{t('actions.delete')}</button>
             )}
             <button className="btn-primary" style={{ flex: 1, padding: 13, fontSize: 14 }} onClick={save}>
-              Save
+              {t('actions.save')}
             </button>
           </div>
         </div>
