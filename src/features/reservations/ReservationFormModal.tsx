@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { IonModal, IonContent } from '@ionic/react';
 import type { Platform, Reservation } from '@/core/types';
 import { useAppStore } from '@/store/useAppStore';
@@ -58,9 +58,18 @@ export const ReservationFormModal: React.FC<Props> = ({ open, onClose, editing, 
   const [commissionEarner, setCommissionEarner] = useState('');
   const [womanPct, setWomanPct] = useState<number | null>(50);
 
-  // Hydrate when (re)opening
+  // Hydrate when (re)opening — guarded by an init key so background
+  // poll-driven `venues` updates don't refire the effect and wipe
+  // whatever the user has just typed. Runs once per open session, or
+  // again whenever the editing target / seeded event changes.
+  const initKey = useRef<string | null>(null);
   useEffect(() => {
-    if (!open) return;
+    if (!open) { initKey.current = null; return; }
+    const key = editing?.id != null
+      ? `edit-${editing.id}`
+      : `new-${seedEventId ?? 'none'}`;
+    if (initKey.current === key) return;
+    initKey.current = key;
     setName(editing?.name ?? '');
     setPhoneCode(editing?.phoneCode ?? '+34');
     setPhoneNum(editing?.phoneNum ?? '');

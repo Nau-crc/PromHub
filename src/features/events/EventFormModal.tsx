@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { IonModal, IonContent } from '@ionic/react';
 import type { PromEvent } from '@/core/types';
 import { useAppStore } from '@/store/useAppStore';
@@ -55,8 +55,17 @@ export const EventFormModal: React.FC<Props> = ({ open, onClose, editing, onRequ
   const [seasonStart, setSeasonStart] = useState<string>('');
   const [seasonEnd, setSeasonEnd] = useState<string>('');
 
+  // Init-once-per-open guard. Without this, the effect's `venues`
+  // dependency would re-fire every time the background poll refreshes
+  // the store — wiping anything the user has just typed. We track an
+  // "init key" that uniquely identifies the entity we opened on; the
+  // effect only re-runs when that key actually changes. Reset on close.
+  const initKey = useRef<string | null>(null);
   useEffect(() => {
-    if (!open) return;
+    if (!open) { initKey.current = null; return; }
+    const key = editing?.id != null ? `edit-${editing.id}` : 'new';
+    if (initKey.current === key) return;
+    initKey.current = key;
     setName(editing?.name ?? '');
     setVenueId(editing?.venueId ?? venues[0]?.id ?? null);
     setIsOneTime(!!editing?.isOneTime);

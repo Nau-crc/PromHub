@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { IonModal, IonContent } from '@ionic/react';
 import type { Guest, Platform, PromEvent } from '@/core/types';
 import { useAppStore } from '@/store/useAppStore';
@@ -94,8 +94,20 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
     return candidates[0]?.id ?? null;
   }
 
+  // Init-once-per-open guard. `venues` and `events` are dependencies
+  // because we read them to compute defaults, but background polling
+  // refreshes those references every ~20s. Without this guard the
+  // effect would re-fire mid-typing and wipe everything the user has
+  // entered. We track an "init key" identifying the entity we opened
+  // for; the effect only re-runs when that key changes. Reset on close.
+  const initKey = useRef<string | null>(null);
   useEffect(() => {
-    if (!open) return;
+    if (!open) { initKey.current = null; return; }
+    const key = editing?.id != null
+      ? `edit-${editing.id}`
+      : `new-${seedEventId ?? 'none'}`;
+    if (initKey.current === key) return;
+    initKey.current = key;
     setName(editing?.name ?? '');
 
     // Seed venue from: existing guest → seeded event's venue → first.
