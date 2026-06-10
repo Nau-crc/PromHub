@@ -35,6 +35,7 @@ export interface ExportTranslations {
   hGuestsPax: string;
   hReservations: string;
   hGross: string;
+  hFixedFees: string;
   hPaidToInviters: string;
   hNet: string;
   hInfluencers: string;
@@ -109,21 +110,27 @@ export async function buildExportBlob(
     { header: tr.hGuestsPax, key: 'guests', width: 14 },
     { header: tr.hReservations, key: 'reservations', width: 14 },
     { header: tr.hGross, key: 'gross', width: 16, style: { numFmt: MONEY_FORMAT } },
+    { header: tr.hFixedFees, key: 'fixedFees', width: 16, style: { numFmt: MONEY_FORMAT } },
     { header: tr.hPaidToInviters, key: 'paid', width: 16, style: { numFmt: MONEY_FORMAT } },
     { header: tr.hNet, key: 'net', width: 16, style: { numFmt: MONEY_FORMAT } },
     { header: tr.hInfluencers, key: 'influencers', width: 12 },
   ];
   styleHeaderRow(sum);
 
-  let tGuests = 0, tRes = 0, tGross = 0, tPaid = 0, tNet = 0, tInf = 0;
+  let tGuests = 0, tRes = 0, tGross = 0, tFees = 0, tPaid = 0, tNet = 0, tInf = 0;
   records.forEach((rec, i) => {
     const eventNames = rec.eventsSnapshot.map((e) => e.name).join(' · ') || '—';
+    // Older NightRecords (closed before fee logic existed) won't
+    // have `fixedFeesEarned` — default to 0 so the column shows
+    // €0.00 instead of blank.
+    const fees = rec.summary.fixedFeesEarned ?? 0;
     sum.addRow({
       date: rec.date,
       events: eventNames,
       guests: rec.summary.totalGuests,
       reservations: rec.summary.totalReservations,
       gross: rec.summary.grossCommission,
+      fixedFees: fees,
       paid: rec.summary.paidToInviters,
       net: rec.summary.netCommission,
       influencers: rec.summary.influencerCount,
@@ -131,6 +138,7 @@ export async function buildExportBlob(
     tGuests += rec.summary.totalGuests;
     tRes += rec.summary.totalReservations;
     tGross += rec.summary.grossCommission;
+    tFees += fees;
     tPaid += rec.summary.paidToInviters;
     tNet += rec.summary.netCommission;
     tInf += rec.summary.influencerCount;
@@ -144,6 +152,7 @@ export async function buildExportBlob(
     guests: tGuests,
     reservations: tRes,
     gross: round2(tGross),
+    fixedFees: round2(tFees),
     paid: round2(tPaid),
     net: round2(tNet),
     influencers: tInf,

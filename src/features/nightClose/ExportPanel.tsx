@@ -172,6 +172,7 @@ function makeExportTranslations(t: (k: string, opts?: any) => string): ExportTra
     hGuestsPax: t('export.h.guestsPax'),
     hReservations: t('export.h.reservations'),
     hGross: t('export.h.gross'),
+    hFixedFees: t('export.h.fixedFees'),
     hPaidToInviters: t('export.h.paidToInviters'),
     hNet: t('export.h.net'),
     hInfluencers: t('export.h.influencers'),

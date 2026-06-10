@@ -52,6 +52,12 @@ export interface PromEvent {
   eventDate: string | null;
   /** Maximum guests per occurrence. 0 / null = no cap. */
   capacity: number | null;
+  /** Minimum guest pax to bring on a single occurrence in order to
+   *  earn the fixed fee. null = no fee logic on this event. */
+  minGuestsThreshold: number | null;
+  /** Fixed € fee awarded on any occurrence that meets the threshold.
+   *  null = no fee logic on this event. */
+  fixedFee: number | null;
   /** Season start (ISO yyyy-mm-dd). Recurring only. null = open-ended past. */
   seasonStart: string | null;
   /** Season end (ISO yyyy-mm-dd). Recurring only. null = open-ended future. */
@@ -144,11 +150,27 @@ export interface NightRecordSummary {
   totalReservations: number;
   grossCommission: number;
   paidToInviters: number;
+  /** Sum of fixed fees earned across every event tonight whose
+   *  guest pax met its `minGuestsThreshold`. Added to gross when
+   *  computing `netCommission`. */
+  fixedFeesEarned: number;
+  /** netCommission = grossCommission + fixedFeesEarned - paidToInviters */
   netCommission: number;
   influencerCount: number;
   byInviteType: Record<string, number>;
   byVenue: Record<string, { guests: number; tables: number }>;
   byVipType: Record<string, { sold: number; capacity: number; revenue: number }>;
+  /** Per-event fixed-fee detail. One entry per event that has fee
+   *  logic configured, even if not earned this night (so the report
+   *  can show "0 / 10 pax, fee €150 pending"). */
+  fixedFeesByEvent: Array<{
+    eventId: number;
+    eventName: string;
+    pax: number;
+    threshold: number;
+    amount: number;
+    earned: boolean;
+  }>;
 }
 
 export interface NightRecord {

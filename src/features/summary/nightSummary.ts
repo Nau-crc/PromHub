@@ -1,7 +1,7 @@
 import type {
   Guest, Reservation, PromEvent, Venue, NightRecordSummary,
 } from '@/core/types';
-import { commCalc, venueName } from './calculations';
+import { commCalc, venueName, fixedFeeStatus } from './calculations';
 
 // ─────────────────────────────────────────────────────────────
 //  Pre-compute the summary that gets frozen into a NightRecord.
@@ -20,6 +20,10 @@ export function buildNightSummary(
   guests: Guest[],
   reservations: Reservation[],
   venues: Venue[],
+  // Optional event context for fixed-fee evaluation. When omitted,
+  // the snapshot still works but the fee block is empty.
+  events: PromEvent[] = [],
+  isoDate?: string,
 ): NightRecordSummary {
   // ── Aggregate totals ─────────────────────────────────────
   // Per-attendance cancellation: a guest still counts toward the
@@ -46,7 +50,31 @@ export function buildNightSummary(
   // Round to 2 decimals so the snapshot doesn't carry float dust.
   grossCommission = round2(grossCommission);
   paidToInviters = round2(paidToInviters);
-  const netCommission = round2(grossCommission - paidToInviters);
+
+  // ── Fixed fees ────────────────────────────────────────────
+  // Walk every event with fee logic configured; an entry lands in
+  // the snapshot whether earned or not (auditable: "we logged 7
+  // pax, threshold was 10, so €0 — not a bug").
+  const fixedFeesByEvent: NightRecordSummary['fixedFeesByEvent'] = [];
+  let fixedFeesEarned = 0;
+  if (isoDate) {
+    for (const ev of events) {
+      if (ev.minGuestsThreshold == null || ev.fixedFee == null || ev.fixedFee <= 0) continue;
+      const st = fixedFeeStatus(ev, guests, isoDate);
+      fixedFeesByEvent.push({
+        eventId: ev.id,
+        eventName: ev.name,
+        pax: st.pax,
+        threshold: ev.minGuestsThreshold,
+        amount: st.amount,
+        earned: st.earned,
+      });
+      fixedFeesEarned += st.amount;
+    }
+  }
+  fixedFeesEarned = round2(fixedFeesEarned);
+
+  const netCommission = round2(grossCommission + fixedFeesEarned - paidToInviters);
 
   const influencerCount = guests
     .filter((g) => g.influencer && isAttendingTonight(g)).length;
@@ -95,6 +123,8 @@ export function buildNightSummary(
     totalReservations,
     grossCommission,
     paidToInviters,
+    fixedFeesEarned,
+    fixedFeesByEvent,
     netCommission,
     influencerCount,
     byInviteType,

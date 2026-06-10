@@ -96,6 +96,10 @@ function normalizeEvent(row: any): PromEvent {
     isOneTime: !!row.isOneTime,
     eventDate: row.eventDate,
     capacity: row.capacity,
+    // numeric column → Drizzle returns string; coerce to number here
+    // so the client always works in numeric space.
+    minGuestsThreshold: row.minGuestsThreshold ?? null,
+    fixedFee: row.fixedFee != null ? Number(row.fixedFee) : null,
     seasonStart: row.seasonStart,
     seasonEnd: row.seasonEnd,
     shareToken: row.shareToken,
@@ -328,6 +332,8 @@ function buildSyncPayload(snap: AppDataSnapshot) {
       isOneTime: e.isOneTime,
       eventDate: e.eventDate,
       capacity: e.capacity,
+      minGuestsThreshold: e.minGuestsThreshold,
+      fixedFee: e.fixedFee,
       seasonStart: e.seasonStart,
       seasonEnd: e.seasonEnd,
       shareToken: e.shareToken,

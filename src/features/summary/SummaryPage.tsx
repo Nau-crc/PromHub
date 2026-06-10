@@ -52,8 +52,9 @@ export const SummaryPage: React.FC = () => {
 // ── Today panel ─────────────────────────────────────────────
 const TodayPanel: React.FC<{ onJumpInfluencers: () => void }> = ({ onJumpInfluencers }) => {
   const { t } = useTranslation();
-  const { guests, reservations, venues } = useAppStore((s) => ({
+  const { guests, reservations, venues, events } = useAppStore((s) => ({
     guests: s.guests, reservations: s.reservations, venues: s.venues,
+    events: s.events,
   }));
   const open = useUIStore((s) => s.open);
   const todayKey = isoDay(today());
@@ -63,8 +64,9 @@ const TodayPanel: React.FC<{ onJumpInfluencers: () => void }> = ({ onJumpInfluen
   if (!todayGuests.length && !todayRes.length) {
     return <><div className="spacer" /><EmptyBox>{t('summary.noGuestsYet')}</EmptyBox><div className="spacer" /></>;
   }
-  // Use the day-scoped data instead of the all-time snapshot
-  const summary = summarizeToday(todayGuests, todayRes, venues);
+  // Use the day-scoped data instead of the all-time snapshot.
+  // Pass events + date so fixed-fee logic runs.
+  const summary = summarizeToday(todayGuests, todayRes, venues, events, todayKey);
   const vipCap = summarizeVipCapacity(venues, reservations);
 
   return (
@@ -166,9 +168,53 @@ const TodayPanel: React.FC<{ onJumpInfluencers: () => void }> = ({ onJumpInfluen
           <div style={{ padding: 14, fontSize: 13, color: 'var(--color-text-secondary)' }}>{t('reservations.noReservations')}</div>
         )}
         {todayRes.length > 0 && (
-          <TotalsBlock totP={summary.totP} totW={summary.totW} net={summary.net} />
+          <TotalsBlock
+            totP={summary.totP}
+            totW={summary.totW}
+            totFixedFees={summary.totFixedFees}
+            net={summary.net}
+          />
         )}
       </div>
+
+      {/* ── Fixed-fee block ────────────────────────────────────
+          Per-event fee status today. Only shown if any event in
+          play has a fee configured — keeps the panel clean for
+          users not using this feature. */}
+      {summary.fixedFeesByEvent.length > 0 && (
+        <div className="summary-block">
+          <div className="summary-head">{t('summary.fixedFees')}</div>
+          {summary.fixedFeesByEvent.map((row) => (
+            <div key={row.eventId} style={{
+              padding: '10px 14px',
+              borderBottom: '0.5px solid var(--color-border-tertiary)',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              gap: 10,
+            }}>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>
+                  {row.eventName}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>
+                  {t('summary.feeProgress', {
+                    pax: row.pax,
+                    threshold: row.threshold,
+                  })}
+                </div>
+              </div>
+              <div style={{
+                fontSize: 13, fontWeight: 600,
+                color: row.earned ? '#3B6D11' : 'var(--color-text-secondary)',
+                textAlign: 'right',
+              }}>
+                {row.earned
+                  ? `+€${row.amount.toFixed(2)}`
+                  : t('summary.feePending', { amount: '€' + (row.amount > 0 ? row.amount.toFixed(2) : '—') })}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Export sits on the Today panel so it's always visible
           regardless of which sub-tab is active. */}
@@ -347,7 +393,16 @@ const formatLongDay = (iso: string) =>
   });
 
 // ── Reusable totals block ──────────────────────────────────
-const TotalsBlock: React.FC<{ totP: number; totW: number; net: number }> = ({ totP, totW, net }) => {
+interface TotalsBlockProps {
+  totP: number;
+  totW: number;
+  net: number;
+  /** Sum of fixed fees earned across all events for the period.
+   *  Optional — older call sites (monthly / day digest) compute
+   *  without fees today. Defaults to 0. */
+  totFixedFees?: number;
+}
+const TotalsBlock: React.FC<TotalsBlockProps> = ({ totP, totW, net, totFixedFees = 0 }) => {
   const { t } = useTranslation();
   return (
     <div style={{
@@ -358,6 +413,12 @@ const TotalsBlock: React.FC<{ totP: number; totW: number; net: number }> = ({ to
         <span style={{ color: 'var(--color-text-secondary)' }}>{t('summary.totalEarnings')}</span>
         <span style={{ color: '#3B6D11', fontWeight: 500 }}>€{totP}</span>
       </div>
+      {totFixedFees > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+          <span style={{ color: 'var(--color-text-secondary)' }}>{t('summary.fixedFees')}</span>
+          <span style={{ color: '#3B6D11', fontWeight: 500 }}>€{totFixedFees}</span>
+        </div>
+      )}
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
         <span style={{ color: 'var(--color-text-secondary)' }}>{t('summary.toPayViaInvitation')}</span>
         <span style={{ color: '#F97316', fontWeight: 500 }}>€{totW}</span>

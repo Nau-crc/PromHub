@@ -288,6 +288,10 @@ const EventStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
       isOneTime,
       eventDate: isOneTime ? eventDate : null,
       capacity: capacity && capacity > 0 ? capacity : null,
+      // Fixed-fee config isn't part of the onboarding form — leave
+      // it null and the promoter can edit the event later to set it.
+      minGuestsThreshold: null,
+      fixedFee: null,
       seasonStart: !isOneTime && seasonStart ? seasonStart : null,
       seasonEnd: !isOneTime && seasonEnd ? seasonEnd : null,
       shareToken: null,

@@ -54,6 +54,12 @@ export const EventFormModal: React.FC<Props> = ({ open, onClose, editing, onRequ
   const [isPriv, setPriv] = useState(false);
   const [isLate, setLate] = useState(false);
   const [capacity, setCapacity] = useState<number | null>(null);
+  /** Minimum pax required on a single occurrence to earn the fixed
+   *  fee. Stays null when the event has no fee logic. */
+  const [minGuestsThreshold, setMinGuestsThreshold] = useState<number | null>(null);
+  /** Fixed € amount earned when threshold is met. Stays null when
+   *  the event has no fee logic. */
+  const [fixedFee, setFixedFee] = useState<number | null>(null);
   const [seasonStart, setSeasonStart] = useState<string>('');
   const [seasonEnd, setSeasonEnd] = useState<string>('');
 
@@ -85,6 +91,8 @@ export const EventFormModal: React.FC<Props> = ({ open, onClose, editing, onRequ
     setPriv(!!editing?.isPrivate);
     setLate(!!editing?.isLateClub);
     setCapacity(editing?.capacity ?? null);
+    setMinGuestsThreshold(editing?.minGuestsThreshold ?? null);
+    setFixedFee(editing?.fixedFee ?? null);
     setSeasonStart(editing?.seasonStart ?? '');
     setSeasonEnd(editing?.seasonEnd ?? '');
   }, [open, editing, venues]);
@@ -125,6 +133,15 @@ export const EventFormModal: React.FC<Props> = ({ open, onClose, editing, onRequ
       }
     }
 
+    // Fixed-fee pair check: must both be set or both empty. A lone
+    // threshold or lone fee would be ambiguous server-side.
+    const hasThreshold = !!minGuestsThreshold && minGuestsThreshold > 0;
+    const hasFee = fixedFee != null && fixedFee > 0;
+    if (hasThreshold !== hasFee) {
+      alert(t('eventForm.errFixedFeePair'));
+      return;
+    }
+
     // Timeslots only required when a venue is set (otherwise the event has none)
     if (venueId != null && !slotIds.length) {
       alert(t('eventForm.errSelectSlot'));
@@ -150,6 +167,10 @@ export const EventFormModal: React.FC<Props> = ({ open, onClose, editing, onRequ
       isOneTime,
       eventDate: isOneTime ? eventDate : null,
       capacity: capacity && capacity > 0 ? capacity : null,
+      // Persist both fee fields together — UI guarantees the pair
+      // is consistent before we get here.
+      minGuestsThreshold: hasThreshold ? minGuestsThreshold : null,
+      fixedFee: hasFee ? fixedFee : null,
       seasonStart: !isOneTime && seasonStart ? seasonStart : null,
       seasonEnd: !isOneTime && seasonEnd ? seasonEnd : null,
       shareToken,
@@ -256,6 +277,59 @@ export const EventFormModal: React.FC<Props> = ({ open, onClose, editing, onRequ
               value={capacity}
               onChange={setCapacity}
             />
+          </div>
+
+          {/* ── Fixed-fee block ────────────────────────────────
+              The promoter optionally sets "bring at least N people
+              → earn €M". Both fields are paired: leaving one blank
+              hides the fee logic entirely for this event. */}
+          <div className="form-group">
+            <label className="form-label">{t('eventForm.fixedFeeSection')}</label>
+            <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 8, lineHeight: 1.5 }}>
+              {t('eventForm.fixedFeeHint')}
+            </div>
+            <div className="form-row">
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 4 }}>
+                  {t('eventForm.minGuestsLabel')}
+                </div>
+                <NumberField
+                  className="form-input"
+                  placeholder={t('eventForm.minGuestsPlaceholder')}
+                  min={1}
+                  value={minGuestsThreshold}
+                  onChange={setMinGuestsThreshold}
+                />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 4 }}>
+                  {t('eventForm.fixedFeeLabel')}
+                </div>
+                <NumberField
+                  className="form-input"
+                  placeholder={t('eventForm.fixedFeePlaceholder')}
+                  min={0}
+                  decimal
+                  value={fixedFee}
+                  onChange={setFixedFee}
+                />
+              </div>
+            </div>
+            {(minGuestsThreshold || fixedFee) && (
+              <div style={{
+                fontSize: 11, marginTop: 6,
+                color: minGuestsThreshold && fixedFee
+                  ? 'var(--color-text-secondary)'
+                  : 'var(--color-danger)',
+              }}>
+                {minGuestsThreshold && fixedFee
+                  ? t('eventForm.fixedFeePreview', {
+                      threshold: minGuestsThreshold,
+                      amount: Number(fixedFee).toFixed(2),
+                    })
+                  : t('eventForm.errFixedFeePair')}
+              </div>
+            )}
           </div>
 
           <div className="form-group">

@@ -181,6 +181,12 @@ export const CloseNightPanel: React.FC<Props> = ({ isoDate }) => {
                   revenue: sumTableTotals(preview.reservations).toFixed(2),
                 })}
               />
+              {preview.summary.fixedFeesEarned > 0 && (
+                <SummaryRow
+                  label={t('summary.fixedFees')}
+                  value={`€${preview.summary.fixedFeesEarned.toFixed(2)}`}
+                />
+              )}
               <SummaryRow
                 label={t('nightClose.previewNet')}
                 value={`€${preview.summary.netCommission.toFixed(2)}`}

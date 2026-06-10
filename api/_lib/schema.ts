@@ -74,6 +74,15 @@ export const events = pgTable('events', {
   /** ISO date; one-time events only. */
   eventDate: date('event_date'),
   capacity: integer('capacity'),
+  /** Minimum guest pax the promoter must bring on a single
+   *  occurrence to earn the fixed fee. NULL = no threshold (no
+   *  fee logic at all for this event). Per-occurrence: the count
+   *  resets each night. */
+  minGuestsThreshold: integer('min_guests_threshold'),
+  /** Fixed fee (€) the promoter earns on any occurrence that meets
+   *  `minGuestsThreshold`. NULL = no fee. Stored to 2 decimals so
+   *  the snapshot maths stays byte-exact with the commission column. */
+  fixedFee: numeric('fixed_fee', { precision: 8, scale: 2 }),
   seasonStart: date('season_start'),
   seasonEnd: date('season_end'),
   /** Public-form share token (UUID v4). Nullable for legacy rows. */

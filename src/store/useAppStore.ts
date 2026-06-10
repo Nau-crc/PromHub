@@ -455,7 +455,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     const nightGuests = guestsForNight(guests, events, isoDate);
     const nightReservations = reservationsForNight(reservations, isoDate);
     const nightEvents = eventsForNight(events, isoDate);
-    const summary = buildNightSummary(nightGuests, nightReservations, venues);
+    // Pass nightEvents + isoDate so fixed-fee evaluation runs.
+    const summary = buildNightSummary(
+      nightGuests, nightReservations, venues, nightEvents, isoDate,
+    );
     return {
       summary,
       guests: nightGuests,
@@ -469,7 +472,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     const nightGuests = guestsForNight(guests, events, isoDate);
     const nightReservations = reservationsForNight(reservations, isoDate);
     const nightEvents = eventsForNight(events, isoDate);
-    const summary = buildNightSummary(nightGuests, nightReservations, venues);
+    const summary = buildNightSummary(
+      nightGuests, nightReservations, venues, nightEvents, isoDate,
+    );
     // Server auto-flags as correction when another record for the
     // date exists, so we don't have to pre-check here. The local
     // detection is just for the confirmation copy in the UI.

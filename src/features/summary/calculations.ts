@@ -164,6 +164,68 @@ export const isGuestAttendingEvent = (
   eventId: number,
 ): boolean => isGuestOnEvent(g, eventId) && !isCancelledFor(g, eventId);
 
+// ── Fixed-fee logic ────────────────────────────────────────
+//
+// Each event optionally declares a `minGuestsThreshold` and a
+// `fixedFee`. On any occurrence where the promoter's confirmed
+// pax for the event ≥ threshold, she earns the fee for THAT night.
+//
+// Both fields are nullable independently of each other, but the
+// fee only kicks in when BOTH are set — the helper handles that.
+
+/** Pax (attending, not cancelled) confirmed for `event` on `isoDate`. */
+export function paxForEventOnDate(
+  event: PromEvent,
+  guests: Guest[],
+  isoDate: string,
+): number {
+  return guests
+    .filter((g) => isGuestAttendingEvent(g, event.id)
+      && (!g.eventDate || g.eventDate === isoDate))
+    .reduce((a, g) => a + g.pax, 0);
+}
+
+export interface FixedFeeStatus {
+  /** € value the event would pay this occurrence — 0 if not earned
+   *  or no fee logic configured. */
+  amount: number;
+  /** Threshold the event sets, or null if no fee logic. */
+  threshold: number | null;
+  /** Pax confirmed for this occurrence. */
+  pax: number;
+  /** True when fee logic is configured AND pax >= threshold. */
+  earned: boolean;
+}
+
+/** Compute the fixed-fee outcome for an event on a specific date. */
+export function fixedFeeStatus(
+  event: PromEvent,
+  guests: Guest[],
+  isoDate: string,
+): FixedFeeStatus {
+  const threshold = event.minGuestsThreshold;
+  const fee = event.fixedFee;
+  const pax = paxForEventOnDate(event, guests, isoDate);
+  if (threshold == null || fee == null || fee <= 0) {
+    return { amount: 0, threshold, pax, earned: false };
+  }
+  const earned = pax >= threshold;
+  return { amount: earned ? round2(fee) : 0, threshold, pax, earned };
+}
+
+/** Total fixed fees the promoter earned on a date across all events. */
+export function totalFixedFeesForDate(
+  events: PromEvent[],
+  guests: Guest[],
+  isoDate: string,
+): number {
+  let sum = 0;
+  for (const e of events) {
+    sum += fixedFeeStatus(e, guests, isoDate).amount;
+  }
+  return round2(sum);
+}
+
 // ── Occurrence helpers ─────────────────────────────────────
 //
 // An event "occurs on" a given ISO date when:
@@ -364,17 +426,31 @@ export function eventCapacity(
 
 // Today: totals across all reservations
 export interface TodayTotals {
-  totP: number;        // total promoter earnings (€)
+  totP: number;        // total promoter commissions from reservations (€)
   totW: number;        // total to inviters (€)
-  net: number;         // net to you (€)
+  totFixedFees: number; // sum of fixed fees earned across events tonight (€)
+  net: number;         // totP + totFixedFees - totW (€)
   influencerCount: number;
   guestsByTimeslot: Record<string, number>; // timeslot name → pax count
+  /** Per-event fixed fee detail: event id → {name, earned, amount}. */
+  fixedFeesByEvent: Array<{
+    eventId: number;
+    eventName: string;
+    pax: number;
+    threshold: number;
+    amount: number;
+    earned: boolean;
+  }>;
 }
 
 export function summarizeToday(
   guests: Guest[],
   reservations: Reservation[],
   venues: Venue[],
+  // New optional inputs so the fixed-fee logic can run. Optional
+  // so legacy callers that only need commission totals still work.
+  events: PromEvent[] = [],
+  isoDate?: string,
 ): TodayTotals {
   let totP = 0;
   let totW = 0;
@@ -383,22 +459,45 @@ export function summarizeToday(
     totP += promoter;
     totW += woman;
   }
-  // Replaces the legacy `guestsByInviteType` aggregation — we now
-  // bucket each guest's pax by whichever event timeslots she's
-  // attending. Names are denormalised onto the guest row so this
-  // stays a flat list aggregation.
+
+  // Bucket guest pax by timeslot name.
   const byTimeslot: Record<string, number> = {};
   guests.forEach((g) => {
     (g.timeslotNames || []).forEach((t) => {
       byTimeslot[t] = (byTimeslot[t] || 0) + g.pax;
     });
   });
+
+  // ── Fixed fees per event ──────────────────────────────
+  // We need a date to evaluate per-occurrence pax. Without one,
+  // we can still surface the event configs but report 0 earned.
+  const fixedFeesByEvent: TodayTotals['fixedFeesByEvent'] = [];
+  let totFixedFees = 0;
+  if (isoDate) {
+    for (const ev of events) {
+      if (ev.minGuestsThreshold == null || ev.fixedFee == null || ev.fixedFee <= 0) continue;
+      const st = fixedFeeStatus(ev, guests, isoDate);
+      fixedFeesByEvent.push({
+        eventId: ev.id,
+        eventName: ev.name,
+        pax: st.pax,
+        threshold: ev.minGuestsThreshold,
+        amount: st.amount,
+        earned: st.earned,
+      });
+      totFixedFees += st.amount;
+    }
+  }
+  totFixedFees = round2(totFixedFees);
+
   return {
     totP: round2(totP),
     totW: round2(totW),
-    net: round2(totP - totW),
+    totFixedFees,
+    net: round2(totP + totFixedFees - totW),
     influencerCount: guests.filter((g) => g.influencer).length,
     guestsByTimeslot: byTimeslot,
+    fixedFeesByEvent,
   };
 }
 

@@ -43,6 +43,13 @@
       "when": 1779490000000,
       "tag": "0005_per_attendance_status",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1779500000000,
+      "tag": "0006_event_fixed_fee",
+      "breakpoints": true
     }
   ]
 }

@@ -122,8 +122,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       for (const e of snap.events) {
         const { clientId, venueClientId, ...rest } = e;
         const venueId = venueClientId != null ? (venueMap.get(venueClientId) ?? null) : null;
+        const fixedFee = rest.fixedFee != null ? String(rest.fixedFee) : null;
         const [row] = await db.insert(schema.events)
-          .values({ ...rest, venueId, tenantId })
+          .values({ ...rest, fixedFee, venueId, tenantId })
           .returning({ id: schema.events.id });
         eventMap.set(clientId, row.id);
       }
@@ -248,8 +249,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
         if (req.method === 'POST') {
           const input = eventInputSchema.parse(parseBody(req.body));
+          // numeric columns expect string on the way in (Drizzle quirk)
+          const fixedFee = input.fixedFee != null ? String(input.fixedFee) : null;
           const [row] = await db.insert(schema.events)
-            .values({ ...input, tenantId })
+            .values({ ...input, fixedFee, tenantId })
             .returning();
           return res.status(201).json({ event: row });
         }
@@ -264,7 +267,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
       if (req.method === 'PATCH' || req.method === 'PUT') {
         const input = eventInputSchema.partial().parse(parseBody(req.body));
-        const [row] = await db.update(schema.events).set(input).where(where).returning();
+        // Only coerce when the patch actually sets fixedFee; partial
+        // patches may not mention it at all.
+        const patch = 'fixedFee' in input
+          ? { ...input, fixedFee: input.fixedFee != null ? String(input.fixedFee) : null }
+          : input;
+        const [row] = await db.update(schema.events).set(patch).where(where).returning();
         if (!row) throw notFound();
         return res.status(200).json({ event: row });
       }

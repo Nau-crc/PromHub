@@ -59,6 +59,11 @@ export const eventInputSchema = z.object({
   isOneTime: z.boolean().default(false),
   eventDate: isoDate.nullable().optional(),
   capacity: z.number().int().min(0).nullable().optional(),
+  /** Pair: both fields must either be set together OR both null.
+   *  We don't enforce the pair-rule at the schema level (the UI
+   *  blocks save when one is missing), but we accept either form. */
+  minGuestsThreshold: z.number().int().min(1).nullable().optional(),
+  fixedFee: z.number().min(0).nullable().optional(),
   seasonStart: isoDate.nullable().optional(),
   seasonEnd: isoDate.nullable().optional(),
   shareToken: uuid.nullable().optional(),
@@ -102,6 +107,7 @@ export const nightRecordSummarySchema = z.object({
   totalReservations: z.number().int().min(0),
   grossCommission: z.number().min(0),
   paidToInviters: z.number().min(0),
+  fixedFeesEarned: z.number().min(0).default(0),
   netCommission: z.number(),
   influencerCount: z.number().int().min(0),
   byInviteType: z.record(z.string(), z.number()).default({}),
@@ -114,6 +120,14 @@ export const nightRecordSummarySchema = z.object({
     capacity: z.number().int().min(0),
     revenue: z.number().min(0),
   })).default({}),
+  fixedFeesByEvent: z.array(z.object({
+    eventId: z.number().int(),
+    eventName: z.string(),
+    pax: z.number().int().min(0),
+    threshold: z.number().int().min(1),
+    amount: z.number().min(0),
+    earned: z.boolean(),
+  })).default([]),
 });
 
 export const nightRecordInputSchema = z.object({
