@@ -129,3 +129,79 @@ export function sendViaWhatsApp(to: WhatsAppRecipient, message: string): boolean
   }
   return true;
 }
+
+// ─────────────────────────────────────────────────────────────
+//  Guest-list message builder.
+//
+//  Used by the "Send list" button on the event detail to deliver
+//  tonight's confirmed guests to the venue/club on WhatsApp. The
+//  format is plain text with *bold* WhatsApp markup so the venue
+//  staff can paste/share it as-is.
+//
+//  Rules:
+//    - Header: event name + occurrence date + venue
+//    - Body:   one line per ATTENDING guest (cancelled excluded)
+//              numbered, with pax and timeslot tags
+//    - Footer: a totals line ("12 guests · 24 pax")
+//  Strings parameterised so the caller passes already-i18n'd labels.
+// ─────────────────────────────────────────────────────────────
+export interface GuestListLine {
+  /** Display name. */
+  name: string;
+  /** Pax count for this row. */
+  pax: number;
+  /** Timeslot tags ("Comida · Tardeo"). May be empty. */
+  slots?: string;
+  /** Optional handle to append in parens. */
+  handle?: string;
+}
+
+export interface GuestListLabels {
+  /** "Guest list — {{event}}" header (use the {{event}} placeholder). */
+  header: string;
+  /** "Date: …" label. */
+  dateLabel: string;
+  /** "Venue: …" label. */
+  venueLabel: string;
+  /** "Total: {{guests}} guests · {{pax}} pax" template. */
+  totalsLine: string;
+  /** Shown when the attending list is empty. */
+  noGuests: string;
+}
+
+export function buildGuestListMessage(opts: {
+  eventName: string;
+  dateLabel: string;
+  venueName: string | null;
+  guests: GuestListLine[];
+  labels: GuestListLabels;
+}): string {
+  const { eventName, dateLabel, venueName, guests, labels } = opts;
+
+  const totalGuests = guests.length;
+  const totalPax = guests.reduce((a, g) => a + g.pax, 0);
+
+  const header = labels.header.replace('{{event}}', eventName);
+  const lines: string[] = [`*${header}*`, ''];
+  lines.push(`${labels.dateLabel}: ${dateLabel}`);
+  if (venueName) lines.push(`${labels.venueLabel}: ${venueName}`);
+  lines.push('');
+
+  if (!guests.length) {
+    lines.push(labels.noGuests);
+  } else {
+    guests.forEach((g, i) => {
+      const slotPart = g.slots ? ` · ${g.slots}` : '';
+      const handlePart = g.handle ? ` (@${g.handle})` : '';
+      lines.push(`${i + 1}. ${g.name} (${g.pax} pax)${slotPart}${handlePart}`);
+    });
+    lines.push('');
+    lines.push(
+      labels.totalsLine
+        .replace('{{guests}}', String(totalGuests))
+        .replace('{{pax}}', String(totalPax)),
+    );
+  }
+
+  return lines.join('\n');
+}

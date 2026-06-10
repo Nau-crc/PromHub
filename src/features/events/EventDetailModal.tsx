@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { IonModal, IonContent, IonIcon } from '@ionic/react';
-import { shareSocialOutline } from 'ionicons/icons';
+import { shareSocialOutline, logoWhatsapp } from 'ionicons/icons';
 import { useTranslation } from 'react-i18next';
 import { useAppStore } from '@/store/useAppStore';
+import { useConfirm } from '@/store/useConfirmStore';
+import { sendViaWhatsApp, buildGuestListMessage } from '@/services/messaging';
 import {
   eventCapacity, venueById, commCalc, isGuestOnEvent,
   occurs, nextOccurrence, previousOccurrence, eventScheduleLabel,
@@ -29,6 +31,7 @@ interface Props {
 
 export const EventDetailModal: React.FC<Props> = ({ open, onClose, eventId, onEdit, onAddGuest, onAddRes }) => {
   const { t } = useTranslation();
+  const confirm = useConfirm();
   const {
     events, venues, guests, reservations,
     togglePrivateInvite, upsertEvent, importSubmissionsAsGuests,
@@ -133,6 +136,63 @@ export const EventDetailModal: React.FC<Props> = ({ open, onClose, eventId, onEd
     setSelectedDate(next);
   };
   const canStepBack = !e.isOneTime && !!selectedDate && selectedDate > todayKey;
+
+  // ── Send guest list to the venue on WhatsApp ──────────────
+  // Builds a formatted message with the ATTENDING guests for the
+  // selected occurrence and opens WhatsApp pre-filled to the venue
+  // (or club) phone. The promoter still has to tap Send in WhatsApp
+  // — that's both the platform's requirement and a useful "are you
+  // sure?" gate.
+  //
+  // Cancelled attendances are excluded (per-attendance cancellation
+  // is respected). The button is disabled when the venue has no
+  // phone or there's nothing to send.
+  const venueHasPhone = !!(v?.phoneCode && v?.phoneNum);
+  // Attending = on this event AND not cancelled FOR this event.
+  // We reuse the already-computed evG (date-filtered + permissive
+  // for legacy null dates).
+  const attendingGuests = evG.filter((g) => {
+    // Match isCancelledFor logic inline: club if linked by club,
+    // main otherwise.
+    if (g.clubEventId === e.id && g.eventId !== e.id) return !g.cancelledClub;
+    return !g.cancelled;
+  });
+  const canSendList = venueHasPhone && attendingGuests.length > 0;
+
+  const sendGuestList = async () => {
+    if (!canSendList || !v) return;
+    const ok = await confirm({
+      title: t('eventDetail.sendListConfirmTitle'),
+      message: t('eventDetail.sendListConfirmMessage', {
+        venue: v.name,
+        count: attendingGuests.length,
+      }),
+      confirmLabel: t('actions.sendOnWhatsApp'),
+    });
+    if (!ok) return;
+    const message = buildGuestListMessage({
+      eventName: e.name,
+      dateLabel: occurrenceLabel,
+      venueName: v.name,
+      guests: attendingGuests.map((g) => ({
+        name: g.name,
+        pax: g.pax,
+        slots: (g.timeslotNames || []).join(' · '),
+        handle: g.igHandle || undefined,
+      })),
+      labels: {
+        header: t('eventDetail.listMsg.header'),
+        dateLabel: t('eventDetail.listMsg.date'),
+        venueLabel: t('eventDetail.listMsg.venue'),
+        totalsLine: t('eventDetail.listMsg.totals'),
+        noGuests: t('eventDetail.listMsg.noGuests'),
+      },
+    });
+    sendViaWhatsApp(
+      { phoneCode: v.phoneCode ?? '', phoneNum: v.phoneNum ?? '' },
+      message,
+    );
+  };
 
   return (
     <IonModal isOpen={open} onDidDismiss={onClose}>
@@ -341,6 +401,37 @@ export const EventDetailModal: React.FC<Props> = ({ open, onClose, eventId, onEd
               return importSubmissionsAsGuests(e.id, submissions);
             }}
           />
+
+          {/* Send-list-to-WhatsApp CTA. Lives above the add buttons
+              because it's the high-value action right before the
+              event runs — once the list is dispatched the promoter
+              usually closes the modal. */}
+          <button
+            type="button"
+            onClick={sendGuestList}
+            disabled={!canSendList}
+            style={{
+              width: '100%',
+              marginTop: 12, padding: 13,
+              background: canSendList ? '#25D366' : 'var(--color-background-secondary)',
+              color: canSendList ? '#fff' : 'var(--color-text-secondary)',
+              border: 'none', borderRadius: 'var(--border-radius-md)',
+              fontSize: 14, fontWeight: 600,
+              cursor: canSendList ? 'pointer' : 'not-allowed',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            }}
+          >
+            <IonIcon icon={logoWhatsapp} style={{ fontSize: 18 }} />
+            {t('eventDetail.sendListBtn', { count: attendingGuests.length })}
+          </button>
+          {!venueHasPhone && (
+            <div style={{
+              fontSize: 11, color: 'var(--color-text-secondary)',
+              marginTop: 6, textAlign: 'center',
+            }}>
+              {t('eventDetail.sendListNoPhone')}
+            </div>
+          )}
 
           <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
             <button className="btn-secondary" style={{ flex: 1 }} onClick={() => onAddGuest(e.id)}>{t('eventDetail.addGuest')}</button>
