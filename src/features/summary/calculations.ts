@@ -157,12 +157,55 @@ export const isCheckedFor = (
   return false;
 };
 
-/** Is this guest ATTENDING the event — i.e. linked to it AND not
- *  cancelled for THAT specific attendance? */
+/** Is this guest ATTENDING the event — i.e. linked to it, NOT
+ *  cancelled for that attendance, AND NOT waitlisted? Waitlisted
+ *  guests are pending acceptance — they don't count toward used
+ *  capacity nor appear in the confirmed list. */
 export const isGuestAttendingEvent = (
-  g: Pick<Guest, 'eventId' | 'clubEventId' | 'cancelled' | 'cancelledClub'>,
+  g: Pick<Guest, 'eventId' | 'clubEventId' | 'cancelled' | 'cancelledClub' | 'waitlisted'>,
   eventId: number,
-): boolean => isGuestOnEvent(g, eventId) && !isCancelledFor(g, eventId);
+): boolean =>
+  isGuestOnEvent(g, eventId)
+  && !isCancelledFor(g, eventId)
+  && !g.waitlisted;
+
+// ── Waitlist helpers ───────────────────────────────────────
+//
+// Position in the queue is computed at READ time from the guest
+// list, ordered by createdAt. That way promoting from the middle
+// (toggling `waitlisted = false`) doesn't require re-numbering
+// anything — positions just shift down by themselves.
+
+/** All waitlisted guests for this event, ordered by createdAt. */
+export function waitlistFor(
+  guests: Guest[],
+  eventId: number,
+  isoDate?: string,
+): Guest[] {
+  return guests
+    .filter((g) =>
+      g.waitlisted
+      && isGuestOnEvent(g, eventId)
+      && !isCancelledFor(g, eventId)
+      && (!isoDate || !g.eventDate || g.eventDate === isoDate))
+    .slice()
+    .sort((a, b) => (a.createdAt < b.createdAt ? -1
+      : a.createdAt > b.createdAt ? 1
+      : a.id - b.id));
+}
+
+/** The 1-based queue position of a guest in the waitlist, or null
+ *  if she's not waitlisted (or not on this event). */
+export function waitlistPosition(
+  guests: Guest[],
+  guestId: number,
+  eventId: number,
+  isoDate?: string,
+): number | null {
+  const list = waitlistFor(guests, eventId, isoDate);
+  const idx = list.findIndex((g) => g.id === guestId);
+  return idx < 0 ? null : idx + 1;
+}
 
 // ── Fixed-fee logic ────────────────────────────────────────
 //
@@ -406,10 +449,12 @@ export function eventCapacity(
   // Cancellation is per-attendance: a guest cancelled-main-only
   // still counts toward her club event's capacity. `isCancelledFor`
   // reads the correct flag based on which attendance ties her to
-  // `eventId`.
+  // `eventId`. Waitlisted guests don't count — they're pending
+  // promotion and only become "used" once promoted.
   const used = guests
     .filter((g) => isGuestOnEvent(g, eventId)
       && !isCancelledFor(g, eventId)
+      && !g.waitlisted
       && (isoDate == null || g.eventDate === isoDate))
     .reduce((a, g) => a + g.pax, 0);
   const capacity = e?.capacity ?? 0;

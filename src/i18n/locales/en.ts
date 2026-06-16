@@ -185,6 +185,10 @@ const en = {
     registrationLink: 'Registration link',
     addGuest: '+ Guest',
     addRes: '+ Reservation',
+    fullBanner: 'Capacity reached. New sign-ups will go to the waitlist ({{waitlist}} waiting).',
+    waitlist: 'Waitlist',
+    promote: 'Promote',
+    waitlistTooBig: 'pax > {{left}} free',
     sendListBtn: 'Send list to the club ({{count}})',
     sendListNoPhone: 'Add a phone to the venue to send the list on WhatsApp.',
     sendListConfirmTitle: 'Send the guest list?',
@@ -468,6 +472,9 @@ const en = {
     for: 'for',
     remember: 'Remember:',
     seeYou: 'The promoter will see your details on their side. See you there.',
+    waitlistedTitle: 'You\'re on the waitlist',
+    queuePositionLabel: 'Queue position',
+    waitlistExplain: 'No spots left right now. The promoter will contact you if someone cancels and a spot opens up.',
   },
 
   // ── Night close (Cerrar noche) ───────────────────────────

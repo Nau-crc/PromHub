@@ -43,6 +43,12 @@ export const PublicRegistrationPage: React.FC = () => {
 
   const [phase, setPhase] = useState<Phase>('loading');
   const [meta, setMeta] = useState<PublicEventMeta | null>(null);
+  /** Outcome of the last submit — drives the "done" screen copy.
+   *  Either confirmed (waitlisted=false) or queued with a position. */
+  const [outcome, setOutcome] = useState<{
+    waitlisted: boolean;
+    queuePosition: number | null;
+  } | null>(null);
 
   // Form fields
   const [name, setName] = useState('');
@@ -65,7 +71,7 @@ export const PublicRegistrationPage: React.FC = () => {
     if (!token) return;
     setPhase('submitting');
     try {
-      await submitRegistration({
+      const resp = await submitRegistration({
         token,
         // Send whatever date the server resolved (so one-time
         // events still get their own date even if the URL had no
@@ -76,6 +82,10 @@ export const PublicRegistrationPage: React.FC = () => {
         igHandle: igHandle.trim().replace(/^@+/, ''),
         igPlatform: platform,
         notes: '', // notes removed from the public form
+      });
+      setOutcome({
+        waitlisted: resp.waitlisted,
+        queuePosition: resp.queuePosition,
       });
       setPhase('done');
     } catch (err) {
@@ -222,47 +232,78 @@ export const PublicRegistrationPage: React.FC = () => {
             </>
           )}
 
-          {phase === 'done' && (
-            <>
-              <div style={{
-                margin: '32px auto 16px', width: 70, height: 70, background: '#EAF3DE',
-                borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 32,
-              }}>✓</div>
-              <div style={{ fontSize: 22, fontWeight: 600, textAlign: 'center', marginBottom: 8 }}>
-                {t('publicForm.submitted')}
-              </div>
-              {eventDateLabel && (
-                <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', textAlign: 'center', marginBottom: 14 }}>
-                  {t('publicForm.for')} <strong style={{ color: 'var(--color-text-primary)' }}>{eventDateLabel}</strong>
-                </div>
-              )}
-              {/* Echo the event description back so the guest leaves
-                  the form with the promoter's own message in front of
-                  them ("dress code", "bring ID", whatever). Falls back
-                  to a neutral note if no description was set. */}
-              {meta?.description?.trim() ? (
+          {phase === 'done' && (() => {
+            const isWaitlist = !!outcome?.waitlisted;
+            return (
+              <>
+                {/* Icon: green ✓ for confirmed, amber ⏳ for waitlist */}
                 <div style={{
-                  background: 'var(--color-background-secondary)',
-                  border: '0.5px solid var(--color-border-tertiary)',
-                  borderRadius: 'var(--border-radius-md)',
-                  padding: '12px 14px',
-                  fontSize: 13, lineHeight: 1.5,
-                  color: 'var(--color-text-primary)',
-                  whiteSpace: 'pre-wrap',
-                }}>
-                  <strong style={{ color: 'var(--color-text-secondary)', fontWeight: 600 }}>
-                    {t('publicForm.remember')}
-                  </strong>{' '}
-                  {meta.description.trim()}
+                  margin: '32px auto 16px', width: 70, height: 70,
+                  background: isWaitlist ? '#FFF4D6' : '#EAF3DE',
+                  borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 32,
+                }}>{isWaitlist ? '⏳' : '✓'}</div>
+
+                <div style={{ fontSize: 22, fontWeight: 600, textAlign: 'center', marginBottom: 8 }}>
+                  {isWaitlist
+                    ? t('publicForm.waitlistedTitle')
+                    : t('publicForm.submitted')}
                 </div>
-              ) : (
-                <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', textAlign: 'center', lineHeight: 1.5 }}>
-                  {t('publicForm.seeYou')}
-                </div>
-              )}
-            </>
-          )}
+
+                {eventDateLabel && (
+                  <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', textAlign: 'center', marginBottom: 14 }}>
+                    {t('publicForm.for')} <strong style={{ color: 'var(--color-text-primary)' }}>{eventDateLabel}</strong>
+                  </div>
+                )}
+
+                {/* Waitlist-specific block: position + explanation */}
+                {isWaitlist && (
+                  <div style={{
+                    background: '#FFF4D6',
+                    border: '1px solid #E5A100',
+                    borderRadius: 'var(--border-radius-md)',
+                    padding: '14px 16px',
+                    marginBottom: 14,
+                    textAlign: 'center',
+                  }}>
+                    <div style={{ fontSize: 12, color: '#8A5A00', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 4 }}>
+                      {t('publicForm.queuePositionLabel')}
+                    </div>
+                    <div style={{ fontSize: 28, fontWeight: 700, color: '#8A5A00' }}>
+                      #{outcome?.queuePosition ?? '—'}
+                    </div>
+                    <div style={{ fontSize: 13, color: '#8A5A00', marginTop: 8, lineHeight: 1.5 }}>
+                      {t('publicForm.waitlistExplain')}
+                    </div>
+                  </div>
+                )}
+
+                {/* Event description always shown after both branches.
+                    Falls back to a neutral note when there's no
+                    description. */}
+                {meta?.description?.trim() ? (
+                  <div style={{
+                    background: 'var(--color-background-secondary)',
+                    border: '0.5px solid var(--color-border-tertiary)',
+                    borderRadius: 'var(--border-radius-md)',
+                    padding: '12px 14px',
+                    fontSize: 13, lineHeight: 1.5,
+                    color: 'var(--color-text-primary)',
+                    whiteSpace: 'pre-wrap',
+                  }}>
+                    <strong style={{ color: 'var(--color-text-secondary)', fontWeight: 600 }}>
+                      {t('publicForm.remember')}
+                    </strong>{' '}
+                    {meta.description.trim()}
+                  </div>
+                ) : !isWaitlist ? (
+                  <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', textAlign: 'center', lineHeight: 1.5 }}>
+                    {t('publicForm.seeYou')}
+                  </div>
+                ) : null}
+              </>
+            );
+          })()}
         </div>
       </IonContent>
     </IonPage>

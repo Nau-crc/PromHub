@@ -68,10 +68,25 @@ export const fetchEvent = (token: string, date?: string | null): Promise<PublicE
   return jsonFetch(`/api/event?${q.toString()}`);
 };
 
+export interface SubmitResponse {
+  ok: true;
+  id: string;
+  /** True when the event was full at the time of submission and she
+   *  landed on the waitlist instead. */
+  waitlisted: boolean;
+  /** 1-based position in the waitlist when `waitlisted = true`. */
+  queuePosition: number | null;
+  /** Event capacity at the time of submission; null if unlimited. */
+  capacity: number | null;
+  /** How many spots were free RIGHT BEFORE this submission. 0 means
+   *  full when she submitted; null = no capacity configured. */
+  spotsLeftBefore: number | null;
+}
+
 /** Public side: submit a registration. */
 export const submitRegistration = (
   payload: Omit<SubmissionDTO, 'id' | 'submittedAt'>,
-): Promise<{ ok: true; id: string }> =>
+): Promise<SubmitResponse> =>
   jsonFetch('/api/registration', { method: 'POST', body: JSON.stringify(payload) });
 
 /** Promoter side: list all submissions for an event token. */

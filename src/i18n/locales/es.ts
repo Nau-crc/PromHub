@@ -173,6 +173,10 @@ const es: LocaleStrings = {
     registrationLink: 'Enlace de registro',
     addGuest: '+ Invitada',
     addRes: '+ Reserva',
+    fullBanner: 'Aforo lleno. Las próximas inscripciones irán a la lista de espera ({{waitlist}} esperando).',
+    waitlist: 'Lista de espera',
+    promote: 'Promover',
+    waitlistTooBig: 'pax > {{left}} libres',
     sendListBtn: 'Enviar listado al club ({{count}})',
     sendListNoPhone: 'Añade un teléfono al local para enviar el listado por WhatsApp.',
     sendListConfirmTitle: '¿Enviar el listado de invitadas?',
@@ -448,6 +452,9 @@ const es: LocaleStrings = {
     for: 'para',
     remember: 'Recuerda:',
     seeYou: 'La promotora verá tus datos. ¡Nos vemos!',
+    waitlistedTitle: 'Estás en la lista de espera',
+    queuePositionLabel: 'Posición en la cola',
+    waitlistExplain: 'Ahora mismo no quedan plazas. La promotora se pondrá en contacto contigo si alguien cancela y se libera una plaza.',
   },
 
   nightClose: {

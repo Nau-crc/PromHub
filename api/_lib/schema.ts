@@ -123,6 +123,11 @@ export const guests = pgTable('guests', {
   /** Cancelled flag for the LATE-CLUB event link. Independent of
    *  `cancelled`. */
   cancelledClub: boolean('cancelled_club').default(false).notNull(),
+  /** Waitlist flag — true means the guest registered AFTER the event
+   *  hit its capacity. She doesn't count toward `used` and is shown
+   *  in a separate "Waitlist" section. The promoter can promote her
+   *  by flipping this back to false (e.g. when someone cancels). */
+  waitlisted: boolean('waitlisted').default(false).notNull(),
   influencer: boolean('influencer').default(false).notNull(),
   igHandle: text('ig_handle').default('').notNull(),
   igPlatform: text('ig_platform', { enum: ['instagram', 'tiktok'] }).default('instagram').notNull(),

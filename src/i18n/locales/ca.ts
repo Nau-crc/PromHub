@@ -173,6 +173,10 @@ const ca: LocaleStrings = {
     registrationLink: 'Enllaç de registre',
     addGuest: '+ Convidada',
     addRes: '+ Reserva',
+    fullBanner: 'Aforament ple. Les pròximes inscripcions aniran a la llista d\'espera ({{waitlist}} esperant).',
+    waitlist: "Llista d'espera",
+    promote: 'Promoure',
+    waitlistTooBig: 'pax > {{left}} lliures',
     sendListBtn: 'Enviar llista al club ({{count}})',
     sendListNoPhone: 'Afegeix un telèfon al local per enviar la llista per WhatsApp.',
     sendListConfirmTitle: 'Enviar la llista de convidades?',
@@ -448,6 +452,9 @@ const ca: LocaleStrings = {
     for: 'per a',
     remember: 'Recorda:',
     seeYou: 'La promotora veurà les teves dades. Ens veiem!',
+    waitlistedTitle: "Ets a la llista d'espera",
+    queuePositionLabel: 'Posició a la cua',
+    waitlistExplain: 'Ara mateix no queden places. La promotora es posarà en contacte amb tu si algú cancel·la i s\'allibera una plaça.',
   },
 
   nightClose: {

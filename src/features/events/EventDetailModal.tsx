@@ -35,6 +35,7 @@ export const EventDetailModal: React.FC<Props> = ({ open, onClose, eventId, onEd
   const {
     events, venues, guests, reservations,
     togglePrivateInvite, upsertEvent, importSubmissionsAsGuests,
+    promoteFromWaitlist,
   } = useAppStore((s) => ({
     events: s.events,
     venues: s.venues,
@@ -43,6 +44,7 @@ export const EventDetailModal: React.FC<Props> = ({ open, onClose, eventId, onEd
     togglePrivateInvite: s.togglePrivateInvite,
     upsertEvent: s.upsertEvent,
     importSubmissionsAsGuests: s.importSubmissionsAsGuests,
+    promoteFromWaitlist: s.promoteFromWaitlist,
   }));
   const e = eventId != null ? events.find((x) => x.id === eventId) : null;
 
@@ -102,15 +104,32 @@ export const EventDetailModal: React.FC<Props> = ({ open, onClose, eventId, onEd
   // Matches if the guest's MAIN event is this event OR their late-club
   // event is — same person, same pax, surfaced in both listings so
   // the promoter sees consistent numbers per event.
+  // All guests on the event (confirmed) — excluded from waitlist
+  // section below. Sorted client-side by createdAt order so the
+  // displayed order matches the order they came in.
   const evG = guests.filter((g) =>
-    isGuestOnEvent(g, e.id) && !isPastPin(g.eventDate) && dateMatches(g.eventDate),
+    isGuestOnEvent(g, e.id)
+    && !isPastPin(g.eventDate)
+    && dateMatches(g.eventDate)
+    && !g.waitlisted,
   );
+  const evWaitlist = guests
+    .filter((g) =>
+      isGuestOnEvent(g, e.id)
+      && !isPastPin(g.eventDate)
+      && dateMatches(g.eventDate)
+      && g.waitlisted)
+    .slice()
+    .sort((a, b) => (a.createdAt < b.createdAt ? -1
+      : a.createdAt > b.createdAt ? 1
+      : a.id - b.id));
   const evR = reservations.filter((r) =>
     r.eventId === e.id && !isPastPin(r.eventDate) && dateMatches(r.eventDate),
   );
 
   const ids = e.selectedSlotIds || [];
   const cap = eventCapacity(e.id, guests, events, selectedDate);
+  const isFull = cap.capacity > 0 && cap.left <= 0;
 
   const occurrenceLabel = selectedDate
     ? new Date(selectedDate + 'T00:00:00').toLocaleDateString(undefined, {
@@ -293,6 +312,24 @@ export const EventDetailModal: React.FC<Props> = ({ open, onClose, eventId, onEd
             </div>
           )}
 
+          {/* ── FULL banner ───────────────────────────────────── */}
+          {/* High-visibility cue when the event has hit its cap.
+              New registrations from the public form now land in the
+              waitlist; the banner tells the promoter to expect that. */}
+          {isFull && (
+            <div style={{
+              background: '#FFF4D6',
+              border: '1px solid #E5A100',
+              borderRadius: 'var(--border-radius-md)',
+              padding: '10px 12px',
+              marginBottom: 14,
+              fontSize: 12, color: '#8A5A00',
+              fontWeight: 500, lineHeight: 1.5,
+            }}>
+              ⚠︎ {t('eventDetail.fullBanner', { waitlist: evWaitlist.length })}
+            </div>
+          )}
+
           {/* ── Description with copy button ──────────────────── */}
           {e.description && (
             <div style={{
@@ -334,6 +371,70 @@ export const EventDetailModal: React.FC<Props> = ({ open, onClose, eventId, onEd
             <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 14 }}>
               {t('eventDetail.noGuestsOnDate')}
             </p>
+          )}
+
+          {/* ── Waitlist ──────────────────────────────────────── */}
+          {/* Shown whenever there's anyone in the queue. The promote
+              button flips `waitlisted` to false, moving the row into
+              the confirmed list above and shifting the rest of the
+              queue up by one (positions are computed live from the
+              remaining order). */}
+          {evWaitlist.length > 0 && (
+            <>
+              <SectionHead>
+                {t('eventDetail.waitlist')} ({evWaitlist.length})
+              </SectionHead>
+              <div className="list-card" style={{ margin: '0 0 14px' }}>
+                {evWaitlist.map((g, i) => {
+                  const queueNo = i + 1;
+                  const wouldFit = cap.capacity > 0
+                    ? g.pax <= Math.max(0, cap.left)
+                    : true;
+                  return (
+                    <div key={g.id} className="list-row" style={{ cursor: 'default', gap: 8 }}>
+                      <div style={{
+                        minWidth: 28, textAlign: 'center',
+                        fontSize: 14, fontWeight: 700, color: '#8A5A00',
+                      }}>
+                        #{queueNo}
+                      </div>
+                      <Avatar name={g.name} handle={g.igHandle} platform={g.igPlatform} />
+                      <div className="list-main">
+                        <div className="list-name">
+                          <StarBadge on={g.influencer} />
+                          <span>{g.name}</span>
+                        </div>
+                        <div className="list-sub">
+                          {g.pax} {t('common.paxShort')}
+                          {!wouldFit && cap.capacity > 0 && (
+                            <span style={{ color: '#A32D2D', marginLeft: 6 }}>
+                              · {t('eventDetail.waitlistTooBig', { left: cap.left })}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn-sm"
+                        style={{
+                          padding: '6px 10px', fontSize: 12,
+                          background: wouldFit ? '#0F6E56' : 'var(--color-background-secondary)',
+                          color: wouldFit ? '#fff' : 'var(--color-text-secondary)',
+                          border: 'none',
+                          borderRadius: 'var(--border-radius-sm)',
+                          cursor: wouldFit ? 'pointer' : 'not-allowed',
+                          flexShrink: 0,
+                        }}
+                        disabled={!wouldFit}
+                        onClick={() => promoteFromWaitlist(g.id)}
+                      >
+                        {t('eventDetail.promote')}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
           )}
 
           <SectionHead>{t('eventDetail.reservations')} ({evR.length})</SectionHead>

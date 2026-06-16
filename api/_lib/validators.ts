@@ -85,6 +85,7 @@ export const guestInputSchema = z.object({
   // the main-event flags above).
   checkedClub: z.boolean().default(false),
   cancelledClub: z.boolean().default(false),
+  waitlisted: z.boolean().default(false),
   influencer: z.boolean().default(false),
   igHandle: z.string().max(60).default(''),
   igPlatform: platform.default('instagram'),

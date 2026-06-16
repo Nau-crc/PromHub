@@ -70,6 +70,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           venueId: schema.events.venueId,
           eventDate: schema.events.eventDate,
           isOneTime: schema.events.isOneTime,
+          capacity: schema.events.capacity,
         })
         .from(schema.events)
         .where(eq(schema.events.shareToken, token))
@@ -92,6 +93,44 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const submissionDate: string | null = event.isOneTime
         ? (event.eventDate ?? null)
         : (isIsoDate ? incomingDate : null);
+
+      // ── Waitlist decision ────────────────────────────────────
+      // If the event has a capacity and the new pax would push the
+      // already-confirmed total over it, this registration lands on
+      // the waitlist. Confirmed = guests on this event + date that
+      // are NOT cancelled and NOT already waitlisted.
+      let waitlisted = false;
+      let queuePosition: number | null = null;
+      let capacityFreeBefore = Number.POSITIVE_INFINITY;
+      if (event.capacity && event.capacity > 0) {
+        const { sql: rawSql } = await import('drizzle-orm');
+        const dateMatch = submissionDate
+          ? rawSql`(event_date IS NULL OR event_date = ${submissionDate})`
+          : rawSql`true`;
+        // Confirmed pax (not waitlisted, not cancelled-for-main).
+        // For public-form submissions we always treat the link as
+        // the main event (clubEventId not involved here).
+        const confirmedRows = await db
+          .select({
+            pax: schema.guests.pax,
+            waitlisted: schema.guests.waitlisted,
+            cancelled: schema.guests.cancelled,
+          })
+          .from(schema.guests)
+          .where(rawSql`event_id = ${event.id} AND ${dateMatch}`);
+        const confirmedPax = confirmedRows
+          .filter((g) => !g.waitlisted && !g.cancelled)
+          .reduce((a, g) => a + g.pax, 0);
+        capacityFreeBefore = event.capacity - confirmedPax;
+        if (confirmedPax + pax > event.capacity) {
+          waitlisted = true;
+          // Position = number of existing waitlisted entries + 1.
+          const waitingCount = confirmedRows.filter(
+            (g) => g.waitlisted && !g.cancelled,
+          ).length;
+          queuePosition = waitingCount + 1;
+        }
+      }
 
       const [row] = await db
         .insert(schema.submissions)
@@ -136,6 +175,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             eventDate: submissionDate,
             submissionId,
             notes: notes || null,
+            waitlisted,
           });
         }
       } catch (mirrorErr) {
@@ -145,7 +185,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         console.error('[api/registration] guest-mirror failed:', mirrorErr);
       }
 
-      return res.status(200).json({ ok: true, id: submissionId });
+      return res.status(200).json({
+        ok: true,
+        id: submissionId,
+        waitlisted,
+        queuePosition,
+        // Capacity context for the client confirmation screen.
+        capacity: event.capacity ?? null,
+        // For UX copy ("there were X spots left when you submitted").
+        // Negative means full when she registered.
+        spotsLeftBefore: Number.isFinite(capacityFreeBefore)
+          ? Math.max(0, capacityFreeBefore)
+          : null,
+      });
     }
 
     if (req.method === 'GET') {

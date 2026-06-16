@@ -93,6 +93,11 @@ export interface Guest {
   /** Cancelled flag for the LATE-CLUB event link. Independent of
    *  `cancelled`. */
   cancelledClub?: boolean;
+  /** True when she signed up AFTER the event hit capacity. She
+   *  doesn't count toward the used capacity and renders in the
+   *  "Waitlist" section instead. Promoter promotes by flipping
+   *  this to false. */
+  waitlisted?: boolean;
   influencer: boolean;
   igHandle: string;
   igPlatform: Platform;

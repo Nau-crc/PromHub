@@ -104,6 +104,8 @@ interface AppState {
    *  Context `'main'` flips `cancelled`; `'club'` flips `cancelledClub`.
    *  Defaults to `'main'` for backward compat. */
   toggleCancelled: (id: number, context?: 'main' | 'club') => Promise<void>;
+  /** Promote a guest off the waitlist into the confirmed list. */
+  promoteFromWaitlist: (id: number) => Promise<void>;
 
   // reservations
   upsertReservation: (r: Reservation | Omit<Reservation, 'id'>) => Promise<Reservation>;
@@ -365,6 +367,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       ? { cancelledClub: !g.cancelledClub, checkedClub: false }
       : { cancelled: !g.cancelled, checked: false };
     const row = await api.updateGuest(id, patch);
+    set((s) => ({ guests: s.guests.map((x) => x.id === id ? row : x) }));
+  },
+
+  promoteFromWaitlist: async (id) => {
+    const row = await api.updateGuest(id, { waitlisted: false });
     set((s) => ({ guests: s.guests.map((x) => x.id === id ? row : x) }));
   },
 
