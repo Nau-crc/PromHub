@@ -63,6 +63,13 @@
   --ion-item-background: var(--color-background-primary);
   --ion-toolbar-background: var(--color-background-primary);
   --ion-toolbar-color: var(--color-text-primary);
+  /* Tab bar tokens — Ionic reads these inside the shadow DOM so we
+     must set them explicitly (they don't cascade from the surface
+     tokens above). Without this the bottom nav stays white in dark
+     mode because Ionic falls back to its own default. */
+  --ion-tab-bar-background: var(--color-background-primary);
+  --ion-tab-bar-color: var(--color-text-secondary);
+  --ion-tab-bar-color-selected: var(--color-primary);
 }
 
 /* ─── Dark theme ─────────────────────────────────────────────── */
@@ -95,6 +102,10 @@
   --ion-item-background: var(--color-background-primary);
   --ion-toolbar-background: var(--color-background-primary);
   --ion-toolbar-color: var(--color-text-primary);
+  /* Tab bar mirrors — see comment in `:root`. */
+  --ion-tab-bar-background: var(--color-background-primary);
+  --ion-tab-bar-color: var(--color-text-secondary);
+  --ion-tab-bar-color-selected: var(--color-primary);
 }
 
 /* ─── Reset / shared ───────────────────────────────────────── */
@@ -403,6 +414,23 @@ ion-tab-button ion-icon { font-size: 24px; }
 ion-item ion-icon { font-size: 20px; }
 /* Inherit the tab text colour so the icon picks up active/orange state. */
 ion-tab-button.tab-selected ion-icon { color: var(--color-primary); }
+
+/* Tab bar — also style via the component's own --background /
+   --color custom props so the dark theme catches it even on Ionic
+   builds that ignore the global `--ion-tab-bar-*` tokens. The pair
+   of declarations (token + part-style) means whichever wins, dark
+   mode is consistent. */
+ion-tab-bar {
+  --background: var(--color-background-primary);
+  --color: var(--color-text-secondary);
+  --color-selected: var(--color-primary);
+  border-top: 0.5px solid var(--color-border-tertiary);
+}
+ion-tab-button {
+  --background: var(--color-background-primary);
+  --color: var(--color-text-secondary);
+  --color-selected: var(--color-primary);
+}
 
 /* Confirm dialog (IonAlert) — destructive variant */
 .confirm-destructive { color: var(--color-danger) !important; font-weight: 600 !important; }
