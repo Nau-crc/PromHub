@@ -50,7 +50,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         description: schema.events.description,
         eventDate: schema.events.eventDate,
         isOneTime: schema.events.isOneTime,
-        capacity: schema.events.capacity,
+        // Per-night capacity is the sum of the event's timeslot
+        // capacities — the standalone `events.capacity` column was
+        // dropped in migration 0008.
+        timeslots: schema.events.timeslots,
         venueId: schema.events.venueId,
         photoCount: schema.events.photoCount,
       })
@@ -59,6 +62,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .limit(1);
 
     if (!row) return res.status(404).json({ error: 'event not found' });
+
+    const capacity = (row.timeslots ?? []).reduce(
+      (sum, slot) => sum + (slot.guestCapacity || 0),
+      0,
+    ) || null;
 
     // Pull the venue name in a second tiny query so the form can show
     // "[event] at [venue]". Null-safe — events without a venue are
@@ -88,7 +96,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       eventDate: occurrenceDate,
       isOneTime: row.isOneTime,
       venueName: venueNameValue,
-      capacity: row.capacity,
+      capacity,
       photoCount: row.photoCount ?? null,
     });
   } catch (err) {

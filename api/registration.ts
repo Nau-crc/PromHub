@@ -67,18 +67,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // submission to the right occurrence AND mirror it straight
       // into the guests table (so the promoter sees the new guest
       // without having to tap "Refresh").
-      const [event] = await db
+      const [eventRow] = await db
         .select({
           id: schema.events.id,
           venueId: schema.events.venueId,
           eventDate: schema.events.eventDate,
           isOneTime: schema.events.isOneTime,
-          capacity: schema.events.capacity,
+          // Per-night capacity moved off the events table in 0008 —
+          // it's now the sum of `timeslots[].guestCapacity` for the
+          // event. We pull the timeslots and reduce in JS.
+          timeslots: schema.events.timeslots,
         })
         .from(schema.events)
         .where(eq(schema.events.shareToken, token))
         .limit(1);
-      if (!event) return res.status(404).json({ error: 'event not found' });
+      if (!eventRow) return res.status(404).json({ error: 'event not found' });
+      // Derive a single `event` view with the same shape the rest of
+      // this handler expects (a `capacity` number), so the downstream
+      // waitlist/response logic doesn't need to know about the model
+      // change.
+      const derivedCapacity = (eventRow.timeslots ?? []).reduce(
+        (sum, slot) => sum + (slot.guestCapacity || 0),
+        0,
+      );
+      const event = {
+        id: eventRow.id,
+        venueId: eventRow.venueId,
+        eventDate: eventRow.eventDate,
+        isOneTime: eventRow.isOneTime,
+        capacity: derivedCapacity > 0 ? derivedCapacity : null,
+      };
 
       const name = String(body.name ?? '').trim().slice(0, MAX_NAME);
       if (!name) return res.status(400).json({ error: 'name is required' });
