@@ -284,6 +284,8 @@ const en = {
     eventDateFixed: 'Event date',
     comingTo: 'Coming to',
     comingToHint: "Which of the event's timeslots is she attending?",
+    extraEvents: 'Also invited to (same night)',
+    extraEventsHint: "Tap any other event at this venue she's also attending tonight. She counts toward each event's capacity.",
     noSlotsSelected: "This event has no timeslots selected. Edit the event to pick one or more from the venue's schedule.",
     socialPlatform: 'Social platform',
     handlePlaceholder: 'Handle (without @)',

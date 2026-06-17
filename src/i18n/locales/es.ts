@@ -269,6 +269,8 @@ const es: LocaleStrings = {
     eventDateFixed: 'Fecha del evento',
     comingTo: 'Viene a',
     comingToHint: '¿A qué franjas del evento va a asistir?',
+    extraEvents: 'También invitada a (misma noche)',
+    extraEventsHint: 'Marca cualquier otro evento del local al que también vaya esa noche. Cuenta para el aforo de cada uno.',
     noSlotsSelected: 'Este evento no tiene franjas. Edita el evento para elegir una o más de las del local.',
     socialPlatform: 'Red social',
     handlePlaceholder: 'Usuario (sin @)',

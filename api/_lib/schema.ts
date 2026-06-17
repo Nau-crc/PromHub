@@ -144,6 +144,13 @@ export const guests = pgTable('guests', {
    *  in a separate "Waitlist" section. The promoter can promote her
    *  by flipping this back to false (e.g. when someone cancels). */
   waitlisted: boolean('waitlisted').default(false).notNull(),
+  /** Additional events the same guest is invited to the same night,
+   *  on top of `event_id` (main) and `club_event_id` (late club).
+   *  Each id here counts her toward that event's capacity exactly
+   *  as if it were her main link. Status (cancelled/checked) is
+   *  inherited from the main flags for now — we can split per-extra
+   *  later if the promoter needs it. */
+  extraEventIds: integer('extra_event_ids').array().default([]).notNull(),
   influencer: boolean('influencer').default(false).notNull(),
   igHandle: text('ig_handle').default('').notNull(),
   igPlatform: text('ig_platform', { enum: ['instagram', 'tiktok'] }).default('instagram').notNull(),

@@ -107,6 +107,11 @@ export interface Guest {
    *  "Waitlist" section instead. Promoter promotes by flipping
    *  this to false. */
   waitlisted?: boolean;
+  /** Additional events she's invited to the same night, on top of
+   *  `eventId` (main) and `clubEventId` (club). Each id here counts
+   *  her toward that event's capacity as if it were a main link.
+   *  Status flags are inherited from the main attendance for now. */
+  extraEventIds?: number[];
   influencer: boolean;
   igHandle: string;
   igPlatform: Platform;

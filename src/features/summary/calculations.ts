@@ -138,9 +138,12 @@ export const lateClubEvents = (events: PromEvent[]): PromEvent[] =>
 // show the same guest with the same pax. This helper is the single
 // source of truth so every filter site stays consistent.
 export const isGuestOnEvent = (
-  g: Pick<Guest, 'eventId' | 'clubEventId'>,
+  g: Pick<Guest, 'eventId' | 'clubEventId' | 'extraEventIds'>,
   eventId: number,
-): boolean => g.eventId === eventId || g.clubEventId === eventId;
+): boolean =>
+  g.eventId === eventId
+  || g.clubEventId === eventId
+  || (g.extraEventIds ?? []).includes(eventId);
 
 // ── Per-attendance helpers ─────────────────────────────────
 //
@@ -161,23 +164,28 @@ export const isClubAttendance = (
   eventId: number,
 ): boolean => g.clubEventId === eventId && g.eventId !== eventId;
 
-/** Has the guest cancelled her attendance at THIS event specifically? */
+/** Has the guest cancelled her attendance at THIS event specifically?
+ *  Club attendance reads its own flag; main + extras share the main
+ *  `cancelled` flag (one body, multiple invitations). */
 export const isCancelledFor = (
-  g: Pick<Guest, 'eventId' | 'clubEventId' | 'cancelled' | 'cancelledClub'>,
+  g: Pick<Guest, 'eventId' | 'clubEventId' | 'extraEventIds' | 'cancelled' | 'cancelledClub'>,
   eventId: number,
 ): boolean => {
   if (isClubAttendance(g, eventId)) return !!g.cancelledClub;
   if (isMainAttendance(g, eventId)) return !!g.cancelled;
+  if ((g.extraEventIds ?? []).includes(eventId)) return !!g.cancelled;
   return false;
 };
 
-/** Has the guest arrived/checked-in for THIS event specifically? */
+/** Has the guest arrived/checked-in for THIS event specifically?
+ *  Same inheritance rule as `isCancelledFor`. */
 export const isCheckedFor = (
-  g: Pick<Guest, 'eventId' | 'clubEventId' | 'checked' | 'checkedClub'>,
+  g: Pick<Guest, 'eventId' | 'clubEventId' | 'extraEventIds' | 'checked' | 'checkedClub'>,
   eventId: number,
 ): boolean => {
   if (isClubAttendance(g, eventId)) return !!g.checkedClub;
   if (isMainAttendance(g, eventId)) return !!g.checked;
+  if ((g.extraEventIds ?? []).includes(eventId)) return !!g.checked;
   return false;
 };
 

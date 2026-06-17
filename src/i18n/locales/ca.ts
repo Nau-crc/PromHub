@@ -269,6 +269,8 @@ const ca: LocaleStrings = {
     eventDateFixed: "Data de l'esdeveniment",
     comingTo: 'Ve a',
     comingToHint: "A quines franges de l'esdeveniment va a assistir?",
+    extraEvents: "També convidada a (mateixa nit)",
+    extraEventsHint: "Marca qualsevol altre esdeveniment del local al qual també vagi aquesta nit. Compta per a l'aforament de cadascun.",
     noSlotsSelected: "Aquest esdeveniment no té franges. Edita l'esdeveniment per triar-ne una o més de les del local.",
     socialPlatform: 'Xarxa social',
     handlePlaceholder: 'Usuari (sense @)',

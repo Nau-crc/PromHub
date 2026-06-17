@@ -51,6 +51,11 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
    *  driven now by the event's `selectedSlotIds`. */
   const [slotIds, setSlotIds] = useState<string[]>([]);
   const [eventId, setEventId] = useState<number | null>(null);
+  /** Extra events (multi-select) on top of the main `eventId`.
+   *  Same night, same body — each event counts her toward its own
+   *  capacity. Status flags (cancelled/checked) are inherited from
+   *  the main attendance. */
+  const [extraEventIds, setExtraEventIds] = useState<number[]>([]);
   const [eventDate, setEventDate] = useState<string>('');
   const [platform, setPlatform] = useState<Platform>('instagram');
   const [handle, setHandle] = useState('');
@@ -135,6 +140,7 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
     setInfluencer(!!editing?.influencer);
     setGoingToClub(!!editing?.clubEventId);
     setClubEventId(editing?.clubEventId ?? null);
+    setExtraEventIds(editing ? [...(editing.extraEventIds ?? [])] : []);
   }, [open, editing, seedEventId, venues, events]); // events: needed for nextEventAtVenue
 
   const v = useMemo(() => (venueId != null ? venueById(venueId, venues) : undefined), [venueId, venues]);
@@ -165,6 +171,8 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
   const onPickEvent = (id: number | null) => {
     setEventId(id);
     setEventDate(initialEventDate(id, null));
+    // Can't be both main and extra. Drop from extras if it's there.
+    if (id != null) setExtraEventIds((arr) => arr.filter((x) => x !== id));
     // Each event has its own timeslot list, so any previously-picked
     // slot ids are meaningless for the new event. Reset to empty so
     // the user explicitly picks for this event.
@@ -229,6 +237,9 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
       timeslotNames,
       pax: Math.max(1, pax ?? 1),
       clubEventId: goingToClub ? (clubEventId ?? null) : null,
+      // Dedupe and strip out any id that already appears as main/club.
+      extraEventIds: Array.from(new Set(extraEventIds))
+        .filter((id) => id !== eventId && id !== (goingToClub ? clubEventId : null)),
       checked: editing?.checked ?? false,
       influencer,
       igHandle: cleanHandle,
@@ -391,6 +402,41 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
                   {t('guestForm.noSlotsSelected')}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* ── Extra events the same night ─────────────────────
+              Multi-select chips for events at the same venue that
+              aren't the main one. Each picked event counts her
+              toward its own capacity. Status flags inherit from
+              the main attendance (cancel main → cancels all).
+              Hidden until the user has picked a main event. */}
+          {selectedEvent && venueEvents.length > 1 && (
+            <div className="form-group">
+              <label className="form-label">{t('guestForm.extraEvents')}</label>
+              <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 6 }}>
+                {t('guestForm.extraEventsHint')}
+              </div>
+              <div className="chip-picker">
+                {venueEvents
+                  .filter((e) => e.id !== eventId)
+                  .map((e) => {
+                    const on = extraEventIds.includes(e.id);
+                    return (
+                      <div
+                        key={e.id}
+                        className={`chip ${on ? 'sel' : ''}`}
+                        onClick={() =>
+                          setExtraEventIds((arr) =>
+                            on ? arr.filter((x) => x !== e.id) : [...arr, e.id],
+                          )
+                        }
+                      >
+                        {e.name}
+                      </div>
+                    );
+                  })}
+              </div>
             </div>
           )}
 

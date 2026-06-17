@@ -64,6 +64,13 @@
       "when": 1779520000000,
       "tag": "0008_move_slots_to_event",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1779530000000,
+      "tag": "0009_guest_extra_events",
+      "breakpoints": true
     }
   ]
 }
