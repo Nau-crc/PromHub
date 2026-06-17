@@ -62,6 +62,10 @@ export const EventFormModal: React.FC<Props> = ({ open, onClose, editing, onRequ
   const [minGuestsThreshold, setMinGuestsThreshold] = useState<number | null>(null);
   /** Fixed € amount earned when threshold is met. */
   const [fixedFee, setFixedFee] = useState<number | null>(null);
+  /** Per-extra-guest bonus (€) paid on top of the fixed fee once
+   *  the threshold is met, for each pax beyond it. Optional even
+   *  when the fixed-fee pair is set. */
+  const [perExtraGuestFee, setPerExtraGuestFee] = useState<number | null>(null);
   const [seasonStart, setSeasonStart] = useState<string>('');
   const [seasonEnd, setSeasonEnd] = useState<string>('');
 
@@ -90,6 +94,7 @@ export const EventFormModal: React.FC<Props> = ({ open, onClose, editing, onRequ
     setLate(!!editing?.isLateClub);
     setMinGuestsThreshold(editing?.minGuestsThreshold ?? null);
     setFixedFee(editing?.fixedFee ?? null);
+    setPerExtraGuestFee(editing?.perExtraGuestFee ?? null);
     setSeasonStart(editing?.seasonStart ?? '');
     setSeasonEnd(editing?.seasonEnd ?? '');
   }, [open, editing, venues]);
@@ -182,6 +187,11 @@ export const EventFormModal: React.FC<Props> = ({ open, onClose, editing, onRequ
       vipPrices: cleanPrices,
       minGuestsThreshold: hasThreshold ? minGuestsThreshold : null,
       fixedFee: hasFee ? fixedFee : null,
+      // Per-extra bonus only persists when the fixed-fee pair is set
+      // — without a threshold the "extras" concept is meaningless.
+      perExtraGuestFee: hasThreshold && hasFee && perExtraGuestFee != null && perExtraGuestFee > 0
+        ? perExtraGuestFee
+        : null,
       seasonStart: !isOneTime && seasonStart ? seasonStart : null,
       seasonEnd: !isOneTime && seasonEnd ? seasonEnd : null,
       shareToken,
@@ -349,6 +359,25 @@ export const EventFormModal: React.FC<Props> = ({ open, onClose, editing, onRequ
                 />
               </div>
             </div>
+
+            {/* Per-extra-guest bonus — only meaningful when both
+                threshold and fixed fee are set. Disabled until then
+                so the form can't enter an invalid state. */}
+            <div style={{ marginTop: 10 }}>
+              <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 4 }}>
+                {t('eventForm.perExtraFeeLabel')}
+              </div>
+              <NumberField
+                className="form-input"
+                placeholder={t('eventForm.perExtraFeePlaceholder')}
+                min={0}
+                decimal
+                value={perExtraGuestFee}
+                onChange={setPerExtraGuestFee}
+                disabled={!(minGuestsThreshold && fixedFee)}
+              />
+            </div>
+
             {(minGuestsThreshold || fixedFee) && (
               <div style={{
                 fontSize: 11, marginTop: 6,
@@ -357,10 +386,16 @@ export const EventFormModal: React.FC<Props> = ({ open, onClose, editing, onRequ
                   : 'var(--color-danger)',
               }}>
                 {minGuestsThreshold && fixedFee
-                  ? t('eventForm.fixedFeePreview', {
-                      threshold: minGuestsThreshold,
-                      amount: Number(fixedFee).toFixed(2),
-                    })
+                  ? (perExtraGuestFee && perExtraGuestFee > 0
+                    ? t('eventForm.fixedFeePreviewWithExtras', {
+                        threshold: minGuestsThreshold,
+                        amount: Number(fixedFee).toFixed(2),
+                        extra: Number(perExtraGuestFee).toFixed(2),
+                      })
+                    : t('eventForm.fixedFeePreview', {
+                        threshold: minGuestsThreshold,
+                        amount: Number(fixedFee).toFixed(2),
+                      }))
                   : t('eventForm.errFixedFeePair')}
               </div>
             )}

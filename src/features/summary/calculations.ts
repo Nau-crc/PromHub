@@ -262,8 +262,14 @@ export function paxForEventOnDate(
 
 export interface FixedFeeStatus {
   /** € value the event would pay this occurrence — 0 if not earned
-   *  or no fee logic configured. */
+   *  or no fee logic configured. Sum of base + extras. */
   amount: number;
+  /** Just the flat fee component (€) once the threshold is met. */
+  base: number;
+  /** Per-extra-guest bonus (€) for pax beyond the threshold. */
+  extras: number;
+  /** How many pax above the threshold — 0 when not earned. */
+  extraPax: number;
   /** Threshold the event sets, or null if no fee logic. */
   threshold: number | null;
   /** Pax confirmed for this occurrence. */
@@ -280,12 +286,30 @@ export function fixedFeeStatus(
 ): FixedFeeStatus {
   const threshold = event.minGuestsThreshold;
   const fee = event.fixedFee;
+  const perExtra = event.perExtraGuestFee ?? 0;
   const pax = paxForEventOnDate(event, guests, isoDate);
   if (threshold == null || fee == null || fee <= 0) {
-    return { amount: 0, threshold, pax, earned: false };
+    return {
+      amount: 0, base: 0, extras: 0, extraPax: 0,
+      threshold, pax, earned: false,
+    };
   }
   const earned = pax >= threshold;
-  return { amount: earned ? round2(fee) : 0, threshold, pax, earned };
+  if (!earned) {
+    return {
+      amount: 0, base: 0, extras: 0, extraPax: 0,
+      threshold, pax, earned: false,
+    };
+  }
+  // Earned: base fixed + per-extra-pax bonus.
+  const extraPax = Math.max(0, pax - threshold);
+  const base = round2(fee);
+  const extras = round2(extraPax * perExtra);
+  return {
+    amount: round2(base + extras),
+    base, extras, extraPax,
+    threshold, pax, earned: true,
+  };
 }
 
 /** Total fixed fees the promoter earned on a date across all events. */

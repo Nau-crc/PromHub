@@ -99,6 +99,12 @@ export const events = pgTable('events', {
    *  `minGuestsThreshold`. NULL = no fee. Stored to 2 decimals so
    *  the snapshot maths stays byte-exact with the commission column. */
   fixedFee: numeric('fixed_fee', { precision: 8, scale: 2 }),
+  /** Per-extra-guest bonus (€) on top of the fixed fee — kicks in
+   *  once the threshold is met, paid for each pax BEYOND the
+   *  threshold. NULL or 0 = no per-extra bonus (only the flat fee).
+   *  Example: threshold=10, fixedFee=150, perExtraGuestFee=5 → at
+   *  15 pax she earns 150 + (15-10)*5 = 175. */
+  perExtraGuestFee: numeric('per_extra_guest_fee', { precision: 8, scale: 2 }),
   seasonStart: date('season_start'),
   seasonEnd: date('season_end'),
   /** Public-form share token (UUID v4). Nullable for legacy rows. */

@@ -273,6 +273,7 @@ const EventStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
       // it null and the promoter can edit the event later to set it.
       minGuestsThreshold: null,
       fixedFee: null,
+      perExtraGuestFee: null,
       seasonStart: !isOneTime && seasonStart ? seasonStart : null,
       seasonEnd: !isOneTime && seasonEnd ? seasonEnd : null,
       shareToken: null,

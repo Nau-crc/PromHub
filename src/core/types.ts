@@ -67,6 +67,9 @@ export interface PromEvent {
   /** Fixed € fee awarded on any occurrence that meets the threshold.
    *  null = no fee logic on this event. */
   fixedFee: number | null;
+  /** Per-extra-guest bonus € paid once the threshold is met, for
+   *  each pax beyond the threshold. null or 0 = no per-extra bonus. */
+  perExtraGuestFee: number | null;
   /** Season start (ISO yyyy-mm-dd). Recurring only. null = open-ended past. */
   seasonStart: string | null;
   /** Season end (ISO yyyy-mm-dd). Recurring only. null = open-ended future. */

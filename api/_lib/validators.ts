@@ -65,6 +65,8 @@ export const eventInputSchema = z.object({
   /** Pair: both fields must either be set together OR both null. */
   minGuestsThreshold: z.number().int().min(1).nullable().optional(),
   fixedFee: z.number().min(0).nullable().optional(),
+  /** Per-extra-guest bonus. Only meaningful when fixedFee is set. */
+  perExtraGuestFee: z.number().min(0).nullable().optional(),
   seasonStart: isoDate.nullable().optional(),
   seasonEnd: isoDate.nullable().optional(),
   shareToken: uuid.nullable().optional(),

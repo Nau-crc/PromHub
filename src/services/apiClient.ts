@@ -100,8 +100,9 @@ function normalizeEvent(row: any): PromEvent {
     timeslots: row.timeslots ?? [],
     vipPrices: row.vipPrices ?? {},
     minGuestsThreshold: row.minGuestsThreshold ?? null,
-    // numeric column → Drizzle returns string; coerce to number here
+    // numeric columns → Drizzle returns strings; coerce to numbers here
     fixedFee: row.fixedFee != null ? Number(row.fixedFee) : null,
+    perExtraGuestFee: row.perExtraGuestFee != null ? Number(row.perExtraGuestFee) : null,
     seasonStart: row.seasonStart,
     seasonEnd: row.seasonEnd,
     shareToken: row.shareToken,
@@ -336,6 +337,7 @@ function buildSyncPayload(snap: AppDataSnapshot) {
       vipPrices: e.vipPrices,
       minGuestsThreshold: e.minGuestsThreshold,
       fixedFee: e.fixedFee,
+      perExtraGuestFee: e.perExtraGuestFee,
       seasonStart: e.seasonStart,
       seasonEnd: e.seasonEnd,
       shareToken: e.shareToken,

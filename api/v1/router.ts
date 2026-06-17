@@ -123,8 +123,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const { clientId, venueClientId, ...rest } = e;
         const venueId = venueClientId != null ? (venueMap.get(venueClientId) ?? null) : null;
         const fixedFee = rest.fixedFee != null ? String(rest.fixedFee) : null;
+        const perExtraGuestFee = rest.perExtraGuestFee != null
+          ? String(rest.perExtraGuestFee)
+          : null;
         const [row] = await db.insert(schema.events)
-          .values({ ...rest, fixedFee, venueId, tenantId })
+          .values({ ...rest, fixedFee, perExtraGuestFee, venueId, tenantId })
           .returning({ id: schema.events.id });
         eventMap.set(clientId, row.id);
       }
@@ -250,9 +253,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (req.method === 'POST') {
           const input = eventInputSchema.parse(parseBody(req.body));
           // numeric columns expect string on the way in (Drizzle quirk)
+          // numeric columns expect string on the way in (Drizzle quirk)
           const fixedFee = input.fixedFee != null ? String(input.fixedFee) : null;
+          const perExtraGuestFee = input.perExtraGuestFee != null
+            ? String(input.perExtraGuestFee)
+            : null;
           const [row] = await db.insert(schema.events)
-            .values({ ...input, fixedFee, tenantId })
+            .values({ ...input, fixedFee, perExtraGuestFee, tenantId })
             .returning();
           return res.status(201).json({ event: row });
         }
@@ -267,11 +274,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
       if (req.method === 'PATCH' || req.method === 'PUT') {
         const input = eventInputSchema.partial().parse(parseBody(req.body));
-        // Only coerce when the patch actually sets fixedFee; partial
-        // patches may not mention it at all.
-        const patch = 'fixedFee' in input
-          ? { ...input, fixedFee: input.fixedFee != null ? String(input.fixedFee) : null }
-          : input;
+        // Only coerce when the patch actually sets each numeric
+        // field; partial patches may not mention them at all.
+        const patch: typeof input = { ...input };
+        if ('fixedFee' in input) {
+          patch.fixedFee = input.fixedFee != null ? (String(input.fixedFee) as unknown as number) : null;
+        }
+        if ('perExtraGuestFee' in input) {
+          patch.perExtraGuestFee = input.perExtraGuestFee != null
+            ? (String(input.perExtraGuestFee) as unknown as number)
+            : null;
+        }
         const [row] = await db.update(schema.events).set(patch).where(where).returning();
         if (!row) throw notFound();
         return res.status(200).json({ event: row });
