@@ -292,16 +292,21 @@ export const EventDetailModal: React.FC<Props> = ({ open, onClose, eventId, onEd
           )}
 
           {/* ── Capacity for this occurrence ──────────────────── */}
+          {/* Labels use the same `cap.used` / `cap.capacity` numbers
+              as the slot breakdown below — so the two blocks always
+              agree. Bug fix: numbers used to be re-computed locally
+              from `evG.reduce(...)`, which gave a different total
+              when waitlist/cancellation flags drifted. */}
           {cap.capacity > 0 ? (
             <div className="summary-block" style={{ margin: '0 0 14px' }}>
               <div className="summary-head">{t('eventDetail.capacityFor', { date: occurrenceLabel })}</div>
               <div style={{ padding: '12px 14px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                   <span style={{ fontSize: 13, color: 'var(--color-text-primary)', fontWeight: 500 }}>
-                    {cap.used} / {cap.capacity} guests
+                    {cap.used} / {cap.capacity} {t('summary.guests').toLowerCase()}
                   </span>
                   <span style={{ fontSize: 12, color: cap.fillClass === 'full' ? '#A32D2D' : 'var(--color-text-secondary)' }}>
-                    {cap.left} left
+                    {t('eventDetail.capLeft', { count: cap.left })}
                   </span>
                 </div>
                 <CapacityBar pct={cap.pct} warnAt={75} />
@@ -309,7 +314,7 @@ export const EventDetailModal: React.FC<Props> = ({ open, onClose, eventId, onEd
             </div>
           ) : (
             <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 14 }}>
-              {evG.reduce((a, g) => a + g.pax, 0)} guests on this date · no capacity set
+              {t('eventDetail.noCapSet', { count: cap.used })}
             </div>
           )}
 

@@ -174,6 +174,8 @@ const ca: LocaleStrings = {
     addGuest: '+ Convidada',
     addRes: '+ Reserva',
     bySlot: 'Aforament per franja',
+    capLeft: '{{count}} lliures',
+    noCapSet: "{{count}} convidades en aquesta data · sense aforament definit",
     fullBanner: 'Aforament ple. Les pròximes inscripcions aniran a la llista d\'espera ({{waitlist}} esperant).',
     waitlist: "Llista d'espera",
     promote: 'Promoure',

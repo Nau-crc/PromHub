@@ -186,6 +186,8 @@ const en = {
     addGuest: '+ Guest',
     addRes: '+ Reservation',
     bySlot: 'Capacity by timeslot',
+    capLeft: '{{count}} left',
+    noCapSet: '{{count}} guests on this date · no capacity set',
     fullBanner: 'Capacity reached. New sign-ups will go to the waitlist ({{waitlist}} waiting).',
     waitlist: 'Waitlist',
     promote: 'Promote',

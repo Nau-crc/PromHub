@@ -174,6 +174,8 @@ const es: LocaleStrings = {
     addGuest: '+ Invitada',
     addRes: '+ Reserva',
     bySlot: 'Aforo por franja',
+    capLeft: '{{count}} libres',
+    noCapSet: '{{count}} invitadas en esta fecha · sin aforo definido',
     fullBanner: 'Aforo lleno. Las próximas inscripciones irán a la lista de espera ({{waitlist}} esperando).',
     waitlist: 'Lista de espera',
     promote: 'Promover',
