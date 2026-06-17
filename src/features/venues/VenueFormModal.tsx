@@ -20,12 +20,14 @@ interface Props {
 
 export const VenueFormModal: React.FC<Props> = ({ open, onClose, editing }) => {
   const { t } = useTranslation();
-  const { upsertVenue, removeVenue } = useAppStore((s) => ({
+  const { upsertVenue, removeVenue, venueTypes } = useAppStore((s) => ({
     upsertVenue: s.upsertVenue, removeVenue: s.removeVenue,
+    venueTypes: s.settings.venueTypes ?? [],
   }));
   const confirm = useConfirm();
 
   const [name, setName] = useState('');
+  const [venueType, setVenueType] = useState<string>('');
   const [phoneCode, setPhoneCode] = useState<string>('+34');
   const [phoneNum, setPhoneNum] = useState<string>('');
   const [vipRows, setVipRows] = useState<VipType[]>([]);
@@ -33,6 +35,7 @@ export const VenueFormModal: React.FC<Props> = ({ open, onClose, editing }) => {
   useEffect(() => {
     if (!open) return;
     setName(editing?.name ?? '');
+    setVenueType(editing?.venueType ?? '');
     setPhoneCode(editing?.phoneCode || '+34');
     setPhoneNum(editing?.phoneNum || '');
     setVipRows(editing ? [...(editing.vipTypes || [])] : []);
@@ -60,6 +63,7 @@ export const VenueFormModal: React.FC<Props> = ({ open, onClose, editing }) => {
     const entry = {
       ...(editing?.id != null ? { id: editing.id } : {}),
       name: trimmed,
+      venueType: venueType.trim() ? venueType.trim() : null,
       vipTypes: newVip,
       phoneCode: phoneDigits ? phoneCode : '',
       phoneNum: phoneDigits ? phoneNum.trim() : '',
@@ -94,6 +98,24 @@ export const VenueFormModal: React.FC<Props> = ({ open, onClose, editing }) => {
           <div className="form-group">
             <label className="form-label">{t('venueForm.name')}</label>
             <input className="form-input" placeholder={t('venueForm.namePlaceholder')} value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">{t('venueForm.venueType')}</label>
+            <SelectField
+              value={venueType}
+              onChange={setVenueType}
+              title={t('venueForm.venueType')}
+              options={[
+                { value: '', label: t('venues.sectionNone') },
+                ...venueTypes.map((typ) => ({ value: typ, label: typ })),
+                // If editing a venue whose type was removed from the
+                // workspace list, surface it here so it stays
+                // selectable until the promoter picks a new one.
+                ...(venueType && !venueTypes.includes(venueType)
+                  ? [{ value: venueType, label: venueType }]
+                  : []),
+              ]}
+            />
           </div>
           <div className="form-group">
             <label className="form-label">{t('venueForm.phone')}</label>

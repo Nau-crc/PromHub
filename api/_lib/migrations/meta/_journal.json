@@ -78,6 +78,13 @@
       "when": 1779540000000,
       "tag": "0010_event_per_extra_fee",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1779550000000,
+      "tag": "0011_venue_types_and_settings",
+      "breakpoints": true
     }
   ]
 }

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Redirect, Route } from 'react-router-dom';
 import {
   IonApp, IonRouterOutlet, IonTabs, IonTabBar, IonTabButton, IonLabel, IonIcon,
@@ -9,7 +9,7 @@ import { IonReactRouter } from '@ionic/react-router';
 import {
   homeOutline, peopleOutline, listOutline,
   calendarOutline, businessOutline, statsChartOutline, addOutline,
-  sunnyOutline, moonOutline, contrastOutline,
+  settingsOutline,
 } from 'ionicons/icons';
 
 import { HomePage } from '@/features/home/HomePage';
@@ -25,92 +25,21 @@ import { ModalsHost } from '@/features/ModalsHost';
 import { ConfirmHost } from '@/components/ConfirmHost';
 import { OnboardingFlow } from '@/features/onboarding/OnboardingFlow';
 import { CloseNightPanel } from '@/features/nightClose/CloseNightPanel';
+import { SettingsModal } from '@/features/settings/SettingsModal';
 import { useAppStore } from '@/store/useAppStore';
 import { useUIStore } from '@/store/useUIStore';
-import { useThemeStore, type ThemeChoice } from '@/store/useThemeStore';
-import { useLocaleStore, type LocaleChoice } from '@/store/useLocaleStore';
+import { useThemeStore } from '@/store/useThemeStore';
+import { useLocaleStore } from '@/store/useLocaleStore';
 import { today } from '@/core/constants';
 import { isoDay } from '@/core/utils/date';
 import { useTranslation } from 'react-i18next';
 
 setupIonicReact({ mode: 'ios' });
 
-const ThemeToggle: React.FC = () => {
-  const { t } = useTranslation();
-  const { choice, set } = useThemeStore((s) => ({ choice: s.choice, set: s.set }));
-  const opts: { value: ThemeChoice; icon: string; labelKey: string }[] = [
-    { value: 'light', icon: sunnyOutline, labelKey: 'drawer.light' },
-    { value: 'dark', icon: moonOutline, labelKey: 'drawer.dark' },
-    { value: 'system', icon: contrastOutline, labelKey: 'drawer.auto' },
-  ];
-  return (
-    <div style={{
-      borderTop: '0.5px solid var(--color-border-tertiary)',
-      padding: '12px 16px',
-    }}>
-      <div style={{
-        fontSize: 11, fontWeight: 500, color: 'var(--color-text-secondary)',
-        textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 8,
-      }}>{t('drawer.appearance')}</div>
-      <div style={{ display: 'flex', gap: 6 }}>
-        {opts.map((o) => (
-          <button
-            key={o.value}
-            type="button"
-            className={`tog-btn ${choice === o.value ? 'on' : ''}`}
-            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
-            onClick={() => set(o.value)}
-          >
-            <IonIcon icon={o.icon} style={{ fontSize: 14 }} />
-            {t(o.labelKey)}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-};
-
-// Language picker — sits below ThemeToggle in the drawer footer.
-// 'Auto' follows the OS/browser language at startup; explicit values
-// override and persist via Capacitor Preferences.
-const LanguageToggle: React.FC = () => {
-  const { t } = useTranslation();
-  const { choice, set } = useLocaleStore((s) => ({ choice: s.choice, set: s.set }));
-  const opts: { value: LocaleChoice; label: string }[] = [
-    { value: 'auto', label: t('drawer.auto') },
-    { value: 'en', label: 'EN' },
-    { value: 'es', label: 'ES' },
-    { value: 'ca', label: 'CA' },
-  ];
-  return (
-    <div style={{
-      borderTop: '0.5px solid var(--color-border-tertiary)',
-      padding: '12px 16px',
-    }}>
-      <div style={{
-        fontSize: 11, fontWeight: 500, color: 'var(--color-text-secondary)',
-        textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 8,
-      }}>{t('drawer.language')}</div>
-      <div style={{ display: 'flex', gap: 6 }}>
-        {opts.map((o) => (
-          <button
-            key={o.value}
-            type="button"
-            className={`tog-btn ${choice === o.value ? 'on' : ''}`}
-            style={{ flex: 1 }}
-            onClick={() => set(o.value)}
-          >
-            {o.label}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-};
-
 const Drawer: React.FC = () => {
   const open = useUIStore((s) => s.open);
   const { t } = useTranslation();
+  const [settingsOpen, setSettingsOpen] = useState(false);
   return (
     <IonMenu contentId="main" type="overlay">
       <IonHeader>
@@ -186,9 +115,10 @@ const Drawer: React.FC = () => {
               when the drawer is taller than the nav content. */}
           <div style={{ flex: '1 1 auto' }} />
 
-          {/* Footer block: Close night → Appearance → Language →
-              Copyright. Stack visually packed together with a top
-              divider so the group reads as one chrome cluster. */}
+          {/* Footer block: Close night → ⚙ Settings → Copyright.
+              Appearance + Language used to live here as inline
+              toggles; both moved into SettingsModal so the gear has
+              one home for every promoter preference. */}
           <div style={{
             flex: '0 0 auto',
             borderTop: '0.5px solid var(--color-border-tertiary)',
@@ -197,8 +127,15 @@ const Drawer: React.FC = () => {
             <div style={{ padding: '12px 16px 0' }}>
               <CloseNightPanel isoDate={isoDay(today())} />
             </div>
-            <ThemeToggle />
-            <LanguageToggle />
+            <div style={{
+              borderTop: '0.5px solid var(--color-border-tertiary)',
+              marginTop: 12,
+            }}>
+              <IonItem button detail={false} onClick={() => setSettingsOpen(true)}>
+                <IonIcon slot="start" icon={settingsOutline} />
+                <IonLabel><h3>{t('settings.title')}</h3></IonLabel>
+              </IonItem>
+            </div>
             <div style={{
               padding: '10px 20px 6px',
               textAlign: 'center',
@@ -210,6 +147,7 @@ const Drawer: React.FC = () => {
           </div>
         </div>
       </IonContent>
+      <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </IonMenu>
   );
 };

@@ -41,6 +41,9 @@ const vipTypeSchema = z.object({
 
 export const venueInputSchema = z.object({
   name: z.string().min(1).max(120),
+  /** Optional section / type name. Free text but the UI fills it
+   *  from the configurable list in `tenants.settings.venueTypes`. */
+  venueType: z.string().max(80).nullable().optional(),
   phoneCode: z.string().nullable().optional(),
   phoneNum: z.string().nullable().optional(),
   vipTypes: z.array(vipTypeSchema).default([]),
@@ -100,6 +103,15 @@ export const guestInputSchema = z.object({
 export type GuestInput = z.infer<typeof guestInputSchema>;
 
 // ── Reservation ────────────────────────────────────────────
+// ── Workspace settings ─────────────────────────────────────
+//  Single jsonb on the shared tenant — the configurable bits of
+//  the app's chrome. PATCH-style: client sends a partial object,
+//  server merges with existing.
+export const settingsInputSchema = z.object({
+  venueTypes: z.array(z.string().min(1).max(80)).optional(),
+});
+export type SettingsInput = z.infer<typeof settingsInputSchema>;
+
 // ── Night record (close-night snapshot) ────────────────────
 //  Snapshots are deliberately loose-typed (z.any() arrays of
 //  whatever Guest/Reservation/PromEvent/Venue look like on the

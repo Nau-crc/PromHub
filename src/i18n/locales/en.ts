@@ -77,6 +77,16 @@ const en = {
     auto: 'Auto',
   },
 
+  // ── Settings modal (gear icon at the bottom of the drawer) ───
+  settings: {
+    title: 'Settings',
+    venueTypes: 'Venue types',
+    venueTypesHint: 'Sections used to group venues on the venues page. Order shown here is the order used in the list.',
+    venueTypePlaceholder: 'e.g. Restaurante',
+    noVenueTypes: 'No types yet — venues will all appear under "Uncategorised".',
+    saveFailed: "Couldn't save settings: {{message}}",
+  },
+
   // ── Page titles & headers ─────────────────────────────────
   home: {
     subtitle: "Today's events",
@@ -139,6 +149,9 @@ const en = {
     noVipTypes: 'No VIP types',
     deleteConfirm: 'Delete venue "{{name}}"?',
     deleteMessage: "Future events at this venue and their guests will be removed. Past events stay for reporting.",
+    /** Section header for venues with no `venueType` set, also used
+     *  as the "no type" option in the venue form picker. */
+    sectionNone: 'Uncategorised',
   },
   summary: {
     title: 'Summary',
@@ -357,6 +370,7 @@ const en = {
     titleEdit: 'Edit venue',
     name: 'Venue name',
     namePlaceholder: 'e.g. Carpe Diem',
+    venueType: 'Type',
     guestCapacity: 'Guest capacity (total)',
     guestCapacityPlaceholder: 'e.g. 200',
     phone: 'Phone (optional)',

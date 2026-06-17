@@ -29,12 +29,23 @@ export interface VipType {
 export interface Venue {
   id: number;
   name: string;
+  /** Optional section / type ("Restaurante", "Club", "Beach Club",
+   *  …). Free text; the UI fills from the workspace's configurable
+   *  list (`AppSettings.venueTypes`). */
+  venueType?: string | null;
   // `guestCapacity` and `timeslots` were dropped in the
   // event-centric refactor — slots now live on the event.
   vipTypes: VipType[];
   /** Optional venue contact for WhatsApp dispatch of reservations. */
   phoneCode?: string;
   phoneNum?: string;
+}
+
+/** Workspace-level configurable settings. Stored on the shared
+ *  tenant; loaded once at startup and exposed via the store. */
+export interface AppSettings {
+  /** Configurable venue-section list. Order is the display order. */
+  venueTypes?: string[];
 }
 
 export interface PromEvent {

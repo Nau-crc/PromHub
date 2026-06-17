@@ -68,6 +68,15 @@ const ca: LocaleStrings = {
     auto: 'Automàtic',
   },
 
+  settings: {
+    title: 'Configuració',
+    venueTypes: 'Tipus de local',
+    venueTypesHint: 'Seccions usades per agrupar locals a la pàgina de locals. L\'ordre aquí és l\'ordre mostrat.',
+    venueTypePlaceholder: 'p. ex. Restaurant',
+    noVenueTypes: 'Encara no hi ha tipus — els locals apareixeran tots sota "Sense categoria".',
+    saveFailed: 'No s\'ha pogut desar la configuració: {{message}}',
+  },
+
   home: {
     subtitle: "Esdeveniments d'avui",
     addBtn: '+ Esdeveniment',
@@ -128,6 +137,7 @@ const ca: LocaleStrings = {
     noVipTypes: 'Sense tipus VIP',
     deleteConfirm: 'Eliminar el local "{{name}}"?',
     deleteMessage: 'Els esdeveniments futurs en aquest local i les seves convidades s\'eliminaran. Els passats es conserven per a reports.',
+    sectionNone: 'Sense categoria',
   },
   summary: {
     title: 'Resum',
@@ -339,6 +349,7 @@ const ca: LocaleStrings = {
     titleEdit: 'Editar local',
     name: 'Nom del local',
     namePlaceholder: 'p. ex. Carpe Diem',
+    venueType: 'Tipus',
     guestCapacity: 'Aforament total',
     guestCapacityPlaceholder: 'p. ex. 200',
     phone: 'Telèfon (opcional)',

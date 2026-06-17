@@ -68,6 +68,15 @@ const es: LocaleStrings = {
     auto: 'Automático',
   },
 
+  settings: {
+    title: 'Ajustes',
+    venueTypes: 'Tipos de local',
+    venueTypesHint: 'Secciones usadas para agrupar locales en la página de locales. El orden aquí es el orden mostrado.',
+    venueTypePlaceholder: 'p. ej. Restaurante',
+    noVenueTypes: 'Aún no hay tipos — los locales aparecerán todos bajo "Sin categoría".',
+    saveFailed: 'No se pudieron guardar los ajustes: {{message}}',
+  },
+
   home: {
     subtitle: 'Eventos de hoy',
     addBtn: '+ Evento',
@@ -128,6 +137,7 @@ const es: LocaleStrings = {
     noVipTypes: 'Sin tipos VIP',
     deleteConfirm: '¿Eliminar el local "{{name}}"?',
     deleteMessage: 'Los eventos futuros en este local y sus invitadas se eliminarán. Los eventos pasados se conservan para reportes.',
+    sectionNone: 'Sin categoría',
   },
   summary: {
     title: 'Resumen',
@@ -339,6 +349,7 @@ const es: LocaleStrings = {
     titleEdit: 'Editar local',
     name: 'Nombre del local',
     namePlaceholder: 'p. ej. Carpe Diem',
+    venueType: 'Tipo',
     guestCapacity: 'Aforo total',
     guestCapacityPlaceholder: 'p. ej. 200',
     phone: 'Teléfono (opcional)',

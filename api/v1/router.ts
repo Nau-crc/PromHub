@@ -92,6 +92,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const {
       venueInputSchema, eventInputSchema, guestInputSchema,
       reservationInputSchema, snapshotSchema, nightRecordInputSchema,
+      settingsInputSchema,
     } = await import('../_lib/validators.js');
     const { parseBody } = await import('../_handler.js');
     const { badRequest, notFound } = await import('../_lib/errors.js');
@@ -390,6 +391,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const [row] = await db.delete(schema.reservations).where(where).returning();
         if (!row) throw notFound();
         return res.status(200).json({ ok: true });
+      }
+      throw badRequest(`Method ${req.method} not allowed`);
+    }
+
+    // ── /api/v1/settings ────────────────────────────────────
+    // Workspace-level configurable settings on the shared tenant:
+    //   GET   → returns the current `settings` jsonb
+    //   PATCH → shallow-merges the body into existing settings
+    if (resource === 'settings' && segments.length === 1) {
+      if (req.method === 'GET') {
+        const [row] = await db.select({ settings: schema.tenants.settings })
+          .from(schema.tenants)
+          .where(eq(schema.tenants.id, tenantId))
+          .limit(1);
+        return res.status(200).json({ settings: row?.settings ?? {} });
+      }
+      if (req.method === 'PATCH' || req.method === 'PUT') {
+        const input = settingsInputSchema.parse(parseBody(req.body));
+        const [existing] = await db.select({ settings: schema.tenants.settings })
+          .from(schema.tenants)
+          .where(eq(schema.tenants.id, tenantId))
+          .limit(1);
+        const merged = { ...(existing?.settings ?? {}), ...input };
+        const [row] = await db.update(schema.tenants)
+          .set({ settings: merged })
+          .where(eq(schema.tenants.id, tenantId))
+          .returning({ settings: schema.tenants.settings });
+        return res.status(200).json({ settings: row.settings });
       }
       throw badRequest(`Method ${req.method} not allowed`);
     }

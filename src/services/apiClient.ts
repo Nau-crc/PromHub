@@ -1,6 +1,6 @@
 import type {
   Venue, PromEvent, Guest, Reservation, AppDataSnapshot,
-  NightRecord, NightRecordSummary,
+  NightRecord, NightRecordSummary, AppSettings,
 } from '@/core/types';
 
 // ─────────────────────────────────────────────────────────────
@@ -74,9 +74,7 @@ function normalizeVenue(row: any): Venue {
   return {
     id: row.id,
     name: row.name,
-    // `vipTypes` rows may still carry a legacy `price` field from
-    // before 0008 — keep it on the type as optional but the new
-    // source of truth is `PromEvent.vipPrices[name]`.
+    venueType: row.venueType ?? null,
     vipTypes: row.vipTypes ?? [],
     phoneCode: row.phoneCode ?? '',
     phoneNum: row.phoneNum ?? '',
@@ -297,6 +295,19 @@ export const api = {
   },
 
   // ── First-run migration ──
+  // ── Workspace settings ──
+  async getSettings(): Promise<AppSettings> {
+    const { settings } = await call<{ settings: AppSettings }>('/settings');
+    return settings ?? {};
+  },
+  async updateSettings(input: Partial<AppSettings>): Promise<AppSettings> {
+    const { settings } = await call<{ settings: AppSettings }>('/settings', {
+      method: 'PATCH',
+      body: JSON.stringify(input),
+    });
+    return settings ?? {};
+  },
+
   async syncSnapshot(snap: AppDataSnapshot) {
     // Re-key local IDs to clientId fields the backend expects
     return call<{
@@ -320,6 +331,7 @@ function buildSyncPayload(snap: AppDataSnapshot) {
     venues: snap.venues.map((v) => ({
       clientId: v.id,
       name: v.name,
+      venueType: v.venueType ?? null,
       vipTypes: v.vipTypes,
     })),
     events: snap.events.map((e) => ({

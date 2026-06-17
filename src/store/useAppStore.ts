@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type {
   AppDataSnapshot, Venue, PromEvent, Guest, Reservation,
-  NightRecord,
+  NightRecord, AppSettings,
 } from '@/core/types';
 import { storage } from '@/services/storage';
 import { STORAGE_KEYS } from '@/core/constants';
@@ -65,6 +65,8 @@ interface AppState {
   guests: Guest[];
   reservations: Reservation[];
   nightRecords: NightRecord[];
+  /** Workspace-level configurable settings (venue types, etc.). */
+  settings: AppSettings;
 
   // ui meta
   hydrated: boolean;
@@ -132,6 +134,12 @@ interface AppState {
   closeNight: (isoDate: string) => Promise<NightRecord>;
   /** Pull a date range (or all) from the backend. */
   loadNightRecords: (opts?: { from?: string; to?: string }) => Promise<NightRecord[]>;
+
+  // settings
+  /** Fetch fresh settings from the server, replacing what's cached. */
+  loadSettings: () => Promise<AppSettings>;
+  /** Patch-merge into existing settings (server merges shallowly). */
+  updateSettings: (patch: Partial<AppSettings>) => Promise<AppSettings>;
 }
 
 /**
@@ -177,6 +185,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   guests: [],
   reservations: [],
   nightRecords: [],
+  // Default workspace settings — the gear UI seeds these on first
+  // open if the server returns empty. Keeping defaults here too
+  // means screens render correctly during the brief window before
+  // `loadSettings()` resolves.
+  settings: {
+    venueTypes: ['Restaurante', 'Club', 'Beach Club', 'Shisha Lounge', 'Tardeo'],
+  },
   hydrated: false,
   onboarded: false,
   syncing: false,
@@ -220,7 +235,18 @@ export const useAppStore = create<AppState>((set, get) => ({
       } catch (err) {
         console.warn('[store] failed to load night records:', err);
       }
-      set({ ...all, nightRecords, hydrated: true, onboarded, syncing: false });
+      // Workspace settings — keep the local defaults if the call
+      // errors. Empty server response also means "use defaults".
+      let settings = get().settings;
+      try {
+        const serverSettings = await api.getSettings();
+        if (serverSettings && Object.keys(serverSettings).length > 0) {
+          settings = { ...settings, ...serverSettings };
+        }
+      } catch (err) {
+        console.warn('[store] failed to load settings:', err);
+      }
+      set({ ...all, nightRecords, settings, hydrated: true, onboarded, syncing: false });
     } catch (err) {
       set({
         hydrated: true,
@@ -505,5 +531,21 @@ export const useAppStore = create<AppState>((set, get) => ({
     const rows = await api.listNightRecords(opts);
     set({ nightRecords: rows });
     return rows;
+  },
+
+  loadSettings: async () => {
+    const fresh = await api.getSettings();
+    // Merge so server-provided keys win but local defaults survive
+    // for unset keys (e.g. brand-new workspaces).
+    const next = { ...get().settings, ...fresh };
+    set({ settings: next });
+    return next;
+  },
+
+  updateSettings: async (patch) => {
+    const fresh = await api.updateSettings(patch);
+    const next = { ...get().settings, ...fresh };
+    set({ settings: next });
+    return next;
   },
 }));

@@ -34,6 +34,12 @@ export const tenants = pgTable('tenants', {
   deviceId: text('device_id').notNull().unique(),
   /** Optional display name (filled when auth lands). */
   displayName: text('display_name'),
+  /** Workspace-level configurable settings — `{ venueTypes: [...] }`
+   *  and other promoter-managed preferences. Stored as a single
+   *  jsonb so we don't need a new table per setting. */
+  settings: jsonb('settings').$type<{
+    venueTypes?: string[];
+  }>().default({}).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -41,6 +47,10 @@ export const venues = pgTable('venues', {
   id: serial('id').primaryKey(),
   tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
+  /** Type/section the venue belongs to ("Club", "Restaurante",
+   *  "Beach Club", etc.). Free-text but expected to match one of
+   *  `tenants.settings.venueTypes`. NULL = uncategorised. */
+  venueType: text('venue_type'),
   phoneCode: text('phone_code'),
   phoneNum: text('phone_num'),
   // Legacy columns dropped in 0008:
