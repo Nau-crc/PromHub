@@ -42,7 +42,12 @@ export const EventCard: React.FC<Props> = ({ event: e, occurrenceDate, onClick }
     .filter((r) => r.eventId === e.id && matchByDate(r.eventDate))
     .length;
   const inv = (e.invitedGuests || []).length;
-  const ids = e.selectedSlotIds || [];
+  // Per-event timeslot ids — events own their slots after 0008.
+  const ids = (e.timeslots || []).map((t) => t.id);
+  // Per-night capacity = sum of slot caps. 0 = unlimited.
+  const nightCapacity = (e.timeslots || []).reduce(
+    (a, s) => a + (s.guestCapacity || 0), 0,
+  );
 
   // Date label:
   //  - If we know the occurrence, show that exact date.
@@ -77,7 +82,7 @@ export const EventCard: React.FC<Props> = ({ event: e, occurrenceDate, onClick }
               Club / etc. as if it were one of them. */}
           {gc > 0 && (
             <Pill tone="blue">
-              {e.capacity ? `${gc}/${e.capacity}` : `${gc}`} {t('summary.guests').toLowerCase()}
+              {nightCapacity > 0 ? `${gc}/${nightCapacity}` : `${gc}`} {t('summary.guests').toLowerCase()}
             </Pill>
           )}
           {rc > 0 && <Pill tone="green">{t('onboarding.legend.sampleReservations', { count: rc })}</Pill>}

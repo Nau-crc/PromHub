@@ -27,10 +27,13 @@ const timeslotSchema = z.object({
 const vipTypeSchema = z.object({
   id: z.string(),
   name: z.string().min(1),
-  price: z.number().min(0),
   minPax: z.number().int().min(1),
   maxPax: z.number().int().min(1),
   tableCapacity: z.number().int().min(0),
+  // `price` was here pre-0008; now lives on the event in
+  // `vipPrices`. Accept it loosely on input for forward-compat
+  // but ignore on the way to the DB.
+  price: z.number().optional(),
 });
 
 // (Legacy invite-type schema dropped — guests now select from the
@@ -38,10 +41,8 @@ const vipTypeSchema = z.object({
 
 export const venueInputSchema = z.object({
   name: z.string().min(1).max(120),
-  guestCapacity: z.number().int().min(0).default(0),
   phoneCode: z.string().nullable().optional(),
   phoneNum: z.string().nullable().optional(),
-  timeslots: z.array(timeslotSchema).default([]),
   vipTypes: z.array(vipTypeSchema).default([]),
 });
 export type VenueInput = z.infer<typeof venueInputSchema>;
@@ -51,17 +52,17 @@ export const eventInputSchema = z.object({
   name: z.string().min(1).max(120),
   venueId: z.number().int().nullable().optional(),
   weekdays: z.array(z.string()).default([]),
-  selectedSlotIds: z.array(z.string()).default([]),
   description: z.string().max(1000).default(''),
   isPrivate: z.boolean().default(false),
   isLateClub: z.boolean().default(false),
   invitedGuests: z.array(z.string()).default([]),
   isOneTime: z.boolean().default(false),
   eventDate: isoDate.nullable().optional(),
-  capacity: z.number().int().min(0).nullable().optional(),
-  /** Pair: both fields must either be set together OR both null.
-   *  We don't enforce the pair-rule at the schema level (the UI
-   *  blocks save when one is missing), but we accept either form. */
+  /** Per-event timeslot definitions — the event OWNS them now. */
+  timeslots: z.array(timeslotSchema).default([]),
+  /** Map of VIP-type name → price-in-€ at this event. */
+  vipPrices: z.record(z.string(), z.number().min(0)).default({}),
+  /** Pair: both fields must either be set together OR both null. */
   minGuestsThreshold: z.number().int().min(1).nullable().optional(),
   fixedFee: z.number().min(0).nullable().optional(),
   seasonStart: isoDate.nullable().optional(),

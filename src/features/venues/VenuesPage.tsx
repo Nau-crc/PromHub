@@ -4,8 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { useAppStore } from '@/store/useAppStore';
 import { useUIStore } from '@/store/useUIStore';
 import { useConfirm } from '@/store/useConfirmStore';
-import { venueGuestCount } from '@/features/summary/calculations';
-import { CapacityBar } from '@/components/CapacityBar';
+// venueGuestCount + CapacityBar dropped — venue no longer holds a
+// total capacity (lives on events as sum-of-slot-caps now).
 import { EmptyBox } from '@/components/EmptyBox';
 
 export const VenuesPage: React.FC = () => {
@@ -48,28 +48,23 @@ export const VenuesPage: React.FC = () => {
         {venues.length ? (
           <div className="list-card">
             {venues.map((v) => {
-              const gc = venueGuestCount(v.id, guests);
-              const gcap = v.guestCapacity || 0;
-              const gpct = gcap ? Math.min(100, Math.round((gc / gcap) * 100)) : 0;
-              const slots = (v.timeslots || []).map((s) => `${s.name} ${s.startTime}–${s.endTime}`).join(', ') || t('venues.noTimeslots');
+              // Capacity and timeslot lists moved to the EVENT after
+              // 0008 — venues now just declare identity, phone, and
+              // VIP types. Display sticks to those.
+              const phone = v.phoneCode && v.phoneNum
+                ? `${v.phoneCode} ${v.phoneNum}`
+                : null;
               const vips = (v.vipTypes || []).map(
-                (vp) => `${vp.name}(${vp.minPax}-${vp.maxPax}pax €${vp.price}/${vp.tableCapacity || 0}tbls)`,
+                (vp) => `${vp.name} (${vp.minPax}-${vp.maxPax} pax · ${vp.tableCapacity || 0} tbls)`,
               ).join(', ') || t('venues.noVipTypes');
               return (
                 <div key={v.id} className="venue-row-item">
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div className="venue-name">{v.name}</div>
                     <div className="venue-sub">
-                      {slots}<br />{vips}
+                      {phone && <>{phone}<br /></>}
+                      {vips}
                     </div>
-                    {gcap > 0 && (
-                      <>
-                        <div style={{ fontSize: 10, color: 'var(--color-text-secondary)', marginTop: 5 }}>
-                          {t('summary.guests')} {gc}/{gcap}
-                        </div>
-                        <CapacityBar pct={gpct} warnAt={80} />
-                      </>
-                    )}
                   </div>
                   <div className="venue-acts">
                     <button className="tag-btn" onClick={() => open('editVenue', { id: v.id })}>{t('actions.edit')}</button>

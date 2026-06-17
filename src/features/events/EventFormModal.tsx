@@ -1,18 +1,18 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { IonModal, IonContent } from '@ionic/react';
 import { useTranslation } from 'react-i18next';
-import type { PromEvent } from '@/core/types';
+import type { PromEvent, Timeslot } from '@/core/types';
 import { useAppStore } from '@/store/useAppStore';
 import { useConfirm } from '@/store/useConfirmStore';
 import { isoDay, todayWeekday } from '@/core/utils/date';
 import { today } from '@/core/constants';
 import { DayChips } from '@/components/DayChips';
-import { SlotChips } from '@/components/SlotChips';
 import { SheetHeader } from '@/components/SheetHeader';
 import { NumberField } from '@/components/NumberField';
 import { Calendar } from '@/components/Calendar';
 import { SelectField } from '@/components/SelectField';
 import { safeUuid } from '@/core/utils/format';
+import { TimeslotRows } from '@/features/venues/VenueEditor';
 
 interface Props {
   open: boolean;
@@ -49,16 +49,18 @@ export const EventFormModal: React.FC<Props> = ({ open, onClose, editing, onRequ
   const [isOneTime, setIsOneTime] = useState(false);
   const [eventDate, setEventDate] = useState<string>('');
   const [days, setDays] = useState<string[]>([]);
-  const [slotIds, setSlotIds] = useState<string[]>([]);
+  /** Event-owned timeslot definitions (moved from venue in 0008). */
+  const [tsRows, setTsRows] = useState<Timeslot[]>([]);
+  /** Per-event VIP prices, keyed by VIP type NAME. The venue owns
+   *  the type identity + table capacity; the event picks the price. */
+  const [vipPrices, setVipPrices] = useState<Record<string, number>>({});
   const [desc, setDesc] = useState('');
   const [isPriv, setPriv] = useState(false);
   const [isLate, setLate] = useState(false);
-  const [capacity, setCapacity] = useState<number | null>(null);
   /** Minimum pax required on a single occurrence to earn the fixed
    *  fee. Stays null when the event has no fee logic. */
   const [minGuestsThreshold, setMinGuestsThreshold] = useState<number | null>(null);
-  /** Fixed € amount earned when threshold is met. Stays null when
-   *  the event has no fee logic. */
+  /** Fixed € amount earned when threshold is met. */
   const [fixedFee, setFixedFee] = useState<number | null>(null);
   const [seasonStart, setSeasonStart] = useState<string>('');
   const [seasonEnd, setSeasonEnd] = useState<string>('');
@@ -81,16 +83,11 @@ export const EventFormModal: React.FC<Props> = ({ open, onClose, editing, onRequ
     setDays(editing && !editing.isOneTime
       ? (editing.weekdays || [editing.weekday]).filter(Boolean)
       : [todayWeekday()]);
-    const initV = venues.find((v) => v.id === (editing?.venueId ?? venues[0]?.id));
-    setSlotIds(
-      editing
-        ? [...(editing.selectedSlotIds || [])]
-        : initV?.timeslots?.length ? [initV.timeslots[0].id] : [],
-    );
+    setTsRows(editing ? [...(editing.timeslots || [])] : []);
+    setVipPrices(editing ? { ...(editing.vipPrices || {}) } : {});
     setDesc(editing?.description ?? '');
     setPriv(!!editing?.isPrivate);
     setLate(!!editing?.isLateClub);
-    setCapacity(editing?.capacity ?? null);
     setMinGuestsThreshold(editing?.minGuestsThreshold ?? null);
     setFixedFee(editing?.fixedFee ?? null);
     setSeasonStart(editing?.seasonStart ?? '');
@@ -104,20 +101,23 @@ export const EventFormModal: React.FC<Props> = ({ open, onClose, editing, onRequ
     }
     if (val === NO_VENUE || val === '') {
       setVenueId(null);
-      setSlotIds([]); // no venue → no timeslots
       return;
     }
-    const id = parseInt(val);
-    setVenueId(id);
-    const v = venues.find((x) => x.id === id);
-    setSlotIds(v?.timeslots?.length ? [v.timeslots[0].id] : []);
+    setVenueId(parseInt(val));
   };
+
+  // VIP types come from the SELECTED venue (identity + capacity);
+  // their prices are kept locally on the event. When the venue
+  // changes, prices for VIP types no longer relevant get dropped
+  // implicitly because they're keyed by name.
+  const selectedVenue = useMemo(
+    () => venues.find((v) => v.id === venueId) ?? null,
+    [venues, venueId],
+  );
+  const vipTypeNames = (selectedVenue?.vipTypes ?? []).map((vt) => vt.name);
 
   const toggleDay = (d: string) =>
     setDays((arr) => (arr.includes(d) ? arr.filter((x) => x !== d) : [...arr, d]));
-
-  const toggleSlot = (id: string) =>
-    setSlotIds((arr) => (arr.includes(id) ? arr.filter((x) => x !== id) : [...arr, id]));
 
   const save = async () => {
     const trimmed = name.trim();
@@ -142,14 +142,27 @@ export const EventFormModal: React.FC<Props> = ({ open, onClose, editing, onRequ
       return;
     }
 
-    // Timeslots only required when a venue is set (otherwise the event has none)
-    if (venueId != null && !slotIds.length) {
+    // At least one timeslot defined.
+    const cleanSlots = tsRows
+      .filter((r) => r.name.trim())
+      .map((r) => ({
+        ...r,
+        name: r.name.trim(),
+        guestCapacity: r.guestCapacity || 0,
+      }));
+    if (!cleanSlots.length) {
       alert(t('eventForm.errSelectSlot'));
       return;
     }
 
-    // Every event gets a public-share token at creation time. Existing
-    // events keep their token; new ones get a fresh UUID v4.
+    // Strip prices for VIP types that no longer exist on the venue.
+    const cleanPrices: Record<string, number> = {};
+    for (const name of vipTypeNames) {
+      const p = vipPrices[name];
+      if (typeof p === 'number' && p > 0) cleanPrices[name] = p;
+    }
+
+    // Every event gets a public-share token at creation time.
     const shareToken = editing?.shareToken ?? safeUuid();
 
     const entry = {
@@ -158,7 +171,6 @@ export const EventFormModal: React.FC<Props> = ({ open, onClose, editing, onRequ
       venueId,
       weekdays: isOneTime ? [] : [...days],
       weekday: isOneTime ? '' : days[0],
-      selectedSlotIds: venueId != null ? [...slotIds] : [],
       description: desc.trim(),
       videoUrl: '',
       isPrivate: isPriv,
@@ -166,9 +178,8 @@ export const EventFormModal: React.FC<Props> = ({ open, onClose, editing, onRequ
       invitedGuests: editing?.invitedGuests ?? [],
       isOneTime,
       eventDate: isOneTime ? eventDate : null,
-      capacity: capacity && capacity > 0 ? capacity : null,
-      // Persist both fee fields together — UI guarantees the pair
-      // is consistent before we get here.
+      timeslots: cleanSlots,
+      vipPrices: cleanPrices,
       minGuestsThreshold: hasThreshold ? minGuestsThreshold : null,
       fixedFee: hasFee ? fixedFee : null,
       seasonStart: !isOneTime && seasonStart ? seasonStart : null,
@@ -261,23 +272,46 @@ export const EventFormModal: React.FC<Props> = ({ open, onClose, editing, onRequ
             )}
           </div>
 
-          {venueId != null && (
+          {/* ── Timeslots (event-owned) ─────────────────────────
+              Slots are now defined HERE — each event sets its own
+              timeslots and per-slot capacity. The per-night cap is
+              the sum of these capacities. */}
+          <TimeslotRows rows={tsRows} setRows={setTsRows} />
+
+          {/* ── VIP prices for this event ──────────────────────
+              The venue declares which VIP types exist (identity +
+              table capacity); the event sets a € price per type. */}
+          {venueId != null && vipTypeNames.length > 0 && (
             <div className="form-group">
-              <label className="form-label">{t('eventForm.timeslots')}</label>
-              <SlotChips venueId={venueId} selected={slotIds} onToggle={toggleSlot} />
+              <label className="form-label">{t('eventForm.vipPricesSection')}</label>
+              <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 8 }}>
+                {t('eventForm.vipPricesHint')}
+              </div>
+              {vipTypeNames.map((name) => (
+                <div key={name} style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '6px 0',
+                }}>
+                  <div style={{ flex: 1, fontSize: 13, color: 'var(--color-text-primary)' }}>
+                    {name}
+                  </div>
+                  <div style={{ width: 110 }}>
+                    <NumberField
+                      className="form-input"
+                      style={{ textAlign: 'right' }}
+                      placeholder="€0"
+                      min={0}
+                      decimal
+                      value={vipPrices[name] ?? null}
+                      onChange={(v) =>
+                        setVipPrices((m) => ({ ...m, [name]: v ?? 0 }))
+                      }
+                    />
+                  </div>
+                </div>
+              ))}
             </div>
           )}
-
-          <div className="form-group">
-            <label className="form-label">{t('eventForm.capacity')}</label>
-            <NumberField
-              className="form-input"
-              placeholder={t('eventForm.capacityPlaceholder')}
-              min={0}
-              value={capacity}
-              onChange={setCapacity}
-            />
-          </div>
 
           {/* ── Fixed-fee block ────────────────────────────────
               The promoter optionally sets "bring at least N people

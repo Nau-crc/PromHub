@@ -74,9 +74,12 @@ function normalizeVenue(row: any): Venue {
   return {
     id: row.id,
     name: row.name,
-    guestCapacity: row.guestCapacity ?? 0,
-    timeslots: row.timeslots ?? [],
+    // `vipTypes` rows may still carry a legacy `price` field from
+    // before 0008 — keep it on the type as optional but the new
+    // source of truth is `PromEvent.vipPrices[name]`.
     vipTypes: row.vipTypes ?? [],
+    phoneCode: row.phoneCode ?? '',
+    phoneNum: row.phoneNum ?? '',
   };
 }
 
@@ -87,7 +90,6 @@ function normalizeEvent(row: any): PromEvent {
     venueId: row.venueId ?? null,
     weekdays: row.weekdays ?? [],
     weekday: (row.weekdays ?? [])[0] ?? '',
-    selectedSlotIds: row.selectedSlotIds ?? [],
     description: row.description ?? '',
     videoUrl: '',
     isPrivate: !!row.isPrivate,
@@ -95,10 +97,10 @@ function normalizeEvent(row: any): PromEvent {
     invitedGuests: row.invitedGuests ?? [],
     isOneTime: !!row.isOneTime,
     eventDate: row.eventDate,
-    capacity: row.capacity,
-    // numeric column → Drizzle returns string; coerce to number here
-    // so the client always works in numeric space.
+    timeslots: row.timeslots ?? [],
+    vipPrices: row.vipPrices ?? {},
     minGuestsThreshold: row.minGuestsThreshold ?? null,
+    // numeric column → Drizzle returns string; coerce to number here
     fixedFee: row.fixedFee != null ? Number(row.fixedFee) : null,
     seasonStart: row.seasonStart,
     seasonEnd: row.seasonEnd,
@@ -316,8 +318,6 @@ function buildSyncPayload(snap: AppDataSnapshot) {
     venues: snap.venues.map((v) => ({
       clientId: v.id,
       name: v.name,
-      guestCapacity: v.guestCapacity,
-      timeslots: v.timeslots,
       vipTypes: v.vipTypes,
     })),
     events: snap.events.map((e) => ({
@@ -325,14 +325,14 @@ function buildSyncPayload(snap: AppDataSnapshot) {
       venueClientId: e.venueId,
       name: e.name,
       weekdays: e.weekdays,
-      selectedSlotIds: e.selectedSlotIds,
       description: e.description,
       isPrivate: e.isPrivate,
       isLateClub: e.isLateClub,
       invitedGuests: e.invitedGuests,
       isOneTime: e.isOneTime,
       eventDate: e.eventDate,
-      capacity: e.capacity,
+      timeslots: e.timeslots,
+      vipPrices: e.vipPrices,
       minGuestsThreshold: e.minGuestsThreshold,
       fixedFee: e.fixedFee,
       seasonStart: e.seasonStart,

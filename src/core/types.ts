@@ -13,10 +13,14 @@ export interface Timeslot {
 export interface VipType {
   id: string;
   name: string;
-  price: number;        // € per table
   minPax: number;
   maxPax: number;
   tableCapacity: number;
+  // `price` is no longer on the venue's VIP type — it's per-event,
+  // stored in `PromEvent.vipPrices[name]`. Field retained as
+  // optional for backward read-compat with older API responses but
+  // shouldn't be relied on going forward.
+  price?: number;
 }
 
 // (InviteType removed — guests now pick from the event's selected
@@ -25,8 +29,8 @@ export interface VipType {
 export interface Venue {
   id: number;
   name: string;
-  guestCapacity: number;
-  timeslots: Timeslot[];
+  // `guestCapacity` and `timeslots` were dropped in the
+  // event-centric refactor — slots now live on the event.
   vipTypes: VipType[];
   /** Optional venue contact for WhatsApp dispatch of reservations. */
   phoneCode?: string;
@@ -40,7 +44,6 @@ export interface PromEvent {
   venueId: number | null;
   weekdays: string[];
   weekday: string;
-  selectedSlotIds: string[];
   description: string;
   videoUrl: string;
   isPrivate: boolean;
@@ -50,8 +53,14 @@ export interface PromEvent {
   isOneTime: boolean;
   /** ISO yyyy-mm-dd. Only meaningful when isOneTime === true. */
   eventDate: string | null;
-  /** Maximum guests per occurrence. 0 / null = no cap. */
-  capacity: number | null;
+  /** Per-event timeslot definitions. The sum of `guestCapacity`
+   *  across slots is the event's per-night capacity — resets each
+   *  night. Slots reference IDs that guests can `timeslotIds`-into. */
+  timeslots: Timeslot[];
+  /** Per-event price per VIP type, keyed by `VipType.name`. The
+   *  venue declares the VIP type identity + table capacity; the
+   *  event decides what each table sells for. */
+  vipPrices: Record<string, number>;
   /** Minimum guest pax to bring on a single occurrence in order to
    *  earn the fixed fee. null = no fee logic on this event. */
   minGuestsThreshold: number | null;

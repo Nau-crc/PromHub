@@ -119,7 +119,6 @@ export const VipRows: React.FC<VipRowsProps> = ({ rows, setRows }) => {
       {
         id: nextId('vip') as string,
         name: '',
-        price: 0,
         minPax: 1,
         maxPax: 10,
         tableCapacity: 5,
@@ -149,18 +148,6 @@ export const VipRows: React.FC<VipRowsProps> = ({ rows, setRows }) => {
             <button type="button" className="row-del-btn" aria-label={t('actions.delete')} onClick={() => remove(i)}>✕</button>
           </div>
           <div className="vip-block-row">
-            <div>
-              <div className="vip-sub-label">{t('venueEditor.pricePerTable')}</div>
-              <NumberField
-                className="form-input"
-                style={{ fontSize: 13, padding: '9px 8px' }}
-                placeholder="—"
-                min={0}
-                decimal
-                value={r.price || null}
-                onChange={(v) => update(i, { price: v ?? 0 })}
-              />
-            </div>
             <div>
               <div className="vip-sub-label">{t('venueEditor.paxRange')}</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>

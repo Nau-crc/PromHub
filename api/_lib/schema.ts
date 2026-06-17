@@ -41,16 +41,17 @@ export const venues = pgTable('venues', {
   id: serial('id').primaryKey(),
   tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
-  guestCapacity: integer('guest_capacity').default(0).notNull(),
   phoneCode: text('phone_code'),
   phoneNum: text('phone_num'),
-  /** Array of { id, name, startTime, endTime, guestCapacity }. */
-  timeslots: jsonb('timeslots').$type<Array<{
-    id: string; name: string; startTime: string; endTime: string; guestCapacity: number;
-  }>>().default([]).notNull(),
-  /** Array of { id, name, price, minPax, maxPax, tableCapacity }. */
+  // Legacy columns dropped in 0008:
+  //   - guest_capacity (venue-level cap was redundant — slots own capacity now)
+  //   - timeslots (moved to events; each event defines its own slots)
+  /** Array of { id, name, minPax, maxPax, tableCapacity }.
+   *  Prices moved to the EVENT (each event sets its own price per
+   *  VIP type), so this row only carries identity + pax range +
+   *  how many tables of this type exist at the venue. */
   vipTypes: jsonb('vip_types').$type<Array<{
-    id: string; name: string; price: number; minPax: number; maxPax: number; tableCapacity: number;
+    id: string; name: string; minPax: number; maxPax: number; tableCapacity: number;
   }>>().default([]).notNull(),
   // (Legacy `invite_types` jsonb dropped in 0003 — guests now pick
   // from the event's selected timeslots directly.)
@@ -65,7 +66,9 @@ export const events = pgTable('events', {
   name: text('name').notNull(),
   venueId: integer('venue_id').references(() => venues.id, { onDelete: 'set null' }),
   weekdays: text('weekdays').array().default([]).notNull(),
-  selectedSlotIds: text('selected_slot_ids').array().default([]).notNull(),
+  // Legacy: `selected_slot_ids` (text[]) dropped in 0008. Events
+  // now own their timeslots directly via the `timeslots` jsonb
+  // below.
   description: text('description').default('').notNull(),
   isPrivate: boolean('is_private').default(false).notNull(),
   isLateClub: boolean('is_late_club').default(false).notNull(),
@@ -73,7 +76,20 @@ export const events = pgTable('events', {
   isOneTime: boolean('is_one_time').default(false).notNull(),
   /** ISO date; one-time events only. */
   eventDate: date('event_date'),
-  capacity: integer('capacity'),
+  // Legacy: `capacity` (integer) dropped in 0008. Per-night capacity
+  // is the sum of `timeslots[].guestCapacity` for this event — slot
+  // capacities are the granular truth and reset each night.
+  /** Per-event timeslot definitions. Each slot has its own
+   *  per-night capacity. The event-level pax check (against
+   *  `minGuestsThreshold`) sums across slots for the date. */
+  timeslots: jsonb('timeslots').$type<Array<{
+    id: string; name: string; startTime: string; endTime: string; guestCapacity: number;
+  }>>().default([]).notNull(),
+  /** Per-event VIP table prices: { [vipTypeName]: price-in-€ }.
+   *  The VIP type identity / capacity stays on the venue; the price
+   *  is event-scoped so the same venue can sell different events
+   *  at different rates. */
+  vipPrices: jsonb('vip_prices').$type<Record<string, number>>().default({}).notNull(),
   /** Minimum guest pax the promoter must bring on a single
    *  occurrence to earn the fixed fee. NULL = no threshold (no
    *  fee logic at all for this event). Per-occurrence: the count

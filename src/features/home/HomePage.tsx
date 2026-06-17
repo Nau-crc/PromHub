@@ -8,7 +8,7 @@ import { fmtDateLong, isoDay } from '@/core/utils/date';
 import { occurs } from '@/features/summary/calculations';
 import { EventCard } from '@/components/EventCard';
 import { EmptyBox } from '@/components/EmptyBox';
-import { CloseNightPanel } from '@/features/nightClose/CloseNightPanel';
+// CloseNightPanel moved out of Home — lives in the drawer footer now.
 
 export const HomePage: React.FC = () => {
   const events = useAppStore((s) => s.events);
@@ -55,11 +55,6 @@ export const HomePage: React.FC = () => {
             {t('home.emptySub')}
           </EmptyBox>
         )}
-        {/* Close-night CTA. Only shown for today; the panel itself
-            handles disabled / closed states based on data + history. */}
-        <div style={{ padding: '0 16px' }}>
-          <CloseNightPanel isoDate={todayKey} />
-        </div>
         <div className="spacer" />
       </IonContent>
     </IonPage>

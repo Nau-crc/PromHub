@@ -156,7 +156,9 @@ async function readLegacySnapshot(): Promise<AppDataSnapshot | null> {
       ...e,
       isOneTime: e.isOneTime ?? false,
       eventDate: e.eventDate ?? null,
-      capacity: e.capacity ?? null,
+      // `capacity` (event-level) dropped in 0008 — slots own it.
+      timeslots: e.timeslots ?? [],
+      vipPrices: e.vipPrices ?? {},
       seasonStart: e.seasonStart ?? null,
       seasonEnd: e.seasonEnd ?? null,
       shareToken: e.shareToken ?? null,

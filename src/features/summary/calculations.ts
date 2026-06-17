@@ -42,11 +42,27 @@ export function venueVipSlotsLeft(
 }
 
 // ── VIP price lookup ────────────────────────────────────────
-export const getVipPrice = (vid: number, name: string, venues: Venue[]): number => {
+//
+// Prices moved from venue → event in the 0008 refactor. The lookup
+// now consults the EVENT'S `vipPrices` map (keyed by VIP type name)
+// when an `eventId` is available. Falls back to the legacy
+// `Venue.vipTypes[x].price` field for pre-refactor rows.
+export const getVipPrice = (
+  vid: number,
+  name: string,
+  venues: Venue[],
+  events: PromEvent[] = [],
+  eventId?: number | null,
+): number => {
+  if (eventId != null) {
+    const ev = events.find((e) => e.id === eventId);
+    const fromEvent = ev?.vipPrices?.[name];
+    if (typeof fromEvent === 'number') return fromEvent;
+  }
   const v = venueById(vid, venues);
   if (!v) return 0;
   const t = (v.vipTypes || []).find((x) => x.name === name);
-  return t ? t.price : 0;
+  return t?.price ?? 0;
 };
 
 // ── Commission breakdown — the core money formula ───────────
@@ -64,8 +80,12 @@ export interface CommissionResult {
   woman: number;
 }
 
-export function commCalc(r: Reservation, venues: Venue[]): CommissionResult {
-  const price = getVipPrice(r.venueId, r.vipType, venues);
+export function commCalc(
+  r: Reservation,
+  venues: Venue[],
+  events: PromEvent[] = [],
+): CommissionResult {
+  const price = getVipPrice(r.venueId, r.vipType, venues, events, r.eventId);
   const promoter = round2(price * (r.commissionPct || 0) / 100);
   const woman = r.fromInvite ? round2(promoter * (r.womanPct || 0) / 100) : 0;
   return { price, tableTotal: price, promoter, woman };
@@ -76,16 +96,20 @@ export function commCalc(r: Reservation, venues: Venue[]): CommissionResult {
 export const netToYou = (c: CommissionResult): number => round2(c.promoter - c.woman);
 
 // ── Slot helpers ────────────────────────────────────────────
-export function slotById(id: string, venues: Venue[]) {
-  for (const v of venues) {
-    const s = (v.timeslots || []).find((t) => t.id === id);
+// Slots moved from venue → event in 0008. The lookups now scan
+// `events[].timeslots`. The signature still ACCEPTS `Venue[]` for
+// callers that haven't migrated, but the venue path returns null
+// — they pass `events` going forward.
+export function slotById(id: string, events: PromEvent[]) {
+  for (const e of events) {
+    const s = (e.timeslots || []).find((t) => t.id === id);
     if (s) return s;
   }
   return null;
 }
 
-export function slotLabel(id: string, venues: Venue[]): string {
-  const s = slotById(id, venues);
+export function slotLabel(id: string, events: PromEvent[]): string {
+  const s = slotById(id, events);
   return s ? `${s.name} (${s.startTime}–${s.endTime})` : '—';
 }
 
@@ -269,6 +293,58 @@ export function totalFixedFeesForDate(
   return round2(sum);
 }
 
+// ── Per-slot capacity helpers ───────────────────────────────
+//
+// Slot capacities are the granular truth — show the promoter what
+// each slot can hold AND what's confirmed so far for tonight.
+
+export interface SlotCapacity {
+  slotId: string;
+  slotName: string;
+  startTime: string;
+  endTime: string;
+  capacity: number;          // 0 = unlimited
+  used: number;              // pax confirmed in this slot for the date
+  left: number;              // remaining; Infinity if unlimited
+  pct: number;
+  fillClass: '' | 'warn' | 'full';
+}
+
+/** Per-slot capacity breakdown for an event on a specific date. */
+export function slotCapacities(
+  event: PromEvent,
+  guests: Guest[],
+  isoDate: string,
+): SlotCapacity[] {
+  return (event.timeslots ?? []).map((slot) => {
+    const used = guests
+      .filter((g) =>
+        isGuestOnEvent(g, event.id)
+        && !isCancelledFor(g, event.id)
+        && !g.waitlisted
+        && (!g.eventDate || g.eventDate === isoDate)
+        && (g.timeslotIds ?? []).includes(slot.id))
+      .reduce((a, g) => a + g.pax, 0);
+    const capacity = slot.guestCapacity || 0;
+    if (!capacity) {
+      return {
+        slotId: slot.id, slotName: slot.name,
+        startTime: slot.startTime, endTime: slot.endTime,
+        capacity: 0, used, left: Infinity, pct: 0, fillClass: '',
+      };
+    }
+    const left = Math.max(0, capacity - used);
+    const pct = Math.min(100, Math.round((used / capacity) * 100));
+    const fillClass: '' | 'warn' | 'full' =
+      pct >= 100 ? 'full' : pct >= 75 ? 'warn' : '';
+    return {
+      slotId: slot.id, slotName: slot.name,
+      startTime: slot.startTime, endTime: slot.endTime,
+      capacity, used, left, pct, fillClass,
+    };
+  });
+}
+
 // ── Occurrence helpers ─────────────────────────────────────
 //
 // An event "occurs on" a given ISO date when:
@@ -361,18 +437,17 @@ export function findEventsAt(
   isoDate: string,
   time: string,
   events: PromEvent[],
-  venues: Venue[],
+  // venues kept for signature stability with callers; slots are
+  // now defined on the event itself so we no longer need to look
+  // up the venue's timeslot list.
+  _venues: Venue[],
 ): EventSlotMatch[] {
   if (venueId == null || !isoDate) return [];
-  const v = venueById(venueId, venues);
-  if (!v) return [];
   const out: EventSlotMatch[] = [];
   for (const e of events) {
     if (e.venueId !== venueId) continue;
     if (!occurs(e, isoDate)) continue;
-    for (const sid of e.selectedSlotIds || []) {
-      const slot = (v.timeslots || []).find((s) => s.id === sid);
-      if (!slot) continue;
+    for (const slot of e.timeslots || []) {
       if (!time || timeInSlot(time, slot.startTime, slot.endTime)) {
         out.push({ event: e, slotName: slot.name, startTime: slot.startTime, endTime: slot.endTime });
       }
@@ -432,8 +507,11 @@ export interface EventCapacity {
 
 /**
  * Capacity for a specific occurrence of the event.
- * If `isoDate` is provided, only guests on that date count toward `used`.
- * If null, all guests linked to the event count (legacy behaviour).
+ *
+ * Capacity = SUM of `event.timeslots[].guestCapacity`. Slot caps
+ * are the granular truth, summed per night. Cancelled + waitlisted
+ * guests are excluded from `used`. Pax counter is per-OCCURRENCE
+ * when `isoDate` is provided — that's how the night resets.
  */
 export function eventCapacity(
   eventId: number,
@@ -442,22 +520,16 @@ export function eventCapacity(
   isoDate: string | null = null,
 ): EventCapacity {
   const e = events.find((x) => x.id === eventId);
-  // Cancelled guests free up their seats — they don't count toward the
-  // used capacity, so the next swipe-cancel widens "left" again.
-  // Includes club-event guests (a guest going to the late club counts
-  // toward the club's capacity, not just their main event's).
-  // Cancellation is per-attendance: a guest cancelled-main-only
-  // still counts toward her club event's capacity. `isCancelledFor`
-  // reads the correct flag based on which attendance ties her to
-  // `eventId`. Waitlisted guests don't count — they're pending
-  // promotion and only become "used" once promoted.
   const used = guests
     .filter((g) => isGuestOnEvent(g, eventId)
       && !isCancelledFor(g, eventId)
       && !g.waitlisted
       && (isoDate == null || g.eventDate === isoDate))
     .reduce((a, g) => a + g.pax, 0);
-  const capacity = e?.capacity ?? 0;
+  const capacity = (e?.timeslots ?? []).reduce(
+    (a, s) => a + (s.guestCapacity || 0),
+    0,
+  );
   if (!capacity) {
     return { used, capacity: 0, left: Infinity, pct: 0, fillClass: '' };
   }
@@ -500,7 +572,7 @@ export function summarizeToday(
   let totP = 0;
   let totW = 0;
   for (const r of reservations) {
-    const { promoter, woman } = commCalc(r, venues);
+    const { promoter, woman } = commCalc(r, venues, events);
     totP += promoter;
     totW += woman;
   }

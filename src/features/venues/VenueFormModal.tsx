@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { IonModal, IonContent } from '@ionic/react';
 import { useTranslation } from 'react-i18next';
-import type { Venue, Timeslot, VipType } from '@/core/types';
+import type { Venue, VipType } from '@/core/types';
 import { useAppStore } from '@/store/useAppStore';
 import { useConfirm } from '@/store/useConfirmStore';
-import { TimeslotRows, VipRows } from './VenueEditor';
+import { VipRows } from './VenueEditor';
 import { SheetHeader } from '@/components/SheetHeader';
 import { SelectField } from '@/components/SelectField';
 import { COUNTRY_CODES } from '@/core/constants';
@@ -26,19 +26,15 @@ export const VenueFormModal: React.FC<Props> = ({ open, onClose, editing }) => {
   const confirm = useConfirm();
 
   const [name, setName] = useState('');
-  const [guestCap, setGuestCap] = useState<number | ''>('');
   const [phoneCode, setPhoneCode] = useState<string>('+34');
   const [phoneNum, setPhoneNum] = useState<string>('');
-  const [tsRows, setTsRows] = useState<Timeslot[]>([]);
   const [vipRows, setVipRows] = useState<VipType[]>([]);
 
   useEffect(() => {
     if (!open) return;
     setName(editing?.name ?? '');
-    setGuestCap(editing?.guestCapacity ? editing.guestCapacity : '');
     setPhoneCode(editing?.phoneCode || '+34');
     setPhoneNum(editing?.phoneNum || '');
-    setTsRows(editing ? [...(editing.timeslots || [])] : []);
     setVipRows(editing ? [...(editing.vipTypes || [])] : []);
   }, [open, editing]);
 
@@ -48,19 +44,14 @@ export const VenueFormModal: React.FC<Props> = ({ open, onClose, editing }) => {
   const save = async () => {
     const trimmed = name.trim();
     if (!trimmed) { alert(t('venueForm.errNameRequired')); return; }
-    if (!tsRows.filter((r) => r.name.trim()).length) {
-      alert(t('venueForm.errAddTimeslot'));
-      return;
-    }
     if (phoneDigits && !phoneOk) {
       alert(t('venueForm.errPhoneFmt', { code: phoneCode }));
       return;
     }
-    const newTs = tsRows.filter((r) => r.name.trim()).map((r) => ({
-      ...r, name: r.name.trim(), guestCapacity: r.guestCapacity || 0,
-    }));
+    // VIP types only carry identity + capacity now — pricing is per
+    // event. Strip out any legacy `price` from rows before saving.
     const newVip = vipRows.filter((r) => r.name.trim()).map((r) => ({
-      ...r,
+      id: r.id,
       name: r.name.trim(),
       minPax: r.minPax || 1,
       maxPax: r.maxPax || 10,
@@ -69,8 +60,6 @@ export const VenueFormModal: React.FC<Props> = ({ open, onClose, editing }) => {
     const entry = {
       ...(editing?.id != null ? { id: editing.id } : {}),
       name: trimmed,
-      guestCapacity: typeof guestCap === 'number' ? guestCap : (parseInt(String(guestCap)) || 0),
-      timeslots: newTs,
       vipTypes: newVip,
       phoneCode: phoneDigits ? phoneCode : '',
       phoneNum: phoneDigits ? phoneNum.trim() : '',
@@ -106,15 +95,6 @@ export const VenueFormModal: React.FC<Props> = ({ open, onClose, editing }) => {
             <label className="form-label">{t('venueForm.name')}</label>
             <input className="form-input" placeholder={t('venueForm.namePlaceholder')} value={name} onChange={(e) => setName(e.target.value)} />
           </div>
-          <div className="form-group">
-            <label className="form-label">{t('venueForm.guestCapacity')}</label>
-            <input
-              className="form-input" type="number" min={0} placeholder={t('venueForm.guestCapacityPlaceholder')}
-              value={guestCap}
-              onChange={(e) => setGuestCap(e.target.value === '' ? '' : (parseInt(e.target.value) || 0))}
-            />
-          </div>
-
           <div className="form-group">
             <label className="form-label">{t('venueForm.phone')}</label>
             <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 6 }}>
@@ -155,7 +135,6 @@ export const VenueFormModal: React.FC<Props> = ({ open, onClose, editing }) => {
             )}
           </div>
 
-          <TimeslotRows rows={tsRows} setRows={setTsRows} />
           <VipRows rows={vipRows} setRows={setVipRows} />
 
           <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>

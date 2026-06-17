@@ -24,10 +24,13 @@ import { Switch, useLocation } from 'react-router-dom';
 import { ModalsHost } from '@/features/ModalsHost';
 import { ConfirmHost } from '@/components/ConfirmHost';
 import { OnboardingFlow } from '@/features/onboarding/OnboardingFlow';
+import { CloseNightPanel } from '@/features/nightClose/CloseNightPanel';
 import { useAppStore } from '@/store/useAppStore';
 import { useUIStore } from '@/store/useUIStore';
 import { useThemeStore, type ThemeChoice } from '@/store/useThemeStore';
 import { useLocaleStore, type LocaleChoice } from '@/store/useLocaleStore';
+import { today } from '@/core/constants';
+import { isoDay } from '@/core/utils/date';
 import { useTranslation } from 'react-i18next';
 
 setupIonicReact({ mode: 'ios' });
@@ -126,64 +129,85 @@ const Drawer: React.FC = () => {
         </IonToolbar>
       </IonHeader>
       <IonContent>
-        <div style={{ padding: '14px 20px 4px', fontSize: 11, fontWeight: 500, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '.06em' }}>
-          {t('drawer.manage')}
-        </div>
-        <IonList lines="full">
-          <IonMenuToggle autoHide={false}>
-            <IonItem button routerLink="/events" detail>
-              <IonIcon slot="start" icon={calendarOutline} />
-              <IonLabel>
-                <h3>{t('drawer.events')}</h3>
-              </IonLabel>
-            </IonItem>
-            <IonItem button routerLink="/venues" detail>
-              <IonIcon slot="start" icon={businessOutline} />
-              <IonLabel>
-                <h3>{t('drawer.venues')}</h3>
-              </IonLabel>
-            </IonItem>
-            <IonItem button routerLink="/summary" detail>
-              <IonIcon slot="start" icon={statsChartOutline} />
-              <IonLabel>
-                <h3>{t('drawer.summary')}</h3>
-              </IonLabel>
-            </IonItem>
-          </IonMenuToggle>
-        </IonList>
-
-        <div style={{ padding: '14px 20px 4px', fontSize: 11, fontWeight: 500, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '.06em' }}>
-          {t('drawer.quickAdd')}
-        </div>
-        <IonList lines="full">
-          <IonMenuToggle autoHide={false}>
-            <IonItem button onClick={() => open('addEvent')}>
-              <IonIcon slot="start" icon={addOutline} color="primary" />
-              <IonLabel><h3>{t('drawer.newEvent')}</h3></IonLabel>
-            </IonItem>
-            <IonItem button onClick={() => open('addVenue')}>
-              <IonIcon slot="start" icon={addOutline} color="primary" />
-              <IonLabel><h3>{t('drawer.newVenue')}</h3></IonLabel>
-            </IonItem>
-          </IonMenuToggle>
-        </IonList>
-
-        <ThemeToggle />
-        <LanguageToggle />
-
-        {/* Copyright footer — pinned at the bottom of the drawer's
-            scroll area. Plain text, no i18n needed (it's a name +
-            year), kept subtle (small, secondary text colour) so it
-            reads as legal chrome rather than nav content. */}
+        {/* Flex column: nav items grow, footer block pinned to the
+            bottom of the viewport. The wrapper's `minHeight: 100%`
+            ensures the column fills the IonContent so `marginTop:
+            auto` on the footer behaves predictably. */}
         <div style={{
-          padding: '20px 20px 24px',
-          marginTop: 8,
-          textAlign: 'center',
-          fontSize: 11,
-          color: 'var(--color-text-secondary)',
-          borderTop: '0.5px solid var(--color-border-tertiary)',
+          display: 'flex', flexDirection: 'column',
+          minHeight: '100%',
         }}>
-          © 2026 Nau-crc
+          <div style={{ flex: '0 0 auto' }}>
+            <div style={{ padding: '14px 20px 4px', fontSize: 11, fontWeight: 500, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '.06em' }}>
+              {t('drawer.manage')}
+            </div>
+            <IonList lines="full">
+              <IonMenuToggle autoHide={false}>
+                <IonItem button routerLink="/events" detail>
+                  <IonIcon slot="start" icon={calendarOutline} />
+                  <IonLabel>
+                    <h3>{t('drawer.events')}</h3>
+                  </IonLabel>
+                </IonItem>
+                <IonItem button routerLink="/venues" detail>
+                  <IonIcon slot="start" icon={businessOutline} />
+                  <IonLabel>
+                    <h3>{t('drawer.venues')}</h3>
+                  </IonLabel>
+                </IonItem>
+                <IonItem button routerLink="/summary" detail>
+                  <IonIcon slot="start" icon={statsChartOutline} />
+                  <IonLabel>
+                    <h3>{t('drawer.summary')}</h3>
+                  </IonLabel>
+                </IonItem>
+              </IonMenuToggle>
+            </IonList>
+
+            <div style={{ padding: '14px 20px 4px', fontSize: 11, fontWeight: 500, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '.06em' }}>
+              {t('drawer.quickAdd')}
+            </div>
+            <IonList lines="full">
+              <IonMenuToggle autoHide={false}>
+                <IonItem button onClick={() => open('addEvent')}>
+                  <IonIcon slot="start" icon={addOutline} color="primary" />
+                  <IonLabel><h3>{t('drawer.newEvent')}</h3></IonLabel>
+                </IonItem>
+                <IonItem button onClick={() => open('addVenue')}>
+                  <IonIcon slot="start" icon={addOutline} color="primary" />
+                  <IonLabel><h3>{t('drawer.newVenue')}</h3></IonLabel>
+                </IonItem>
+              </IonMenuToggle>
+            </IonList>
+          </div>
+
+          {/* Spacer eats any remaining vertical space so the footer
+              block below it stays glued to the viewport bottom even
+              when the drawer is taller than the nav content. */}
+          <div style={{ flex: '1 1 auto' }} />
+
+          {/* Footer block: Close night → Appearance → Language →
+              Copyright. Stack visually packed together with a top
+              divider so the group reads as one chrome cluster. */}
+          <div style={{
+            flex: '0 0 auto',
+            borderTop: '0.5px solid var(--color-border-tertiary)',
+            paddingBottom: 12,
+          }}>
+            <div style={{ padding: '12px 16px 0' }}>
+              <CloseNightPanel isoDate={isoDay(today())} />
+            </div>
+            <ThemeToggle />
+            <LanguageToggle />
+            <div style={{
+              padding: '10px 20px 6px',
+              textAlign: 'center',
+              fontSize: 11,
+              color: 'var(--color-text-secondary)',
+            }}>
+              © 2026 Nau-crc
+            </div>
+          </div>
         </div>
       </IonContent>
     </IonMenu>

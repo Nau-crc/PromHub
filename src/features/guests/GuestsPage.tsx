@@ -111,17 +111,12 @@ export const GuestsPage: React.FC = () => {
   const divisionByEvent = useMemo(() => {
     const map = new Map<number, SlotDivision>();
     for (const ev of todayEvents) {
-      const v = ev.venueId != null ? venueById(ev.venueId, venues) : undefined;
-      if (!v) {
-        map.set(ev.id, { slots: [], single: true });
-        continue;
-      }
-      const slotIdSet = new Set(ev.selectedSlotIds || []);
-      const slots = (v.timeslots || []).filter((ts) => slotIdSet.has(ts.id));
+      // Slots are event-owned post-0008.
+      const slots = ev.timeslots ?? [];
       map.set(ev.id, { slots, single: slots.length <= 1 });
     }
     return map;
-  }, [todayEvents, venues]);
+  }, [todayEvents]);
 
   // ── Polling for new public-form submissions ─────────────────
   useEffect(() => {
@@ -245,9 +240,11 @@ export const GuestsPage: React.FC = () => {
         if (targetSlotId && targetSlotId !== UNASSIGNED) {
           if (!newSlotIds.includes(targetSlotId)) newSlotIds.push(targetSlotId);
         }
-        const venue = venues.find((v) => v.id === g.venueId);
+        // Resolve names via the EVENT'S slot defs (events own slots
+        // after 0008; venue no longer has them).
+        const sourceEvent = events.find((ev) => ev.id === sourceEventId);
         const newSlotNames = newSlotIds
-          .map((id) => venue?.timeslots.find((ts) => ts.id === id)?.name || '')
+          .map((id) => sourceEvent?.timeslots.find((ts) => ts.id === id)?.name || '')
           .filter(Boolean);
         await upsertGuest({
           ...g,
@@ -258,8 +255,6 @@ export const GuestsPage: React.FC = () => {
       }
 
       // ── Cross-event → reassign main or club, possibly pre-pick slot ──
-      // If we dragged from the guest's club bucket (and her main lives
-      // elsewhere) → rewrite clubEventId; otherwise rewrite the main.
       const updatingClub =
         g.clubEventId === sourceEventId && g.eventId !== sourceEventId;
 
@@ -270,11 +265,10 @@ export const GuestsPage: React.FC = () => {
 
       // Cross-event main reassignment. Pre-pick the target slot for
       // her, if the user dropped on a specific one. Otherwise clear.
-      const targetVenue = venues.find((v) => v.id === targetEvent.venueId);
       const newSlotIds =
         targetSlotId && targetSlotId !== UNASSIGNED ? [targetSlotId] : [];
       const newSlotNames = newSlotIds
-        .map((id) => targetVenue?.timeslots.find((ts) => ts.id === id)?.name || '')
+        .map((id) => targetEvent.timeslots.find((ts) => ts.id === id)?.name || '')
         .filter(Boolean);
       await upsertGuest({
         ...g,
@@ -577,11 +571,17 @@ export const GuestsPage: React.FC = () => {
                         )}
                       </div>
                     </div>
-                    {ev.capacity ? (
-                      <Pill tone="blue">{totalPax}/{ev.capacity}</Pill>
-                    ) : (
-                      <Pill tone="gray">{totalPax} pax</Pill>
-                    )}
+                    {/* Per-night cap = sum of slot caps (event-owned). */}
+                    {(() => {
+                      const nightCap = (ev.timeslots ?? []).reduce(
+                        (a, s) => a + (s.guestCapacity || 0), 0,
+                      );
+                      return nightCap > 0 ? (
+                        <Pill tone="blue">{totalPax}/{nightCap}</Pill>
+                      ) : (
+                        <Pill tone="gray">{totalPax} {t('common.paxShort')}</Pill>
+                      );
+                    })()}
                   </div>
 
                   {division.single ? (

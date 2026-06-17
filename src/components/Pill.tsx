@@ -16,8 +16,8 @@ export const Pill: React.FC<PillProps> = ({ tone, children, style }) => (
 
 // Recreates the original `slotPill(id)` helper — color depends on slot name
 export const SlotPill: React.FC<{ slotId: string }> = ({ slotId }) => {
-  const venues = useAppStore((s) => s.venues);
-  const s = slotById(slotId, venues);
+  const events = useAppStore((s) => s.events);
+  const s = slotById(slotId, events);
   if (!s) return null;
   const n = s.name.toLowerCase();
   const tone: PillTone = n.includes('lunch')

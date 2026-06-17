@@ -141,15 +141,13 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
   const lateEvents: PromEvent[] = useMemo(() => lateClubEvents(events), [events]);
 
   // Timeslots offered to the chip picker = the EVENT's selected slots
-  // resolved against the venue's timeslot definitions. Resolving via
-  // the venue means we always have name + start/end for display.
+  // resolved straight from the event itself (events own their slot
+  // definitions post-0008; venue no longer carries them).
   const eventTimeslots = useMemo(() => {
-    if (!v || !eventId) return [];
+    if (!eventId) return [];
     const ev = events.find((e) => e.id === eventId);
-    if (!ev) return [];
-    const slotIdSet = new Set(ev.selectedSlotIds || []);
-    return (v.timeslots || []).filter((ts) => slotIdSet.has(ts.id));
-  }, [v, eventId, events]);
+    return ev?.timeslots ?? [];
+  }, [eventId, events]);
 
   // Events to show in the picker — only the ones at the selected
   // venue, ordered by their next occurrence so the soonest is on top.
@@ -212,11 +210,15 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
       return;
     }
 
-    // Resolve chosen slot ids → display names via the venue's timeslot
-    // definitions. Denormalising the names onto the guest row keeps
-    // chips rendering correctly even if the venue is later edited.
+    // Resolve chosen slot ids → display names via the EVENT's slot
+    // definitions (events own their slots post-0008). Denormalising
+    // the names onto the guest row keeps chips rendering correctly
+    // even if the event is later edited.
+    const eventForSlots = eventId != null
+      ? events.find((e) => e.id === eventId)
+      : null;
     const timeslotNames = slotIds
-      .map((id) => (v?.timeslots || []).find((x) => x.id === id)?.name || '')
+      .map((id) => (eventForSlots?.timeslots || []).find((x) => x.id === id)?.name || '')
       .filter(Boolean);
     const entry = {
       ...(editing?.id != null ? { id: editing.id } : {}),

@@ -6,7 +6,7 @@ import { useAppStore } from '@/store/useAppStore';
 import { useConfirm } from '@/store/useConfirmStore';
 import { sendViaWhatsApp, buildGuestListMessage } from '@/services/messaging';
 import {
-  eventCapacity, venueById, commCalc, isGuestOnEvent,
+  eventCapacity, slotCapacities, venueById, commCalc, isGuestOnEvent,
   occurs, nextOccurrence, previousOccurrence, eventScheduleLabel,
 } from '@/features/summary/calculations';
 import { Pill, SlotPill } from '@/components/Pill';
@@ -127,7 +127,8 @@ export const EventDetailModal: React.FC<Props> = ({ open, onClose, eventId, onEd
     r.eventId === e.id && !isPastPin(r.eventDate) && dateMatches(r.eventDate),
   );
 
-  const ids = e.selectedSlotIds || [];
+  // Slot ids are now event-owned (e.timeslots) post-0008.
+  const ids = (e.timeslots || []).map((t) => t.id);
   const cap = eventCapacity(e.id, guests, events, selectedDate);
   const isFull = cap.capacity > 0 && cap.left <= 0;
 
@@ -309,6 +310,46 @@ export const EventDetailModal: React.FC<Props> = ({ open, onClose, eventId, onEd
           ) : (
             <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 14 }}>
               {evG.reduce((a, g) => a + g.pax, 0)} guests on this date · no capacity set
+            </div>
+          )}
+
+          {/* ── Per-slot capacity ───────────────────────────────
+              Slot caps are the granular truth — the promoter checks
+              this to see where there's still room tonight. Rendered
+              only when the event has slots and there's a date. */}
+          {selectedDate && (e.timeslots ?? []).length > 0 && (
+            <div className="summary-block" style={{ margin: '0 0 14px' }}>
+              <div className="summary-head">{t('eventDetail.bySlot')}</div>
+              {slotCapacities(e, guests, selectedDate).map((s) => (
+                <div key={s.slotId} style={{
+                  padding: '10px 14px',
+                  borderBottom: '0.5px solid var(--color-border-tertiary)',
+                }}>
+                  <div style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+                    marginBottom: 6,
+                  }}>
+                    <div>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                        {s.slotName}
+                      </span>
+                      <span style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginLeft: 6 }}>
+                        {s.startTime}–{s.endTime}
+                      </span>
+                    </div>
+                    <span style={{
+                      fontSize: 12,
+                      color: s.fillClass === 'full' ? '#A32D2D'
+                        : s.fillClass === 'warn' ? '#A36100'
+                        : 'var(--color-text-secondary)',
+                      fontVariantNumeric: 'tabular-nums',
+                    }}>
+                      {s.capacity > 0 ? `${s.used}/${s.capacity}` : `${s.used}`}
+                    </span>
+                  </div>
+                  {s.capacity > 0 && <CapacityBar pct={s.pct} warnAt={75} />}
+                </div>
+              ))}
             </div>
           )}
 

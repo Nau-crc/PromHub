@@ -7,9 +7,9 @@ import { today } from '@/core/constants';
 import type { Timeslot, VipType } from '@/core/types';
 import { TimeslotRows, VipRows } from '@/features/venues/VenueEditor';
 import { DayChips } from '@/components/DayChips';
-import { SlotChips } from '@/components/SlotChips';
+// SlotChips dropped — events own their slots via TimeslotRows now.
 import { Calendar } from '@/components/Calendar';
-import { NumberField } from '@/components/NumberField';
+// NumberField dropped — event capacity is sum-of-slot-caps now.
 import { SelectField } from '@/components/SelectField';
 import { COUNTRY_CODES } from '@/core/constants';
 import {
@@ -114,18 +114,17 @@ const VenueStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
   const { t } = useTranslation();
   const upsertVenue = useAppStore((s) => s.upsertVenue);
   const [name, setName] = useState('');
-  const [guestCap, setGuestCap] = useState<number | ''>('');
   // Phone is optional but shares the country-code + formatted-number
   // pair with the regular VenueFormModal, so a venue created at
   // onboarding looks identical to one created later.
   const [phoneCode, setPhoneCode] = useState('+34');
   const [phoneNum, setPhoneNum] = useState('');
-  const [tsRows, setTsRows] = useState<Timeslot[]>([
-    { id: 'ts-seed-1', name: 'Tardeo', startTime: '16:00', endTime: '23:00', guestCapacity: 0 },
-  ]);
+  // Venue no longer carries capacity or timeslots after 0008 — both
+  // live on the event now. VIP types stay on the venue but without
+  // prices (those are per-event).
   const [vipRows, setVipRows] = useState<VipType[]>([
-    { id: 'vip-seed-1', name: 'VIP', price: 500, minPax: 2, maxPax: 6, tableCapacity: 5 },
-    { id: 'vip-seed-2', name: 'SUPER VIP', price: 1000, minPax: 6, maxPax: 12, tableCapacity: 3 },
+    { id: 'vip-seed-1', name: 'VIP', minPax: 2, maxPax: 6, tableCapacity: 5 },
+    { id: 'vip-seed-2', name: 'SUPER VIP', minPax: 6, maxPax: 12, tableCapacity: 3 },
   ]);
   const phoneDigits = onlyDigits(phoneNum);
   const phoneOk = !phoneDigits || isValidPhone(phoneCode, phoneDigits);
@@ -136,9 +135,8 @@ const VenueStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
       alert(t('venueForm.errPhoneFmt', { code: phoneCode }));
       return;
     }
-    const newTs = tsRows.filter((r) => r.name.trim()).map((r) => ({ ...r, name: r.name.trim() }));
     const newVip = vipRows.filter((r) => r.name.trim()).map((r) => ({
-      ...r,
+      id: r.id,
       name: r.name.trim(),
       minPax: r.minPax || 1,
       maxPax: r.maxPax || 10,
@@ -146,10 +144,8 @@ const VenueStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
     }));
     await upsertVenue({
       name: name.trim(),
-      guestCapacity: typeof guestCap === 'number' ? guestCap : (parseInt(String(guestCap)) || 0),
       phoneCode: phoneDigits ? phoneCode : '',
       phoneNum: phoneDigits ? phoneNum.trim() : '',
-      timeslots: newTs,
       vipTypes: newVip,
     });
     onNext();
@@ -169,18 +165,6 @@ const VenueStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
         <label className="form-label">{t('venueForm.name')} *</label>
         <input className="form-input" placeholder={t('venueForm.namePlaceholder')} value={name} onChange={(e) => setName(e.target.value)} />
       </div>
-      <div className="form-group">
-        <label className="form-label">{t('venueForm.guestCapacity')}</label>
-        <input
-          className="form-input"
-          type="number"
-          placeholder={t('venueForm.guestCapacityPlaceholder')}
-          min={0}
-          value={guestCap}
-          onChange={(e) => setGuestCap(e.target.value === '' ? '' : (parseInt(e.target.value) || 0))}
-        />
-      </div>
-
       <div className="form-group">
         <label className="form-label">{t('venueForm.phone')}</label>
         <div className="phone-row">
@@ -218,7 +202,6 @@ const VenueStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
         )}
       </div>
 
-      <TimeslotRows rows={tsRows} setRows={setTsRows} />
       <VipRows rows={vipRows} setRows={setVipRows} />
       <button className="onboard-btn" onClick={save}>{t('onboarding.saveVenueContinue')}</button>
       <button className="onboard-btn-secondary" onClick={onNext}>{t('actions.skip')}</button>
@@ -236,35 +219,33 @@ const EventStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
   const [name, setName] = useState('');
   const [venueId, setVenueId] = useState<number | null>(venues[0]?.id ?? null);
   const [days, setDays] = useState<string[]>([todayWeekday()]);
-  const [slotIds, setSlotIds] = useState<string[]>(() => {
-    const v = venues[0];
-    return v?.timeslots?.length ? [v.timeslots[0].id] : [];
-  });
+  // Events own their slots after 0008 — seeded with one default
+  // slot so the onboarding doesn't dead-end on capacity validation.
+  const [tsRows, setTsRows] = useState<Timeslot[]>([
+    { id: 'ts-seed-1', name: 'Tardeo', startTime: '16:00', endTime: '23:00', guestCapacity: 0 },
+  ]);
   const [isPriv, setPriv] = useState(false);
   const [isLate, setLate] = useState(false);
   const [isOneTime, setIsOneTime] = useState(false);
   const [eventDate, setEventDate] = useState<string>(isoDay(today()));
   const [seasonStart, setSeasonStart] = useState<string>('');
   const [seasonEnd, setSeasonEnd] = useState<string>('');
-  const [capacity, setCapacity] = useState<number | null>(null);
   const [desc, setDesc] = useState('');
 
   const onVenueChange = (id: number) => {
     setVenueId(id);
-    const v = venues.find((x) => x.id === id);
-    setSlotIds(v?.timeslots?.length ? [v.timeslots[0].id] : []);
   };
 
   const toggleDay = (d: string) =>
     setDays((arr) => (arr.includes(d) ? arr.filter((x) => x !== d) : [...arr, d]));
 
-  const toggleSlot = (id: string) =>
-    setSlotIds((arr) => (arr.includes(id) ? arr.filter((x) => x !== id) : [...arr, id]));
-
   const save = async () => {
     if (noVenues) { onNext(); return; }
     if (!name.trim()) { onNext(); return; }
-    if (!slotIds.length) { alert(t('eventForm.errSelectSlot')); return; }
+    const cleanSlots = tsRows
+      .filter((r) => r.name.trim())
+      .map((r) => ({ ...r, name: r.name.trim() }));
+    if (!cleanSlots.length) { alert(t('eventForm.errSelectSlot')); return; }
     if (isOneTime) {
       if (!eventDate) { alert(t('eventForm.errPickDate')); return; }
     } else {
@@ -279,7 +260,6 @@ const EventStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
       venueId: venueId!,
       weekdays: isOneTime ? [] : [...days],
       weekday: isOneTime ? '' : days[0],
-      selectedSlotIds: [...slotIds],
       description: desc.trim(),
       videoUrl: '',
       isPrivate: isPriv,
@@ -287,7 +267,8 @@ const EventStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
       invitedGuests: [],
       isOneTime,
       eventDate: isOneTime ? eventDate : null,
-      capacity: capacity && capacity > 0 ? capacity : null,
+      timeslots: cleanSlots,
+      vipPrices: {},
       // Fixed-fee config isn't part of the onboarding form — leave
       // it null and the promoter can edit the event later to set it.
       minGuestsThreshold: null,
@@ -372,18 +353,9 @@ const EventStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
             )}
           </div>
 
-          <div className="form-group">
-            <label className="form-label">{t('eventForm.timeslots')}</label>
-            <SlotChips venueId={venueId} selected={slotIds} onToggle={toggleSlot} />
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">{t('eventForm.capacity')}</label>
-            <NumberField
-              className="form-input" placeholder={t('eventForm.capacityPlaceholder')} min={0}
-              value={capacity} onChange={setCapacity}
-            />
-          </div>
+          {/* Timeslots editor — event-owned post-0008. Each slot
+              carries its own per-night capacity; sum = night cap. */}
+          <TimeslotRows rows={tsRows} setRows={setTsRows} />
           <div className="form-group">
             <label className="form-label">{t('eventForm.description')}</label>
             <textarea
