@@ -59,6 +59,12 @@ export const PublicRegistrationPage: React.FC = () => {
   /** Vercel Blob URLs filled by `PhotoUploader` — only rendered when
    *  `meta.photoCount` is set on the event. */
   const [photos, setPhotos] = useState<string[]>([]);
+  /** Terms gate: when the event has a description we treat that as
+   *  the event's conditions. The form stays hidden until the guest
+   *  has ticked the acceptance checkbox AND tapped Continue. Events
+   *  without a description bypass the gate entirely. */
+  const [termsChecked, setTermsChecked] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
@@ -118,6 +124,14 @@ export const PublicRegistrationPage: React.FC = () => {
   // A recurring event link without ?d= is broken — refuse to accept
   // sign-ups since we'd have no occurrence to pin them to.
   const missingDate = meta && !meta.isOneTime && !meta.eventDate;
+
+  // The event's description is treated as its conditions / rules.
+  // We force the guest through an acceptance gate before showing
+  // the form. Events without a description skip the gate entirely
+  // — there's nothing to accept.
+  const eventTerms = meta?.description?.trim() ?? '';
+  const hasTerms = eventTerms.length > 0;
+  const showForm = !hasTerms || termsAccepted;
 
   return (
     <IonPage>
@@ -195,71 +209,135 @@ export const PublicRegistrationPage: React.FC = () => {
                 </div>
               )}
 
-              <div className="form-group">
-                <label className="form-label">{t('publicForm.yourName')}</label>
-                <input
-                  className="form-input"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder={t('publicForm.namePlaceholder')}
-                  autoComplete="name"
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">{t('publicForm.howMany')}</label>
-                <NumberField
-                  className="form-input" min={1} max={20}
-                  value={pax} onChange={setPax}
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">{t('publicForm.socials')}</label>
-                <PlatformPicker value={platform} onChange={setPlatform} />
-                <input
-                  className="form-input"
-                  value={igHandle}
-                  onChange={(e) => setIgHandle(e.target.value)}
-                  placeholder={t('publicForm.handlePlaceholder')}
-                  autoComplete="off"
-                  autoCapitalize="off"
-                />
-              </div>
-
-              {/* Photo requirement — only when the event opted in
-                  via `events.photo_count`. The bouncer at the door
-                  will pull these up to vet the list. */}
-              {meta.photoCount != null && meta.photoCount > 0 && (
-                <div className="form-group">
-                  <label className="form-label">
-                    {t('publicForm.photos', { count: meta.photoCount })}
-                  </label>
-                  <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 10, lineHeight: 1.5 }}>
-                    {t('publicForm.photosHint', { count: meta.photoCount })}
+              {/* ── Terms gate ─────────────────────────────────────
+                  We show the event description as the conditions
+                  for entering and require an explicit accept before
+                  the form appears. Skipped when there's no
+                  description (nothing to accept) or when the link
+                  is missing its date (we'll never accept the submit
+                  anyway so the gate would be busywork). */}
+              {!showForm && !missingDate && (
+                <>
+                  <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 8 }}>
+                    {t('publicForm.conditionsTitle')}
                   </div>
-                  <PhotoUploader
-                    count={meta.photoCount}
-                    value={photos}
-                    onChange={setPhotos}
-                  />
-                </div>
+                  <div style={{
+                    background: 'var(--color-background-secondary)',
+                    border: '0.5px solid var(--color-border-tertiary)',
+                    borderRadius: 'var(--border-radius-md)',
+                    padding: '14px 16px',
+                    fontSize: 14, lineHeight: 1.55,
+                    color: 'var(--color-text-primary)',
+                    whiteSpace: 'pre-wrap',
+                    marginBottom: 16,
+                  }}>
+                    {eventTerms}
+                  </div>
+
+                  {/* Acceptance checkbox — required, hard gate. */}
+                  <label
+                    htmlFor="acceptTerms"
+                    style={{
+                      display: 'flex', alignItems: 'flex-start', gap: 10,
+                      padding: '12px 14px',
+                      border: '1px solid var(--color-border-tertiary)',
+                      borderRadius: 'var(--border-radius-md)',
+                      cursor: 'pointer',
+                      marginBottom: 14,
+                    }}
+                  >
+                    <input
+                      id="acceptTerms"
+                      type="checkbox"
+                      checked={termsChecked}
+                      onChange={(e) => setTermsChecked(e.target.checked)}
+                      style={{ marginTop: 2, flexShrink: 0 }}
+                    />
+                    <span style={{ fontSize: 13, lineHeight: 1.5, color: 'var(--color-text-primary)' }}>
+                      {t('publicForm.acceptConditions')}
+                    </span>
+                  </label>
+
+                  <button
+                    className="btn-primary"
+                    style={{ width: '100%', padding: 14, fontSize: 15 }}
+                    onClick={() => setTermsAccepted(true)}
+                    disabled={!termsChecked}
+                  >
+                    {t('publicForm.continueToForm')}
+                  </button>
+                </>
               )}
 
-              {errorMsg && (
-                <div style={{ fontSize: 12, color: 'var(--color-danger)', marginBottom: 10 }}>
-                  ⚠︎ {errorMsg}
-                </div>
-              )}
+              {showForm && (
+                <>
+                  <div className="form-group">
+                    <label className="form-label">{t('publicForm.yourName')}</label>
+                    <input
+                      className="form-input"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder={t('publicForm.namePlaceholder')}
+                      autoComplete="name"
+                    />
+                  </div>
 
-              <button
-                className="btn-primary"
-                style={{ width: '100%', padding: 14, fontSize: 15 }}
-                onClick={submit}
-                disabled={phase === 'submitting' || !!missingDate}
-              >
-                {phase === 'submitting' ? t('publicForm.submitting') : t('publicForm.submit')}
-              </button>
+                  <div className="form-group">
+                    <label className="form-label">{t('publicForm.howMany')}</label>
+                    <NumberField
+                      className="form-input" min={1} max={20}
+                      value={pax} onChange={setPax}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">{t('publicForm.socials')}</label>
+                    <PlatformPicker value={platform} onChange={setPlatform} />
+                    <input
+                      className="form-input"
+                      value={igHandle}
+                      onChange={(e) => setIgHandle(e.target.value)}
+                      placeholder={t('publicForm.handlePlaceholder')}
+                      autoComplete="off"
+                      autoCapitalize="off"
+                    />
+                  </div>
+
+                  {/* Photo requirement — only when the event opted in
+                      via `events.photo_count`. The bouncer at the door
+                      will pull these up to vet the list. */}
+                  {meta.photoCount != null && meta.photoCount > 0 && (
+                    <div className="form-group">
+                      <label className="form-label">
+                        {t('publicForm.photos', { count: meta.photoCount })}
+                      </label>
+                      <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 10, lineHeight: 1.5 }}>
+                        {t('publicForm.photosHint', { count: meta.photoCount })}
+                      </div>
+                      <PhotoUploader
+                        count={meta.photoCount}
+                        value={photos}
+                        onChange={setPhotos}
+                      />
+                    </div>
+                  )}
+
+                  {errorMsg && (
+                    <div style={{ fontSize: 12, color: 'var(--color-danger)', marginBottom: 10 }}>
+                      ⚠︎ {errorMsg}
+                    </div>
+                  )}
+
+                  <button
+                    className="btn-primary"
+                    style={{ width: '100%', padding: 14, fontSize: 15 }}
+                    onClick={submit}
+                    disabled={phase === 'submitting' || !!missingDate}
+                  >
+                    {phase === 'submitting' ? t('publicForm.submitting') : t('publicForm.submit')}
+                  </button>
+                </>
+              )}
             </>
           )}
 
