@@ -115,6 +115,12 @@ export const events = pgTable('events', {
    *  Example: threshold=10, fixedFee=150, perExtraGuestFee=5 → at
    *  15 pax she earns 150 + (15-10)*5 = 175. */
   perExtraGuestFee: numeric('per_extra_guest_fee', { precision: 8, scale: 2 }),
+  /** When set to a positive integer, this event requires N photos
+   *  per guest (e.g. clubs that vet guests by photo at the door).
+   *  NULL = no photo requirement. The form-side checkbox toggles
+   *  between NULL and a number; we store the number directly so
+   *  there's no second "requires photos" boolean to drift. */
+  photoCount: integer('photo_count'),
   seasonStart: date('season_start'),
   seasonEnd: date('season_end'),
   /** Public-form share token (UUID v4). Nullable for legacy rows. */
@@ -171,6 +177,12 @@ export const guests = pgTable('guests', {
   igHandle: text('ig_handle').default('').notNull(),
   igPlatform: text('ig_platform', { enum: ['instagram', 'tiktok'] }).default('instagram').notNull(),
   notes: text('notes'),
+  /** Vercel Blob URLs for the guest's submitted photos (only used
+   *  for events with `events.photo_count` set). Order matters — the
+   *  promoter sees them in the order they were uploaded. Empty
+   *  array when the event doesn't require photos or none have been
+   *  submitted yet. */
+  photos: text('photos').array().default([]).notNull(),
   /** Specific occurrence of the linked event. */
   eventDate: date('event_date'),
   /** When imported from the public form, the original submission UUID. */
@@ -272,6 +284,10 @@ export const submissions = pgTable('submissions', {
   igHandle: text('ig_handle').default('').notNull(),
   igPlatform: text('ig_platform', { enum: ['instagram', 'tiktok'] }).default('instagram').notNull(),
   notes: text('notes').default('').notNull(),
+  /** Photos collected by the public form when the event requires
+   *  them (see `events.photo_count`). Carried over to the guest
+   *  row on import. */
+  photos: text('photos').array().default([]).notNull(),
   /** When the promoter pulled this submission into the guests
    *  list. Null = not yet imported (used for dedup on re-pulls). */
   importedAt: timestamp('imported_at', { withTimezone: true }),

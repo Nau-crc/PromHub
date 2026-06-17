@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { fetchEvent, submitRegistration, type PublicEventMeta } from '@/services/shareApi';
 import { NumberField } from '@/components/NumberField';
 import { PlatformPicker } from '@/components/PlatformPicker';
+import { PhotoUploader } from '@/components/PhotoUploader';
 import type { Platform } from '@/core/types';
 
 // ─────────────────────────────────────────────────────────────
@@ -55,6 +56,9 @@ export const PublicRegistrationPage: React.FC = () => {
   const [pax, setPax] = useState<number | null>(1);
   const [platform, setPlatform] = useState<Platform>('instagram');
   const [igHandle, setIgHandle] = useState('');
+  /** Vercel Blob URLs filled by `PhotoUploader` — only rendered when
+   *  `meta.photoCount` is set on the event. */
+  const [photos, setPhotos] = useState<string[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
@@ -69,6 +73,13 @@ export const PublicRegistrationPage: React.FC = () => {
     const trimmed = name.trim();
     if (!trimmed) { setErrorMsg(t('publicForm.nameRequired')); return; }
     if (!token) return;
+    // Block submit when the event requires photos but the guest hasn't
+    // filled every slot. Photos are physical-access gating; missing
+    // them would just create a guest the door turns away.
+    if (meta?.photoCount && photos.length < meta.photoCount) {
+      setErrorMsg(t('publicForm.photosRequired', { count: meta.photoCount }));
+      return;
+    }
     setPhase('submitting');
     try {
       const resp = await submitRegistration({
@@ -82,6 +93,7 @@ export const PublicRegistrationPage: React.FC = () => {
         igHandle: igHandle.trim().replace(/^@+/, ''),
         igPlatform: platform,
         notes: '', // notes removed from the public form
+        photos,
       });
       setOutcome({
         waitlisted: resp.waitlisted,
@@ -214,6 +226,25 @@ export const PublicRegistrationPage: React.FC = () => {
                   autoCapitalize="off"
                 />
               </div>
+
+              {/* Photo requirement — only when the event opted in
+                  via `events.photo_count`. The bouncer at the door
+                  will pull these up to vet the list. */}
+              {meta.photoCount != null && meta.photoCount > 0 && (
+                <div className="form-group">
+                  <label className="form-label">
+                    {t('publicForm.photos', { count: meta.photoCount })}
+                  </label>
+                  <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 10, lineHeight: 1.5 }}>
+                    {t('publicForm.photosHint', { count: meta.photoCount })}
+                  </div>
+                  <PhotoUploader
+                    count={meta.photoCount}
+                    value={photos}
+                    onChange={setPhotos}
+                  />
+                </div>
+              )}
 
               {errorMsg && (
                 <div style={{ fontSize: 12, color: 'var(--color-danger)', marginBottom: 10 }}>

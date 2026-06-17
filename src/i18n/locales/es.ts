@@ -239,6 +239,9 @@ const es: LocaleStrings = {
     fixedFeePreview: 'Trae ≥{{threshold}} pax → ganas €{{amount}}',
     fixedFeePreviewWithExtras: 'Trae ≥{{threshold}} pax → ganas €{{amount}} + €{{extra}} por cada pax extra',
     errFixedFeePair: 'Rellena los dos campos juntos — mínimo de invitadas Y cuota fija — o déjalos los dos vacíos.',
+    requiresPhotosLabel: 'Pide fotos de cada invitada',
+    requiresPhotosHint: 'Algunos locales filtran en la puerta por foto. Al activarlo, el formulario de invitación (y el enlace público) pedirá las fotos indicadas abajo.',
+    photoCountLabel: 'Cuántas fotos por invitada',
     description: 'Descripción',
     descPlaceholder: '¿Qué tiene de especial esta noche?',
     privateLabel: 'Evento privado',
@@ -265,6 +268,7 @@ const es: LocaleStrings = {
     clubLater: 'Club después',
     influencer: 'Influencer',
     timesVisited: 'Visitas',
+    photos: 'Fotos',
   },
 
   guestForm: {
@@ -284,6 +288,8 @@ const es: LocaleStrings = {
     comingToHint: '¿A qué franjas del evento va a asistir?',
     extraEvents: 'También invitada a (misma noche)',
     extraEventsHint: 'Marca cualquier otro evento del local al que también vaya esa noche. Cuenta para el aforo de cada uno.',
+    photos: 'Fotos ({{count}})',
+    photosHint: 'Este local filtra invitadas en la puerta — sube {{count}} fotos claras de su cara.',
     noSlotsSelected: 'Este evento no tiene franjas. Edita el evento para elegir una o más de las del local.',
     socialPlatform: 'Red social',
     handlePlaceholder: 'Usuario (sin @)',
@@ -454,6 +460,13 @@ const es: LocaleStrings = {
     doneTip4Bold: 'Más → Resumen',
   },
 
+  photoUploader: {
+    add: '+ Añadir foto',
+    uploading: 'Subiendo…',
+    photoAlt: 'Foto {{n}}',
+    uploadFailed: 'No se pudo subir: {{message}}',
+  },
+
   publicForm: {
     loading: 'Cargando…',
     notFound: 'Este enlace de registro ha expirado o no existe.',
@@ -466,6 +479,9 @@ const es: LocaleStrings = {
     howMany: '¿Cuántas vais?',
     socials: 'Instagram / TikTok (opcional)',
     handlePlaceholder: 'Usuario (sin @)',
+    photos: 'Fotos ({{count}})',
+    photosHint: 'El local filtra invitadas en la puerta. Sube {{count}} fotos claras de tu cara — la promotora se las pasará al local.',
+    photosRequired: 'Sube {{count}} fotos antes de enviar.',
     nameRequired: 'Tu nombre es obligatorio.',
     submit: 'Apúntame',
     submitting: 'Enviando…',

@@ -274,6 +274,7 @@ const EventStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
       minGuestsThreshold: null,
       fixedFee: null,
       perExtraGuestFee: null,
+      photoCount: null,
       seasonStart: !isOneTime && seasonStart ? seasonStart : null,
       seasonEnd: !isOneTime && seasonEnd ? seasonEnd : null,
       shareToken: null,

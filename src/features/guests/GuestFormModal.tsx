@@ -15,6 +15,7 @@ import { SelectField } from '@/components/SelectField';
 import { SheetHeader } from '@/components/SheetHeader';
 import { PlatformPicker } from '@/components/PlatformPicker';
 import { NumberField } from '@/components/NumberField';
+import { PhotoUploader } from '@/components/PhotoUploader';
 import { sendViaSocial } from '@/services/messaging';
 
 interface Props {
@@ -62,6 +63,9 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
   const [influencer, setInfluencer] = useState(false);
   const [goingToClub, setGoingToClub] = useState(false);
   const [clubEventId, setClubEventId] = useState<number | null>(null);
+  /** URLs of photos uploaded for this guest. Only meaningful when
+   *  the selected event has `photoCount` set; otherwise stays empty. */
+  const [photos, setPhotos] = useState<string[]>([]);
 
   // ── Helpers (declared before useEffect that uses them) ─────────
   //
@@ -141,6 +145,7 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
     setGoingToClub(!!editing?.clubEventId);
     setClubEventId(editing?.clubEventId ?? null);
     setExtraEventIds(editing ? [...(editing.extraEventIds ?? [])] : []);
+    setPhotos(editing?.photos ? [...editing.photos] : []);
   }, [open, editing, seedEventId, venues, events]); // events: needed for nextEventAtVenue
 
   const v = useMemo(() => (venueId != null ? venueById(venueId, venues) : undefined), [venueId, venues]);
@@ -247,6 +252,11 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
       createdMonth: editing?.createdMonth ?? today().getMonth(),
       createdAt: editing?.createdAt ?? isoDay(today()),
       eventDate: selectedEvent ? (eventDate || null) : null,
+      // Only persist photos when the chosen event actually wants
+      // them. Otherwise drop them — saves bytes and avoids stale
+      // photos sticking around if the promoter re-points the guest
+      // at an event without a photo requirement.
+      photos: selectedEvent?.photoCount ? photos : [],
     };
 
     let saved: Guest;
@@ -402,6 +412,26 @@ export const GuestFormModal: React.FC<Props> = ({ open, onClose, editing, seedEv
                   {t('guestForm.noSlotsSelected')}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* ── Photos (only if event requires them) ───────────
+              Some venues vet guests by photo at the door. When
+              the event has `photoCount` set, we surface N upload
+              slots wired straight to /api/v1/photos. */}
+          {selectedEvent?.photoCount != null && selectedEvent.photoCount > 0 && (
+            <div className="form-group">
+              <label className="form-label">
+                {t('guestForm.photos', { count: selectedEvent.photoCount })}
+              </label>
+              <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 8, lineHeight: 1.5 }}>
+                {t('guestForm.photosHint', { count: selectedEvent.photoCount })}
+              </div>
+              <PhotoUploader
+                count={selectedEvent.photoCount}
+                value={photos}
+                onChange={setPhotos}
+              />
             </div>
           )}
 

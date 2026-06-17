@@ -29,6 +29,9 @@ interface IncomingSubmission {
   notes?: string;
   /** yyyy-mm-dd. The specific event occurrence this sign-up is for. */
   eventDate?: string;
+  /** Vercel Blob URLs previously uploaded via /api/v1/photos. Empty
+   *  unless the event has `photoCount` set on it. */
+  photos?: string[];
 }
 
 function parseBody<T = Record<string, unknown>>(body: unknown): Partial<T> {
@@ -84,6 +87,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const igHandle = String(body.igHandle ?? '').trim().replace(/^@+/, '').slice(0, MAX_HANDLE);
       const igPlatform = body.igPlatform === 'tiktok' ? 'tiktok' : 'instagram';
       const notes = String(body.notes ?? '').trim().slice(0, MAX_NOTES);
+      // Photos must be Vercel Blob URLs the client already uploaded
+      // via /api/v1/photos. We accept up to 10 and trust the URL host
+      // (validating beyond shape would require a HEAD per blob).
+      const incomingPhotos = Array.isArray(body.photos) ? body.photos : [];
+      const photos = incomingPhotos
+        .filter((u): u is string => typeof u === 'string' && /^https?:\/\//.test(u))
+        .slice(0, 10);
 
       // Pick the occurrence the submission should belong to:
       //   - one-time event → always the event's own date
@@ -142,6 +152,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           igHandle,
           igPlatform,
           notes,
+          photos,
         })
         .returning({ id: schema.submissions.id });
       const submissionId = String(row.id);
@@ -176,6 +187,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             submissionId,
             notes: notes || null,
             waitlisted,
+            photos,
           });
         }
       } catch (mirrorErr) {
@@ -222,6 +234,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           igHandle: schema.submissions.igHandle,
           igPlatform: schema.submissions.igPlatform,
           notes: schema.submissions.notes,
+          photos: schema.submissions.photos,
           createdAt: schema.submissions.createdAt,
         })
         .from(schema.submissions)
@@ -241,6 +254,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         igHandle: r.igHandle,
         igPlatform: r.igPlatform as 'instagram' | 'tiktok',
         notes: r.notes,
+        photos: r.photos ?? [],
         submittedAt: r.createdAt instanceof Date
           ? r.createdAt.toISOString()
           : String(r.createdAt),

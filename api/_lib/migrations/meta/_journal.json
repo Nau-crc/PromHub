@@ -85,6 +85,13 @@
       "when": 1779550000000,
       "tag": "0011_venue_types_and_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1779560000000,
+      "tag": "0012_event_photos",
+      "breakpoints": true
     }
   ]
 }

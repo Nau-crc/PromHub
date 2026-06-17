@@ -423,6 +423,46 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       throw badRequest(`Method ${req.method} not allowed`);
     }
 
+    // ── /api/v1/photos ──────────────────────────────────────
+    // Proxy upload to Vercel Blob. The client resizes images
+    // client-side (canvas → JPEG 80%) so payloads stay well
+    // under Hobby's 4.5 MB request cap, then POSTs JSON:
+    //   { filename, contentType, data }   // data = base64
+    // Server decodes, `put()`s to public Blob, returns the URL.
+    // Direct/client tokens were the other option; we picked the
+    // proxy because it keeps the public form (anonymous guests)
+    // from needing any client-token dance and works the same on
+    // `vercel dev`.
+    if (resource === 'photos' && segments.length === 1) {
+      if (req.method !== 'POST') throw badRequest(`Method ${req.method} not allowed`);
+      const { put } = await import('@vercel/blob');
+      const body = parseBody(req.body) as {
+        filename?: string;
+        contentType?: string;
+        data?: string;
+      };
+      const { filename, contentType, data } = body;
+      if (!filename || !contentType || !data) {
+        throw badRequest('filename, contentType and data are required');
+      }
+      const allowed = ['image/jpeg', 'image/png', 'image/webp'];
+      if (!allowed.includes(contentType)) {
+        throw badRequest(`contentType must be one of: ${allowed.join(', ')}`);
+      }
+      const buffer = Buffer.from(data, 'base64');
+      // 5 MB safety cap on the decoded buffer — the client resizes
+      // long before this, but a malicious caller could skip that.
+      if (buffer.byteLength > 5 * 1024 * 1024) {
+        throw badRequest('Photo exceeds 5 MB');
+      }
+      const blob = await put(filename, buffer, {
+        access: 'public',
+        contentType,
+        addRandomSuffix: true,
+      });
+      return res.status(201).json({ url: blob.url });
+    }
+
     // ── /api/v1/night-records ───────────────────────────────
     // Closed-night snapshots. POST creates one; GET lists or
     // fetches by id. Supports `?from=YYYY-MM-DD&to=YYYY-MM-DD`

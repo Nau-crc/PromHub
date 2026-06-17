@@ -118,6 +118,48 @@ export const GuestDetailModal: React.FC<Props> = ({ open, onClose, guestId, onEd
               <span className="dv" style={{ color: '#F97316', fontWeight: 600 }}>{visitCount}×</span>
             </div>
           )}
+          {/* Photos uploaded for this guest. Shown when the linked
+              event has a photo requirement OR the guest already has
+              photos (legacy case where the event was later flipped
+              off). Tapping opens the full-size blob in a new tab. */}
+          {(g.photos?.length ?? 0) > 0 && (
+            <div style={{ marginTop: 12 }}>
+              <div style={{
+                fontSize: 11, fontWeight: 500, color: 'var(--color-text-secondary)',
+                textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6,
+              }}>
+                {t('guestDetail.photos')}
+              </div>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))',
+                gap: 6,
+              }}>
+                {g.photos!.map((url, i) => (
+                  <a
+                    key={url}
+                    href={url}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{
+                      aspectRatio: '1 / 1',
+                      borderRadius: 8,
+                      overflow: 'hidden',
+                      border: '1px solid var(--color-border-tertiary)',
+                      display: 'block',
+                    }}
+                  >
+                    <img
+                      src={url}
+                      alt={t('photoUploader.photoAlt', { n: i + 1 })}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+
           {canSendDescription && (
             <button
               className="btn-secondary"

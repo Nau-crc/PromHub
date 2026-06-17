@@ -81,6 +81,12 @@ export interface PromEvent {
   /** Per-extra-guest bonus € paid once the threshold is met, for
    *  each pax beyond the threshold. null or 0 = no per-extra bonus. */
   perExtraGuestFee: number | null;
+  /** Number of photos this event requires per guest (clubs that vet
+   *  guests at the door). null = no photos required. The UI shows
+   *  a checkbox to toggle between null and a number on the event
+   *  form, and surfaces an upload section in the guest form / public
+   *  registration form when this is set. */
+  photoCount: number | null;
   /** Season start (ISO yyyy-mm-dd). Recurring only. null = open-ended past. */
   seasonStart: string | null;
   /** Season end (ISO yyyy-mm-dd). Recurring only. null = open-ended future. */
@@ -129,6 +135,9 @@ export interface Guest {
   influencer: boolean;
   igHandle: string;
   igPlatform: Platform;
+  /** Vercel Blob URLs uploaded for this guest (only filled when the
+   *  linked event has `photoCount` set). Order is upload order. */
+  photos?: string[];
   createdMonth: number;
   /** ISO yyyy-mm-dd date when the guest record was created. */
   createdAt: string;

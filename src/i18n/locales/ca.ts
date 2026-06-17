@@ -239,6 +239,9 @@ const ca: LocaleStrings = {
     fixedFeePreview: 'Porta ≥{{threshold}} pax → guanyes €{{amount}}',
     fixedFeePreviewWithExtras: 'Porta ≥{{threshold}} pax → guanyes €{{amount}} + €{{extra}} per cada pax extra',
     errFixedFeePair: 'Omple els dos camps junts — mínim de convidades I quota fixa — o deixa\'ls tots dos buits.',
+    requiresPhotosLabel: 'Demana fotos de cada convidada',
+    requiresPhotosHint: 'Alguns locals filtren a la porta per foto. En activar-ho, el formulari de convidada (i l\'enllaç públic) demanaran les fotos indicades a sota.',
+    photoCountLabel: 'Quantes fotos per convidada',
     description: 'Descripció',
     descPlaceholder: 'Què té d\'especial aquesta nit?',
     privateLabel: 'Esdeveniment privat',
@@ -265,6 +268,7 @@ const ca: LocaleStrings = {
     clubLater: 'Club després',
     influencer: 'Influencer',
     timesVisited: 'Visites',
+    photos: 'Fotos',
   },
 
   guestForm: {
@@ -284,6 +288,8 @@ const ca: LocaleStrings = {
     comingToHint: "A quines franges de l'esdeveniment va a assistir?",
     extraEvents: "També convidada a (mateixa nit)",
     extraEventsHint: "Marca qualsevol altre esdeveniment del local al qual també vagi aquesta nit. Compta per a l'aforament de cadascun.",
+    photos: 'Fotos ({{count}})',
+    photosHint: 'Aquest local filtra a la porta — puja {{count}} fotos clares de la seva cara.',
     noSlotsSelected: "Aquest esdeveniment no té franges. Edita l'esdeveniment per triar-ne una o més de les del local.",
     socialPlatform: 'Xarxa social',
     handlePlaceholder: 'Usuari (sense @)',
@@ -454,6 +460,13 @@ const ca: LocaleStrings = {
     doneTip4Bold: 'Més → Resum',
   },
 
+  photoUploader: {
+    add: '+ Afegir foto',
+    uploading: 'Pujant…',
+    photoAlt: 'Foto {{n}}',
+    uploadFailed: 'No s\'ha pogut pujar: {{message}}',
+  },
+
   publicForm: {
     loading: 'Carregant…',
     notFound: "Aquest enllaç de registre ha caducat o no existeix.",
@@ -466,6 +479,9 @@ const ca: LocaleStrings = {
     howMany: 'Quantes veniu?',
     socials: 'Instagram / TikTok (opcional)',
     handlePlaceholder: 'Usuari (sense @)',
+    photos: 'Fotos ({{count}})',
+    photosHint: "El local filtra a la porta. Puja {{count}} fotos clares de la teva cara — la promotora les passarà al local.",
+    photosRequired: 'Puja {{count}} fotos abans d\'enviar.',
     nameRequired: 'El teu nom és obligatori.',
     submit: "Apunta'm",
     submitting: 'Enviant…',

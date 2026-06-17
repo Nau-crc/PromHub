@@ -52,6 +52,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         isOneTime: schema.events.isOneTime,
         capacity: schema.events.capacity,
         venueId: schema.events.venueId,
+        photoCount: schema.events.photoCount,
       })
       .from(schema.events)
       .where(eq(schema.events.shareToken, token))
@@ -88,6 +89,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       isOneTime: row.isOneTime,
       venueName: venueNameValue,
       capacity: row.capacity,
+      photoCount: row.photoCount ?? null,
     });
   } catch (err) {
     console.error('[api/event]', err);

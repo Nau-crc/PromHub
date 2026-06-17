@@ -26,6 +26,10 @@ export interface PublicEventMeta {
   isOneTime: boolean;
   venueName: string | null;
   capacity: number | null;
+  /** When set, the event requires this many photos per guest at the
+   *  door; the form surfaces an upload section and blocks submit until
+   *  every slot is filled. */
+  photoCount: number | null;
 }
 
 export interface SubmissionDTO {
@@ -38,6 +42,8 @@ export interface SubmissionDTO {
   igHandle: string;
   igPlatform: 'instagram' | 'tiktok';
   notes: string;
+  /** Vercel Blob URLs the public form uploaded for this submission. */
+  photos: string[];
   submittedAt: string;
 }
 

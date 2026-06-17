@@ -70,6 +70,10 @@ export const eventInputSchema = z.object({
   fixedFee: z.number().min(0).nullable().optional(),
   /** Per-extra-guest bonus. Only meaningful when fixedFee is set. */
   perExtraGuestFee: z.number().min(0).nullable().optional(),
+  /** Number of photos required per guest at this event (null = no
+   *  photos required). The UI shows a checkbox + number input;
+   *  unchecking the box sends null. */
+  photoCount: z.number().int().min(1).max(10).nullable().optional(),
   seasonStart: isoDate.nullable().optional(),
   seasonEnd: isoDate.nullable().optional(),
   shareToken: uuid.nullable().optional(),
@@ -97,6 +101,10 @@ export const guestInputSchema = z.object({
   igHandle: z.string().max(60).default(''),
   igPlatform: platform.default('instagram'),
   notes: z.string().max(280).nullable().optional(),
+  /** Vercel Blob URLs uploaded for this guest. The form validates
+   *  count/MIME on the client; here we only check shape. Empty
+   *  default keeps existing creates frictionless. */
+  photos: z.array(z.string().url()).max(10).default([]),
   eventDate: isoDate.nullable().optional(),
   submissionId: z.string().nullable().optional(),
 });

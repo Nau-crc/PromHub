@@ -255,6 +255,9 @@ const en = {
     fixedFeePreview: 'Bring ≥{{threshold}} pax → earn €{{amount}}',
     fixedFeePreviewWithExtras: 'Bring ≥{{threshold}} pax → earn €{{amount}} + €{{extra}} per extra pax',
     errFixedFeePair: 'Set both fields together — minimum guests AND fixed fee — or leave both blank.',
+    requiresPhotosLabel: 'Requires photos of each guest',
+    requiresPhotosHint: 'Some venues vet each guest by photo at the door. When enabled, the guest form (and public registration link) asks for the photos below.',
+    photoCountLabel: 'How many photos per guest',
     description: 'Description',
     descPlaceholder: "What's special about this night?",
     privateLabel: 'Private event',
@@ -282,6 +285,7 @@ const en = {
     clubLater: 'Club later',
     influencer: 'Influencer',
     timesVisited: 'Times visited',
+    photos: 'Photos',
   },
 
   // ── Guest form ────────────────────────────────────────────
@@ -302,6 +306,8 @@ const en = {
     comingToHint: "Which of the event's timeslots is she attending?",
     extraEvents: 'Also invited to (same night)',
     extraEventsHint: "Tap any other event at this venue she's also attending tonight. She counts toward each event's capacity.",
+    photos: 'Photos ({{count}})',
+    photosHint: 'This venue vets guests at the door — upload {{count}} clear photos of her face.',
     noSlotsSelected: "This event has no timeslots selected. Edit the event to pick one or more from the venue's schedule.",
     socialPlatform: 'Social platform',
     handlePlaceholder: 'Handle (without @)',
@@ -476,6 +482,14 @@ const en = {
     doneTip4Bold: 'More → Summary',
   },
 
+  // ── Reusable photo-uploader component ─────────────────────
+  photoUploader: {
+    add: '+ Add photo',
+    uploading: 'Uploading…',
+    photoAlt: 'Photo {{n}}',
+    uploadFailed: "Couldn't upload: {{message}}",
+  },
+
   // ── Public registration form ──────────────────────────────
   publicForm: {
     loading: 'Loading…',
@@ -489,6 +503,9 @@ const en = {
     howMany: 'How many of you?',
     socials: 'Instagram / TikTok (optional)',
     handlePlaceholder: 'Handle (without @)',
+    photos: 'Photos ({{count}})',
+    photosHint: 'The venue vets guests at the door. Please upload {{count}} clear photos of your face — the promoter will share them with the venue.',
+    photosRequired: 'Please upload {{count}} photos before submitting.',
     nameRequired: 'Your name is required.',
     submit: 'Sign me up',
     submitting: 'Sending…',

@@ -101,6 +101,7 @@ function normalizeEvent(row: any): PromEvent {
     // numeric columns → Drizzle returns strings; coerce to numbers here
     fixedFee: row.fixedFee != null ? Number(row.fixedFee) : null,
     perExtraGuestFee: row.perExtraGuestFee != null ? Number(row.perExtraGuestFee) : null,
+    photoCount: row.photoCount ?? null,
     seasonStart: row.seasonStart,
     seasonEnd: row.seasonEnd,
     shareToken: row.shareToken,
@@ -126,6 +127,7 @@ function normalizeGuest(row: any): Guest {
     influencer: !!row.influencer,
     igHandle: row.igHandle ?? '',
     igPlatform: row.igPlatform ?? 'instagram',
+    photos: row.photos ?? [],
     createdMonth: row.createdAt ? new Date(row.createdAt).getMonth() : new Date().getMonth(),
     createdAt: row.createdAt ? String(row.createdAt).slice(0, 10) : '',
     eventDate: row.eventDate,
@@ -295,6 +297,28 @@ export const api = {
   },
 
   // ── First-run migration ──
+  // ── Photo upload (Vercel Blob, proxied through /api/v1/photos) ──
+  //
+  //  The caller is responsible for resizing the image before calling
+  //  (see `resizePhotoForUpload` in `core/utils/photos.ts`). We POST
+  //  base64 JSON because Vercel Hobby caps the request body at 4.5 MB
+  //  and multipart/form-data isn't auto-parsed by @vercel/node — the
+  //  proxy route on the server side just decodes the base64 and
+  //  `put()`s it to public Blob storage.
+  async uploadPhoto(file: Blob): Promise<string> {
+    const data = await blobToBase64(file);
+    const contentType = file.type || 'image/jpeg';
+    const ext = contentType === 'image/png' ? 'png'
+      : contentType === 'image/webp' ? 'webp'
+      : 'jpg';
+    const filename = `guest-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    const { url } = await call<{ url: string }>('/photos', {
+      method: 'POST',
+      body: JSON.stringify({ filename, contentType, data }),
+    });
+    return url;
+  },
+
   // ── Workspace settings ──
   async getSettings(): Promise<AppSettings> {
     const { settings } = await call<{ settings: AppSettings }>('/settings');
@@ -350,6 +374,7 @@ function buildSyncPayload(snap: AppDataSnapshot) {
       minGuestsThreshold: e.minGuestsThreshold,
       fixedFee: e.fixedFee,
       perExtraGuestFee: e.perExtraGuestFee,
+      photoCount: e.photoCount,
       seasonStart: e.seasonStart,
       seasonEnd: e.seasonEnd,
       shareToken: e.shareToken,
@@ -372,6 +397,7 @@ function buildSyncPayload(snap: AppDataSnapshot) {
       influencer: g.influencer,
       igHandle: g.igHandle,
       igPlatform: g.igPlatform,
+      photos: g.photos ?? [],
       notes: g.notes,
       eventDate: g.eventDate,
       submissionId: g.submissionId,
@@ -395,4 +421,19 @@ function buildSyncPayload(snap: AppDataSnapshot) {
       eventDate: r.eventDate,
     })),
   };
+}
+
+// Convert a Blob/File to a raw base64 string (no `data:` prefix —
+// the server adds its own metadata via the JSON envelope).
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      const comma = result.indexOf(',');
+      resolve(comma >= 0 ? result.slice(comma + 1) : result);
+    };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
 }

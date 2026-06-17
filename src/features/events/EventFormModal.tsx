@@ -66,6 +66,11 @@ export const EventFormModal: React.FC<Props> = ({ open, onClose, editing, onRequ
    *  the threshold is met, for each pax beyond it. Optional even
    *  when the fixed-fee pair is set. */
   const [perExtraGuestFee, setPerExtraGuestFee] = useState<number | null>(null);
+  /** Requires-photos toggle is encoded as `photoCount: number | null`.
+   *  We keep the count separately so the number input can stay populated
+   *  while the user un-ticks/re-ticks the checkbox without losing it. */
+  const [requiresPhotos, setRequiresPhotos] = useState(false);
+  const [photoCount, setPhotoCount] = useState<number | null>(3);
   const [seasonStart, setSeasonStart] = useState<string>('');
   const [seasonEnd, setSeasonEnd] = useState<string>('');
 
@@ -95,6 +100,8 @@ export const EventFormModal: React.FC<Props> = ({ open, onClose, editing, onRequ
     setMinGuestsThreshold(editing?.minGuestsThreshold ?? null);
     setFixedFee(editing?.fixedFee ?? null);
     setPerExtraGuestFee(editing?.perExtraGuestFee ?? null);
+    setRequiresPhotos(editing?.photoCount != null && editing.photoCount > 0);
+    setPhotoCount(editing?.photoCount ?? 3);
     setSeasonStart(editing?.seasonStart ?? '');
     setSeasonEnd(editing?.seasonEnd ?? '');
   }, [open, editing, venues]);
@@ -191,6 +198,12 @@ export const EventFormModal: React.FC<Props> = ({ open, onClose, editing, onRequ
       // — without a threshold the "extras" concept is meaningless.
       perExtraGuestFee: hasThreshold && hasFee && perExtraGuestFee != null && perExtraGuestFee > 0
         ? perExtraGuestFee
+        : null,
+      // Photo requirement: the count is only persisted when the
+      // checkbox is on AND the count is a positive integer. We
+      // clamp to [1, 10] to match the server-side zod schema.
+      photoCount: requiresPhotos && photoCount != null && photoCount > 0
+        ? Math.max(1, Math.min(10, Math.round(photoCount)))
         : null,
       seasonStart: !isOneTime && seasonStart ? seasonStart : null,
       seasonEnd: !isOneTime && seasonEnd ? seasonEnd : null,
@@ -397,6 +410,43 @@ export const EventFormModal: React.FC<Props> = ({ open, onClose, editing, onRequ
                         amount: Number(fixedFee).toFixed(2),
                       }))
                   : t('eventForm.errFixedFeePair')}
+              </div>
+            )}
+          </div>
+
+          {/* ── Photo requirement ─────────────────────────────
+              Some venues (Beach Clubs, strict clubs) require N
+              photos per guest at the door. Toggle drives an upload
+              section on both the guest form AND the public
+              registration form. Stored as `photoCount: number | null`
+              so the null-vs-positive-int distinction is the truth;
+              we keep the count split out from the checkbox in local
+              state so the user can tick/untick without losing it. */}
+          <div className="form-group">
+            <div className="check-row">
+              <input
+                id="evRequiresPhotos"
+                type="checkbox"
+                checked={requiresPhotos}
+                onChange={(e) => setRequiresPhotos(e.target.checked)}
+              />
+              <label htmlFor="evRequiresPhotos">{t('eventForm.requiresPhotosLabel')}</label>
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 4, marginBottom: requiresPhotos ? 10 : 0, lineHeight: 1.5 }}>
+              {t('eventForm.requiresPhotosHint')}
+            </div>
+            {requiresPhotos && (
+              <div>
+                <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 4 }}>
+                  {t('eventForm.photoCountLabel')}
+                </div>
+                <NumberField
+                  className="form-input"
+                  placeholder="3"
+                  min={1}
+                  value={photoCount}
+                  onChange={setPhotoCount}
+                />
               </div>
             )}
           </div>
