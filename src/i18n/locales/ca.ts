@@ -79,9 +79,16 @@ const ca: LocaleStrings = {
 
   home: {
     subtitle: "Esdeveniments d'avui",
+    subtitleFuture: 'Pròxims esdeveniments',
     addBtn: '+ Esdeveniment',
     empty: 'Avui no hi ha esdeveniments.',
     emptySub: 'Els esdeveniments programats apareixeran aquí en la seva data.',
+    emptyDay: 'Sense esdeveniments aquest dia.',
+    emptyDaySub: 'Torna a avui o tria una altra data.',
+    prevDay: 'Dia anterior',
+    nextDay: 'Dia següent',
+    sharePlanLink: 'Compartir enllaç de registre',
+    shareCopied: 'Enllaç copiat ✓',
   },
   guests: {
     title: 'Llista de convidades',

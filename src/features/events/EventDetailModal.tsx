@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { IonModal, IonContent, IonIcon } from '@ionic/react';
-import { shareSocialOutline, logoWhatsapp } from 'ionicons/icons';
+import { logoWhatsapp } from 'ionicons/icons';
 import { useTranslation } from 'react-i18next';
 import { useAppStore } from '@/store/useAppStore';
 import { useConfirm } from '@/store/useConfirmStore';
@@ -11,14 +11,13 @@ import {
 } from '@/features/summary/calculations';
 import { Pill, SlotPill } from '@/components/Pill';
 import { Avatar } from '@/components/Avatar';
-import { initials, safeUuid } from '@/core/utils/format';
+import { initials } from '@/core/utils/format';
 import { isoDay } from '@/core/utils/date';
 import { today } from '@/core/constants';
 import { StarBadge, SocialBadge } from '@/components/SocialBadge';
 import { CapacityBar } from '@/components/CapacityBar';
 import { CopyButton } from '@/components/CopyButton';
 import { SheetHeader } from '@/components/SheetHeader';
-import { listSubmissions, buildPlanUrl } from '@/services/shareApi';
 
 interface Props {
   open: boolean;
@@ -34,16 +33,13 @@ export const EventDetailModal: React.FC<Props> = ({ open, onClose, eventId, onEd
   const confirm = useConfirm();
   const {
     events, venues, guests, reservations,
-    togglePrivateInvite, upsertEvent, importSubmissionsAsGuests,
-    promoteFromWaitlist,
+    togglePrivateInvite, promoteFromWaitlist,
   } = useAppStore((s) => ({
     events: s.events,
     venues: s.venues,
     guests: s.guests,
     reservations: s.reservations,
     togglePrivateInvite: s.togglePrivateInvite,
-    upsertEvent: s.upsertEvent,
-    importSubmissionsAsGuests: s.importSubmissionsAsGuests,
     promoteFromWaitlist: s.promoteFromWaitlist,
   }));
   const e = eventId != null ? events.find((x) => x.id === eventId) : null;
@@ -539,16 +535,6 @@ export const EventDetailModal: React.FC<Props> = ({ open, onClose, eventId, onEd
             </>
           )}
 
-          <SharePanel
-            event={e}
-            occurrenceDate={selectedDate || null}
-            onPublish={(updatedEvent) => upsertEvent(updatedEvent)}
-            onSync={async (token) => {
-              const { submissions } = await listSubmissions(token);
-              return importSubmissionsAsGuests(e.id, submissions);
-            }}
-          />
-
           {/* Send-list-to-WhatsApp CTA. Lives above the add buttons
               because it's the high-value action right before the
               event runs — once the list is dispatched the promoter
@@ -590,6 +576,9 @@ export const EventDetailModal: React.FC<Props> = ({ open, onClose, eventId, onEd
   );
 };
 
+// Small lowercase-uppercase section label used in several spots
+// of the modal. Kept as a tiny inline component so each section
+// (Capacity, Schedule, Guests, etc.) lines up visually.
 const SectionHead: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <div style={{
     fontSize: 12, fontWeight: 500, color: 'var(--color-text-secondary)',
@@ -597,237 +586,8 @@ const SectionHead: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   }}>{children}</div>
 );
 
-// ─────────────────────────────────────────────────────────────
-//  SharePanel — generate a public registration link and sync
-//  submissions back into the local guests list. Lives inside the
-//  event detail because the link is event-scoped.
-// ─────────────────────────────────────────────────────────────
-interface SharePanelProps {
-  event: import('@/core/types').PromEvent;
-  /** Which occurrence the share link is for. For one-time events
-   *  the public endpoint ignores it and uses the event's own date;
-   *  for recurring events the link MUST carry one so the sign-up
-   *  ends up on the right night. */
-  occurrenceDate: string | null;
-  onPublish: (e: import('@/core/types').PromEvent) => void;
-  onSync: (token: string) => Promise<number>;
-}
-
-const SharePanel: React.FC<SharePanelProps> = ({ event, occurrenceDate, onPublish, onSync }) => {
-  const { t } = useTranslation();
-  const [working, setWorking] = useState(false);
-  const [feedback, setFeedback] = useState<string | null>(null);
-
-  const showFeedback = (msg: string) => {
-    setFeedback(msg);
-    setTimeout(() => setFeedback(null), 3500);
-  };
-
-  // Legacy events created before auto-token generation may not have
-  // a `shareToken` yet. Generating one just means assigning a UUID
-  // and saving the event back — the row itself IS the registration
-  // record (no separate publish call needed).
-  const generate = async () => {
-    setWorking(true);
-    try {
-      const token = event.shareToken ?? safeUuid();
-      onPublish({ ...event, shareToken: token });
-      showFeedback(t('eventDetail.publicLinkReady'));
-    } catch (err) {
-      showFeedback(t('eventDetail.publicLinkCouldnt', { message: (err as Error).message }));
-    } finally {
-      setWorking(false);
-    }
-  };
-
-  // The link MUST point at a specific occurrence. For one-time
-  // events that's the event's own date; for recurring events it's
-  // whichever night the promoter has selected in the detail view.
-  const linkDate: string | null = event.isOneTime
-    ? (event.eventDate ?? null)
-    : occurrenceDate;
-  const canShare = !!event.shareToken && !!linkDate;
-
-  // The shared link points at /plan?d=<date>, the new multi-event
-  // entry point. One link covers every event happening that night;
-  // the legacy per-event /register/:token URL still works for
-  // anyone who has it but isn't what we hand out anymore.
-  const copyLink = async () => {
-    if (!event.shareToken || !linkDate) return;
-    const url = buildPlanUrl(linkDate);
-    try {
-      await navigator.clipboard.writeText(url);
-      showFeedback(t('eventDetail.publicLinkCopied'));
-    } catch {
-      showFeedback(url);
-    }
-  };
-
-  const shareNative = async () => {
-    if (!event.shareToken || !linkDate) return;
-    const url = buildPlanUrl(linkDate);
-    const text = `Sign up for ${event.name}: ${url}`;
-    if (navigator.share) {
-      try { await navigator.share({ title: event.name, text, url }); }
-      catch { /* user cancelled */ }
-    } else {
-      await navigator.clipboard.writeText(text);
-      showFeedback(t('actions.copied'));
-    }
-  };
-
-  // Pulls submissions from the `submissions` table (joined to the
-  // event via its share token) into the local guests list.
-  const pullSignups = async () => {
-    if (!event.shareToken) return;
-    setWorking(true);
-    try {
-      const added = await onSync(event.shareToken);
-      showFeedback(added > 0 ? t('eventDetail.publicLinkImported', { count: added }) : t('eventDetail.publicLinkNoNew'));
-    } catch (err) {
-      showFeedback(t('eventDetail.publicLinkCouldntRefresh', { message: (err as Error).message }));
-    } finally {
-      setWorking(false);
-    }
-  };
-
-  // ── Render ─────────────────────────────────────────────────
-  // Legacy events without a token (created before auto-gen): show
-  // the "Generate link" CTA. Everything else: render the prominent
-  // link card with copy/share/refresh actions.
-  if (!event.shareToken) {
-    return (
-      <div style={{
-        marginTop: 14, padding: '12px 14px',
-        background: 'var(--color-background-secondary)',
-        borderRadius: 'var(--border-radius-md)',
-        border: '0.5px solid var(--color-border-tertiary)',
-      }}>
-        <SectionHead>{t('eventDetail.publicLink')}</SectionHead>
-        <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 10, lineHeight: 1.5 }}>
-          {t('eventDetail.publicLinkGenerate')}
-        </div>
-        <button
-          type="button"
-          className="btn-primary"
-          style={{ width: '100%', padding: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
-          onClick={generate}
-          disabled={working}
-        >
-          <IonIcon icon={shareSocialOutline} style={{ fontSize: 16 }} />
-          {working ? t('eventDetail.publicLinkGenerating') : t('eventDetail.publicLinkCreate')}
-        </button>
-        {feedback && (
-          <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 8 }}>
-            {feedback}
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  const url = canShare ? buildPlanUrl(linkDate) : '';
-  const linkDateLabel = linkDate
-    ? new Date(linkDate + 'T00:00:00').toLocaleDateString(undefined, {
-        weekday: 'long', day: 'numeric', month: 'long',
-      })
-    : null;
-  return (
-    <div style={{
-      marginTop: 14, padding: '14px 14px',
-      background: 'var(--color-background-primary)',
-      borderRadius: 'var(--border-radius-lg)',
-      border: '1px solid var(--color-primary)',
-    }}>
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10,
-      }}>
-        <IonIcon icon={shareSocialOutline} style={{ fontSize: 18, color: 'var(--color-primary)' }} />
-        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>
-          {t('eventDetail.registrationLink')}
-        </div>
-      </div>
-
-      {/* Date pill — makes the bound occurrence unmissable so the
-          promoter knows which night they're sharing for. */}
-      {linkDateLabel ? (
-        <div style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6,
-          background: 'var(--color-background-secondary)',
-          border: '0.5px solid var(--color-border-tertiary)',
-          borderRadius: 'var(--border-radius-sm)',
-          padding: '4px 10px',
-          fontSize: 12, fontWeight: 500,
-          color: 'var(--color-text-primary)',
-          marginBottom: 10,
-        }}>
-          📅 {linkDateLabel}
-        </div>
-      ) : (
-        <div style={{
-          fontSize: 12, color: '#A32D2D',
-          background: '#FDECEC', border: '0.5px solid #F3C4C4',
-          padding: '8px 10px', borderRadius: 'var(--border-radius-sm)',
-          marginBottom: 10,
-        }}>
-          {t('eventDetail.publicLinkPickFirst')}
-        </div>
-      )}
-
-      <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 10, lineHeight: 1.5 }}>
-        {t('eventDetail.publicLinkInfo')}
-      </div>
-
-      {canShare && (
-        <div style={{
-          background: 'var(--color-background-secondary)',
-          border: '0.5px solid var(--color-border-tertiary)',
-          borderRadius: 'var(--border-radius-md)',
-          padding: '10px 12px',
-          fontSize: 12, color: 'var(--color-text-primary)',
-          wordBreak: 'break-all',
-          marginBottom: 10,
-          fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-        }}>
-          {url}
-        </div>
-      )}
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-        <button
-          className="btn-primary"
-          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
-          onClick={copyLink}
-          disabled={!canShare}
-        >
-          📋 {t('actions.copy')}
-        </button>
-        <button
-          className="btn-primary"
-          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
-          onClick={shareNative}
-          disabled={!canShare}
-        >
-          <IonIcon icon={shareSocialOutline} style={{ fontSize: 14 }} /> {t('actions.share')}
-        </button>
-        <button
-          className="btn-secondary"
-          style={{ gridColumn: '1 / -1' }}
-          onClick={pullSignups}
-          disabled={working}
-        >
-          {working ? t('eventDetail.publicLinkRefreshing') : t('eventDetail.publicLinkRefresh')}
-        </button>
-      </div>
-
-      {feedback && (
-        <div style={{
-          fontSize: 11, color: 'var(--color-text-secondary)',
-          marginTop: 8, textAlign: 'center',
-        }}>
-          {feedback}
-        </div>
-      )}
-    </div>
-  );
-};
+// The SharePanel that used to live here is gone — the public-
+// registration link now lives at the top of HomePage (one button,
+// no preview, no refresh action). importSubmissionsAsGuests /
+// listSubmissions stay in the store / shareApi in case a "pull
+// legacy submissions" tool gets re-added later.

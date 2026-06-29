@@ -79,9 +79,16 @@ const es: LocaleStrings = {
 
   home: {
     subtitle: 'Eventos de hoy',
+    subtitleFuture: 'Próximos eventos',
     addBtn: '+ Evento',
     empty: 'Hoy no hay eventos.',
     emptySub: 'Los eventos programados aparecerán aquí en su fecha.',
+    emptyDay: 'Sin eventos en este día.',
+    emptyDaySub: 'Vuelve a hoy o elige otra fecha.',
+    prevDay: 'Día anterior',
+    nextDay: 'Día siguiente',
+    sharePlanLink: 'Compartir enlace de registro',
+    shareCopied: 'Enlace copiado ✓',
   },
   guests: {
     title: 'Lista de invitadas',

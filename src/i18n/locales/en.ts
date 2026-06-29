@@ -90,9 +90,16 @@ const en = {
   // ── Page titles & headers ─────────────────────────────────
   home: {
     subtitle: "Today's events",
+    subtitleFuture: 'Upcoming events',
     addBtn: '+ Event',
     empty: 'No events today.',
     emptySub: 'All scheduled events will show here on their date.',
+    emptyDay: 'No events on this day.',
+    emptyDaySub: 'Step back to today or pick another date.',
+    prevDay: 'Previous day',
+    nextDay: 'Next day',
+    sharePlanLink: 'Share registration link',
+    shareCopied: 'Link copied ✓',
   },
   guests: {
     title: 'Guest list',
