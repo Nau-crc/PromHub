@@ -242,6 +242,8 @@ const ca: LocaleStrings = {
     requiresPhotosLabel: 'Demana fotos de cada convidada',
     requiresPhotosHint: 'Alguns locals filtren a la porta per foto. En activar-ho, el formulari de convidada (i l\'enllaç públic) demanaran les fotos indicades a sota.',
     photoCountLabel: 'Quantes fotos per convidada',
+    flyerLabel: 'Flyer (imatge o vídeo)',
+    flyerHint: 'Les convidades el poden descarregar després d\'apuntar-se i pujar-lo a la seva història d\'Instagram. Imatge o vídeo curt, fins a 50 MB.',
     description: 'Descripció',
     descPlaceholder: 'Què té d\'especial aquesta nit?',
     privateLabel: 'Esdeveniment privat',
@@ -465,6 +467,34 @@ const ca: LocaleStrings = {
     uploading: 'Pujant…',
     photoAlt: 'Foto {{n}}',
     uploadFailed: 'No s\'ha pogut pujar: {{message}}',
+  },
+
+  flyerUploader: {
+    add: 'Afegir flyer',
+    uploading: 'Pujant…',
+    hint: 'Imatge (JPEG/PNG/WebP/GIF) o vídeo curt (MP4/MOV/WebM), fins a 50 MB.',
+    uploadFailed: 'No s\'ha pogut pujar: {{message}}',
+  },
+
+  plan: {
+    title: 'Munta el teu pla d\'avui!',
+    nothingTonight: 'No hi ha res programat aquesta nit. Torna demà.',
+    q1: 'Què et ve de gust fer avui?',
+    q2: 'On t\'agradaria anar a/de {{slots}}?',
+    q2Hint: 'Tria un o més locals. Pots anar a diversos.',
+    noVenue: 'Sense local',
+    continue: 'Continuar →',
+    back: '← Enrere',
+    termsTitle: 'Condicions de la teva selecció',
+    noConditions: 'Sense condicions específiques per a aquest esdeveniment.',
+    acceptTerms: 'He llegit i accepto les condicions de cada esdeveniment seleccionat.',
+    acceptFlyerStory: 'Em comprometo a descarregar el flyer de l\'esdeveniment i pujar-lo a la meva història d\'Instagram.',
+    signMeUp: 'Apunta\'m',
+    doneTitle: 'Estàs dins!',
+    confirmed: 'Confirmada',
+    waitlisted: 'Llista d\'espera · posició #{{position}}',
+    downloadFlyer: '↓ Descarregar flyer',
+    flyerReminder: 'Recorda: descarrega cada flyer i puja\'l a la teva història d\'Instagram.',
   },
 
   publicForm: {

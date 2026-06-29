@@ -242,6 +242,8 @@ const es: LocaleStrings = {
     requiresPhotosLabel: 'Pide fotos de cada invitada',
     requiresPhotosHint: 'Algunos locales filtran en la puerta por foto. Al activarlo, el formulario de invitación (y el enlace público) pedirá las fotos indicadas abajo.',
     photoCountLabel: 'Cuántas fotos por invitada',
+    flyerLabel: 'Flyer (imagen o vídeo)',
+    flyerHint: 'Las invitadas pueden descargarlo tras apuntarse y subirlo a su historia de Instagram. Imagen o vídeo corto, hasta 50 MB.',
     description: 'Descripción',
     descPlaceholder: '¿Qué tiene de especial esta noche?',
     privateLabel: 'Evento privado',
@@ -465,6 +467,34 @@ const es: LocaleStrings = {
     uploading: 'Subiendo…',
     photoAlt: 'Foto {{n}}',
     uploadFailed: 'No se pudo subir: {{message}}',
+  },
+
+  flyerUploader: {
+    add: 'Añadir flyer',
+    uploading: 'Subiendo…',
+    hint: 'Imagen (JPEG/PNG/WebP/GIF) o vídeo corto (MP4/MOV/WebM), hasta 50 MB.',
+    uploadFailed: 'No se pudo subir: {{message}}',
+  },
+
+  plan: {
+    title: '¡Arma tu plan de hoy!',
+    nothingTonight: 'No hay nada programado esta noche. Vuelve mañana.',
+    q1: '¿Qué te gustaría hacer hoy?',
+    q2: '¿A dónde te gustaría ir a/de {{slots}}?',
+    q2Hint: 'Elige uno o más locales. Puedes ir a varios.',
+    noVenue: 'Sin local',
+    continue: 'Continuar →',
+    back: '← Atrás',
+    termsTitle: 'Condiciones de tu selección',
+    noConditions: 'Sin condiciones específicas para este evento.',
+    acceptTerms: 'He leído y acepto las condiciones de cada evento seleccionado.',
+    acceptFlyerStory: 'Me comprometo a descargar el flyer del evento y subirlo a mi historia de Instagram.',
+    signMeUp: 'Apúntame',
+    doneTitle: '¡Estás dentro!',
+    confirmed: 'Confirmada',
+    waitlisted: 'Lista de espera · posición #{{position}}',
+    downloadFlyer: '↓ Descargar flyer',
+    flyerReminder: 'Recuerda: descarga cada flyer y súbelo a tu historia de Instagram.',
   },
 
   publicForm: {

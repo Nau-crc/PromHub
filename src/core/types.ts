@@ -87,6 +87,10 @@ export interface PromEvent {
    *  form, and surfaces an upload section in the guest form / public
    *  registration form when this is set. */
   photoCount: number | null;
+  /** Vercel Blob URL for the event's flyer (image or video). The
+   *  /plan flow downloads this on submit so the guest can re-share
+   *  it on her IG story. null = no flyer configured. */
+  flyerUrl: string | null;
   /** Season start (ISO yyyy-mm-dd). Recurring only. null = open-ended past. */
   seasonStart: string | null;
   /** Season end (ISO yyyy-mm-dd). Recurring only. null = open-ended future. */

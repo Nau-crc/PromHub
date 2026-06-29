@@ -18,7 +18,7 @@ import { StarBadge, SocialBadge } from '@/components/SocialBadge';
 import { CapacityBar } from '@/components/CapacityBar';
 import { CopyButton } from '@/components/CopyButton';
 import { SheetHeader } from '@/components/SheetHeader';
-import { listSubmissions, buildShareUrl } from '@/services/shareApi';
+import { listSubmissions, buildPlanUrl } from '@/services/shareApi';
 
 interface Props {
   open: boolean;
@@ -648,9 +648,13 @@ const SharePanel: React.FC<SharePanelProps> = ({ event, occurrenceDate, onPublis
     : occurrenceDate;
   const canShare = !!event.shareToken && !!linkDate;
 
+  // The shared link points at /plan?d=<date>, the new multi-event
+  // entry point. One link covers every event happening that night;
+  // the legacy per-event /register/:token URL still works for
+  // anyone who has it but isn't what we hand out anymore.
   const copyLink = async () => {
     if (!event.shareToken || !linkDate) return;
-    const url = buildShareUrl(event.shareToken, linkDate);
+    const url = buildPlanUrl(linkDate);
     try {
       await navigator.clipboard.writeText(url);
       showFeedback(t('eventDetail.publicLinkCopied'));
@@ -661,7 +665,7 @@ const SharePanel: React.FC<SharePanelProps> = ({ event, occurrenceDate, onPublis
 
   const shareNative = async () => {
     if (!event.shareToken || !linkDate) return;
-    const url = buildShareUrl(event.shareToken, linkDate);
+    const url = buildPlanUrl(linkDate);
     const text = `Sign up for ${event.name}: ${url}`;
     if (navigator.share) {
       try { await navigator.share({ title: event.name, text, url }); }
@@ -722,7 +726,7 @@ const SharePanel: React.FC<SharePanelProps> = ({ event, occurrenceDate, onPublis
     );
   }
 
-  const url = canShare ? buildShareUrl(event.shareToken!, linkDate) : '';
+  const url = canShare ? buildPlanUrl(linkDate) : '';
   const linkDateLabel = linkDate
     ? new Date(linkDate + 'T00:00:00').toLocaleDateString(undefined, {
         weekday: 'long', day: 'numeric', month: 'long',

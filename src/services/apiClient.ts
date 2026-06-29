@@ -102,6 +102,7 @@ function normalizeEvent(row: any): PromEvent {
     fixedFee: row.fixedFee != null ? Number(row.fixedFee) : null,
     perExtraGuestFee: row.perExtraGuestFee != null ? Number(row.perExtraGuestFee) : null,
     photoCount: row.photoCount ?? null,
+    flyerUrl: row.flyerUrl ?? null,
     seasonStart: row.seasonStart,
     seasonEnd: row.seasonEnd,
     shareToken: row.shareToken,
@@ -297,6 +298,25 @@ export const api = {
   },
 
   // ── First-run migration ──
+  // ── Flyer upload (Vercel Blob client-direct via /api/v1/uploads) ──
+  //
+  //  Flyers can be images or short videos (≤50 MB). We bypass the
+  //  proxy-upload path that /api/v1/photos uses because Vercel's
+  //  Hobby plan caps request bodies at 4.5 MB. Instead the client
+  //  hands a small token-request to our /api/v1/uploads endpoint,
+  //  which signs and returns a short-lived upload token, and the
+  //  client streams the file straight to Blob storage.
+  async uploadFlyer(file: File): Promise<string> {
+    const { upload } = await import('@vercel/blob/client');
+    const ext = (file.name.split('.').pop() ?? 'bin').toLowerCase();
+    const filename = `flyer-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    const blob = await upload(filename, file, {
+      access: 'public',
+      handleUploadUrl: '/api/v1/uploads',
+    });
+    return blob.url;
+  },
+
   // ── Photo upload (Vercel Blob, proxied through /api/v1/photos) ──
   //
   //  The caller is responsible for resizing the image before calling
@@ -375,6 +395,7 @@ function buildSyncPayload(snap: AppDataSnapshot) {
       fixedFee: e.fixedFee,
       perExtraGuestFee: e.perExtraGuestFee,
       photoCount: e.photoCount,
+      flyerUrl: e.flyerUrl,
       seasonStart: e.seasonStart,
       seasonEnd: e.seasonEnd,
       shareToken: e.shareToken,

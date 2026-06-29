@@ -275,6 +275,7 @@ const EventStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
       fixedFee: null,
       perExtraGuestFee: null,
       photoCount: null,
+      flyerUrl: null,
       seasonStart: !isOneTime && seasonStart ? seasonStart : null,
       seasonEnd: !isOneTime && seasonEnd ? seasonEnd : null,
       shareToken: null,

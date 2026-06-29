@@ -92,7 +92,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const {
       venueInputSchema, eventInputSchema, guestInputSchema,
       reservationInputSchema, snapshotSchema, nightRecordInputSchema,
-      settingsInputSchema,
+      settingsInputSchema, planRegisterInputSchema,
     } = await import('../_lib/validators.js');
     const { parseBody } = await import('../_handler.js');
     const { badRequest, notFound } = await import('../_lib/errors.js');
@@ -461,6 +461,230 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         addRandomSuffix: true,
       });
       return res.status(201).json({ url: blob.url });
+    }
+
+    // ── /api/v1/uploads ─────────────────────────────────────
+    // Vercel Blob client-direct upload endpoint. Used by the
+    // promoter app to attach a flyer (image OR video) to an event.
+    // Videos easily exceed the 4.5 MB body cap that /api/v1/photos
+    // operates under, so we hand the client a short-lived signed
+    // token and it uploads straight to Blob storage. Up to 50 MB.
+    //
+    // The endpoint serves BOTH legs of @vercel/blob's client-upload
+    // protocol — token generation AND the (optional) upload-completed
+    // webhook — via the `handleUpload` helper. We pass an empty
+    // `onUploadCompleted` because we don't need server-side
+    // bookkeeping; the URL the helper returns is what we persist
+    // to the event row.
+    if (resource === 'uploads' && segments.length === 1) {
+      if (req.method !== 'POST') throw badRequest(`Method ${req.method} not allowed`);
+      const { handleUpload } = await import('@vercel/blob/client');
+      const body = parseBody(req.body) as unknown;
+      // VercelRequest.headers is a plain object, but handleUpload's
+      // signature-verification path on the `blob.upload-completed`
+      // callback calls `request.headers.get('x-vercel-signature')`.
+      // Wrap the request so that call works in production.
+      const wrappedRequest = {
+        headers: {
+          get(name: string) {
+            const v = req.headers[name.toLowerCase()];
+            if (Array.isArray(v)) return v[0] ?? null;
+            return v ?? null;
+          },
+        },
+      } as unknown as Request;
+      try {
+        const jsonResponse = await handleUpload({
+          body: body as Parameters<typeof handleUpload>[0]['body'],
+          request: wrappedRequest,
+          onBeforeGenerateToken: async () => ({
+            allowedContentTypes: [
+              'image/jpeg', 'image/png', 'image/webp', 'image/gif',
+              'video/mp4', 'video/quicktime', 'video/webm',
+            ],
+            maximumSizeInBytes: 50 * 1024 * 1024,
+            addRandomSuffix: true,
+          }),
+          onUploadCompleted: async () => { /* no-op */ },
+        });
+        return res.status(200).json(jsonResponse);
+      } catch (err) {
+        throw badRequest((err as Error).message);
+      }
+    }
+
+    // ── /api/v1/today ───────────────────────────────────────
+    // Public lookup driving the /plan flow. Returns every event
+    // occurring on the requested date (defaults to today) with
+    // just the data the guest needs to pick: name, description,
+    // timeslots, venue name, photoCount, flyerUrl. No tenant
+    // header required — same shared workspace as everything else.
+    //
+    // Recurrence resolution lives client-side in the rest of the
+    // app, but doing it server-side here lets the public form
+    // stay tiny (no events array, no occurrence math).
+    if (resource === 'today' && segments.length === 1) {
+      if (req.method !== 'GET') throw badRequest(`Method ${req.method} not allowed`);
+      const dateRaw = pickString(req.query.d) ?? pickString(req.query.date);
+      const date = dateRaw && /^\d{4}-\d{2}-\d{2}$/.test(dateRaw)
+        ? dateRaw
+        : new Date().toISOString().slice(0, 10);
+      const weekdayShort = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][
+        new Date(date + 'T00:00:00Z').getUTCDay()
+      ];
+
+      const eventRows = await db.select({
+        id: schema.events.id,
+        name: schema.events.name,
+        description: schema.events.description,
+        venueId: schema.events.venueId,
+        weekdays: schema.events.weekdays,
+        isOneTime: schema.events.isOneTime,
+        eventDate: schema.events.eventDate,
+        timeslots: schema.events.timeslots,
+        photoCount: schema.events.photoCount,
+        flyerUrl: schema.events.flyerUrl,
+        seasonStart: schema.events.seasonStart,
+        seasonEnd: schema.events.seasonEnd,
+      }).from(schema.events);
+
+      // Match: one-time events fire on their exact eventDate;
+      // recurring fire when the weekday is in their weekdays[] AND
+      // the date sits within the optional season window.
+      const matching = eventRows.filter((e) => {
+        if (e.isOneTime) return e.eventDate === date;
+        if (!(e.weekdays ?? []).map((d) => d.toLowerCase().slice(0, 3)).includes(weekdayShort)) {
+          return false;
+        }
+        if (e.seasonStart && date < e.seasonStart) return false;
+        if (e.seasonEnd && date > e.seasonEnd) return false;
+        return true;
+      });
+
+      // Pull venue names in one query so we can include the venue
+      // label on each event row without joining N times.
+      const venueIds = [...new Set(matching.map((e) => e.venueId).filter((v): v is number => v != null))];
+      const venuesById = new Map<number, string>();
+      if (venueIds.length) {
+        const { inArray } = await import('drizzle-orm');
+        const venues = await db.select({
+          id: schema.venues.id,
+          name: schema.venues.name,
+        }).from(schema.venues).where(inArray(schema.venues.id, venueIds));
+        for (const v of venues) venuesById.set(v.id, v.name);
+      }
+
+      return res.status(200).json({
+        date,
+        events: matching.map((e) => ({
+          id: e.id,
+          name: e.name,
+          description: e.description ?? '',
+          venueId: e.venueId,
+          venueName: e.venueId != null ? (venuesById.get(e.venueId) ?? null) : null,
+          timeslots: e.timeslots ?? [],
+          photoCount: e.photoCount ?? null,
+          flyerUrl: e.flyerUrl ?? null,
+        })),
+      });
+    }
+
+    // ── /api/v1/plan-register ───────────────────────────────
+    // Public multi-event sign-up. One submit creates one guest row
+    // per selected event (matches the "N guests, uno por evento"
+    // decision). Each event runs its own waitlist check against
+    // the date's already-confirmed pax.
+    if (resource === 'plan-register' && segments.length === 1) {
+      if (req.method !== 'POST') throw badRequest(`Method ${req.method} not allowed`);
+      const input = planRegisterInputSchema.parse(parseBody(req.body));
+
+      const eventRows = await db.select({
+        id: schema.events.id,
+        name: schema.events.name,
+        venueId: schema.events.venueId,
+        timeslots: schema.events.timeslots,
+        flyerUrl: schema.events.flyerUrl,
+        photoCount: schema.events.photoCount,
+      }).from(schema.events).where(
+        // inArray imported lazily here so the import isn't redundant
+        // at the top of the dispatcher (other branches don't need it).
+        (await import('drizzle-orm')).inArray(schema.events.id, input.eventIds),
+      );
+      if (eventRows.length !== input.eventIds.length) {
+        throw badRequest('One or more events not found');
+      }
+
+      const { sql: rawSql } = await import('drizzle-orm');
+      const results: Array<{
+        eventId: number;
+        eventName: string;
+        waitlisted: boolean;
+        queuePosition: number | null;
+        flyerUrl: string | null;
+      }> = [];
+
+      // Audit notes: stamp the two acceptance flags into the guest
+      // row's notes column. Keeps a trail without adding columns
+      // for what's effectively self-attested.
+      const notes = `via /plan · terms✓ · igStory✓`;
+
+      for (const event of eventRows) {
+        const derivedCapacity = (event.timeslots ?? []).reduce(
+          (sum, slot) => sum + (slot.guestCapacity || 0),
+          0,
+        );
+        const capacity = derivedCapacity > 0 ? derivedCapacity : null;
+
+        let waitlisted = false;
+        let queuePosition: number | null = null;
+        if (capacity && capacity > 0) {
+          const confirmedRows = await db.select({
+            pax: schema.guests.pax,
+            waitlisted: schema.guests.waitlisted,
+            cancelled: schema.guests.cancelled,
+          }).from(schema.guests)
+            .where(rawSql`event_id = ${event.id} AND (event_date IS NULL OR event_date = ${input.date})`);
+          const confirmedPax = confirmedRows
+            .filter((g) => !g.waitlisted && !g.cancelled)
+            .reduce((a, g) => a + g.pax, 0);
+          if (confirmedPax + input.pax > capacity) {
+            waitlisted = true;
+            queuePosition = confirmedRows.filter((g) => g.waitlisted && !g.cancelled).length + 1;
+          }
+        }
+
+        // Only attach the photos the guest uploaded when this event
+        // actually requires them — otherwise drop them so unrelated
+        // events don't inflate their rows with photos they'll never
+        // surface.
+        const eventPhotos = event.photoCount ? input.photos : [];
+
+        await db.insert(schema.guests).values({
+          tenantId: SHARED_TENANT_ID,
+          name: input.name,
+          eventId: event.id,
+          venueId: event.venueId,
+          pax: input.pax,
+          igHandle: input.igHandle,
+          igPlatform: input.igPlatform,
+          timeslotIds: [],
+          timeslotNames: [],
+          eventDate: input.date,
+          notes,
+          waitlisted,
+          photos: eventPhotos,
+        });
+
+        results.push({
+          eventId: event.id,
+          eventName: event.name,
+          waitlisted,
+          queuePosition,
+          flyerUrl: event.flyerUrl ?? null,
+        });
+      }
+
+      return res.status(201).json({ ok: true, results });
     }
 
     // ── /api/v1/night-records ───────────────────────────────

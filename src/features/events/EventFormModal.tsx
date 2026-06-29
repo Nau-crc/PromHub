@@ -13,6 +13,7 @@ import { Calendar } from '@/components/Calendar';
 import { SelectField } from '@/components/SelectField';
 import { safeUuid } from '@/core/utils/format';
 import { TimeslotRows } from '@/features/venues/VenueEditor';
+import { FlyerUploader } from '@/components/FlyerUploader';
 
 interface Props {
   open: boolean;
@@ -71,6 +72,9 @@ export const EventFormModal: React.FC<Props> = ({ open, onClose, editing, onRequ
    *  while the user un-ticks/re-ticks the checkbox without losing it. */
   const [requiresPhotos, setRequiresPhotos] = useState(false);
   const [photoCount, setPhotoCount] = useState<number | null>(3);
+  /** Flyer (image or video) the /plan flow downloads at submit time
+   *  so guests can re-post on their IG story. */
+  const [flyerUrl, setFlyerUrl] = useState<string | null>(null);
   const [seasonStart, setSeasonStart] = useState<string>('');
   const [seasonEnd, setSeasonEnd] = useState<string>('');
 
@@ -102,6 +106,7 @@ export const EventFormModal: React.FC<Props> = ({ open, onClose, editing, onRequ
     setPerExtraGuestFee(editing?.perExtraGuestFee ?? null);
     setRequiresPhotos(editing?.photoCount != null && editing.photoCount > 0);
     setPhotoCount(editing?.photoCount ?? 3);
+    setFlyerUrl(editing?.flyerUrl ?? null);
     setSeasonStart(editing?.seasonStart ?? '');
     setSeasonEnd(editing?.seasonEnd ?? '');
   }, [open, editing, venues]);
@@ -205,6 +210,7 @@ export const EventFormModal: React.FC<Props> = ({ open, onClose, editing, onRequ
       photoCount: requiresPhotos && photoCount != null && photoCount > 0
         ? Math.max(1, Math.min(10, Math.round(photoCount)))
         : null,
+      flyerUrl,
       seasonStart: !isOneTime && seasonStart ? seasonStart : null,
       seasonEnd: !isOneTime && seasonEnd ? seasonEnd : null,
       shareToken,
@@ -412,6 +418,19 @@ export const EventFormModal: React.FC<Props> = ({ open, onClose, editing, onRequ
                   : t('eventForm.errFixedFeePair')}
               </div>
             )}
+          </div>
+
+          {/* ── Flyer (image or video) ─────────────────────────
+              Surfaced on the /plan flow's "done" screen so the
+              guest can download and re-share to her IG story. The
+              checkbox commitment on the public form is meaningful
+              only when there's a flyer to download. */}
+          <div className="form-group">
+            <label className="form-label">{t('eventForm.flyerLabel')}</label>
+            <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 8, lineHeight: 1.5 }}>
+              {t('eventForm.flyerHint')}
+            </div>
+            <FlyerUploader value={flyerUrl} onChange={setFlyerUrl} />
           </div>
 
           {/* ── Photo requirement ─────────────────────────────

@@ -107,3 +107,74 @@ export const buildShareUrl = (token: string, date?: string | null): string => {
   if (typeof window === 'undefined') return path;
   return `${window.location.origin}${path}`;
 };
+
+// ─── /plan flow ─────────────────────────────────────────────
+//  Public, multi-event sign-up. The promoter shares ONE link per
+//  night (or just /plan and the public form defaults to today).
+//  /api/v1/today returns the events; /api/v1/plan-register takes
+//  the picks and creates one guest row per chosen event.
+
+/** Trimmed event payload the public /plan flow needs. No tenancy
+ *  data; only what's safe to show to anonymous guests. */
+export interface PlanEvent {
+  id: number;
+  name: string;
+  description: string;
+  venueId: number | null;
+  venueName: string | null;
+  timeslots: Array<{
+    id: string;
+    name: string;
+    startTime: string;
+    endTime: string;
+    guestCapacity: number;
+  }>;
+  photoCount: number | null;
+  flyerUrl: string | null;
+}
+
+export interface TodayResponse {
+  date: string;
+  events: PlanEvent[];
+}
+
+export const fetchToday = (date?: string | null): Promise<TodayResponse> => {
+  const q = date ? `?d=${encodeURIComponent(date)}` : '';
+  return jsonFetch(`/api/v1/today${q}`);
+};
+
+export interface PlanRegisterPayload {
+  date: string;
+  eventIds: number[];
+  name: string;
+  pax: number;
+  igHandle: string;
+  igPlatform: 'instagram' | 'tiktok';
+  photos: string[];
+  acceptedTerms: true;
+  acceptedFlyerStory: true;
+}
+
+export interface PlanRegisterResult {
+  eventId: number;
+  eventName: string;
+  waitlisted: boolean;
+  queuePosition: number | null;
+  flyerUrl: string | null;
+}
+
+export const planRegister = (
+  payload: PlanRegisterPayload,
+): Promise<{ ok: true; results: PlanRegisterResult[] }> =>
+  jsonFetch('/api/v1/plan-register', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+
+/** Build the /plan share URL. Optional date pin defaults to "today
+ *  on the device that opens the link" when omitted. */
+export const buildPlanUrl = (date?: string | null): string => {
+  const path = date ? `/plan?d=${encodeURIComponent(date)}` : '/plan';
+  if (typeof window === 'undefined') return path;
+  return `${window.location.origin}${path}`;
+};

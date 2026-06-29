@@ -121,6 +121,10 @@ export const events = pgTable('events', {
    *  between NULL and a number; we store the number directly so
    *  there's no second "requires photos" boolean to drift. */
   photoCount: integer('photo_count'),
+  /** Vercel Blob URL for the event's flyer (image or video). Public-
+   *  facing /plan flow downloads this on submit so the guest can
+   *  re-share it to her IG story. Nullable when not configured. */
+  flyerUrl: text('flyer_url'),
   seasonStart: date('season_start'),
   seasonEnd: date('season_end'),
   /** Public-form share token (UUID v4). Nullable for legacy rows. */

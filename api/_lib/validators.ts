@@ -74,6 +74,10 @@ export const eventInputSchema = z.object({
    *  photos required). The UI shows a checkbox + number input;
    *  unchecking the box sends null. */
   photoCount: z.number().int().min(1).max(10).nullable().optional(),
+  /** Vercel Blob URL for the event's flyer (image or video).
+   *  Surfaced on the /plan flow's "done" screen so the guest can
+   *  download and re-post it on her IG story. */
+  flyerUrl: z.string().url().nullable().optional(),
   seasonStart: isoDate.nullable().optional(),
   seasonEnd: isoDate.nullable().optional(),
   shareToken: uuid.nullable().optional(),
@@ -109,6 +113,28 @@ export const guestInputSchema = z.object({
   submissionId: z.string().nullable().optional(),
 });
 export type GuestInput = z.infer<typeof guestInputSchema>;
+
+// ── Plan-register (public, multi-event) ─────────────────────
+//  Body the /api/v1/plan-register endpoint accepts. The /plan flow
+//  collects which events the guest wants to attend tonight + one
+//  shared set of personal info, and the server creates one guest
+//  row per selected event (so each event's capacity counts her).
+//  Photos are shared across all picked events that require them.
+//  `acceptedTerms` and `acceptedFlyerStory` are checkbox states
+//  the client must explicitly confirm — we record them on the
+//  notes column so there's an audit trail.
+export const planRegisterInputSchema = z.object({
+  date: isoDate,
+  eventIds: z.array(z.number().int().positive()).min(1).max(10),
+  name: z.string().min(1).max(120),
+  pax: z.number().int().min(1).max(50).default(1),
+  igHandle: z.string().max(60).default(''),
+  igPlatform: platform.default('instagram'),
+  photos: z.array(z.string().url()).max(10).default([]),
+  acceptedTerms: z.literal(true),
+  acceptedFlyerStory: z.literal(true),
+});
+export type PlanRegisterInput = z.infer<typeof planRegisterInputSchema>;
 
 // ── Reservation ────────────────────────────────────────────
 // ── Workspace settings ─────────────────────────────────────

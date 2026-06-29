@@ -92,6 +92,13 @@
       "when": 1779560000000,
       "tag": "0012_event_photos",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1779570000000,
+      "tag": "0013_event_flyer",
+      "breakpoints": true
     }
   ]
 }

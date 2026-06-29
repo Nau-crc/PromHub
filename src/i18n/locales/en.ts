@@ -258,6 +258,8 @@ const en = {
     requiresPhotosLabel: 'Requires photos of each guest',
     requiresPhotosHint: 'Some venues vet each guest by photo at the door. When enabled, the guest form (and public registration link) asks for the photos below.',
     photoCountLabel: 'How many photos per guest',
+    flyerLabel: 'Flyer (image or video)',
+    flyerHint: 'Guests can download this after signing up and re-share it on their IG story. Image or short video, up to 50 MB.',
     description: 'Description',
     descPlaceholder: "What's special about this night?",
     privateLabel: 'Private event',
@@ -488,6 +490,36 @@ const en = {
     uploading: 'Uploading…',
     photoAlt: 'Photo {{n}}',
     uploadFailed: "Couldn't upload: {{message}}",
+  },
+
+  // ── Reusable flyer-uploader component ─────────────────────
+  flyerUploader: {
+    add: 'Add flyer',
+    uploading: 'Uploading…',
+    hint: 'Image (JPEG/PNG/WebP/GIF) or short video (MP4/MOV/WebM), up to 50 MB.',
+    uploadFailed: "Couldn't upload: {{message}}",
+  },
+
+  // ── /plan flow (public, multi-event) ──────────────────────
+  plan: {
+    title: 'Build tonight\'s plan',
+    nothingTonight: "Nothing scheduled tonight. Check back tomorrow.",
+    q1: 'What do you feel like doing tonight?',
+    q2: 'Where would you like to go for {{slots}}?',
+    q2Hint: 'Pick one or more venues. You can attend more than one.',
+    noVenue: 'No venue',
+    continue: 'Continue →',
+    back: '← Back',
+    termsTitle: 'Conditions for tonight\'s pick',
+    noConditions: 'No specific conditions for this event.',
+    acceptTerms: 'I have read and accept the conditions of each selected event.',
+    acceptFlyerStory: 'I commit to downloading the event flyer and re-sharing it on my Instagram story.',
+    signMeUp: 'Sign me up',
+    doneTitle: 'You\'re in!',
+    confirmed: 'Confirmed',
+    waitlisted: 'Waitlist · position #{{position}}',
+    downloadFlyer: '↓ Download flyer',
+    flyerReminder: 'Remember: download each flyer and post it to your Instagram story.',
   },
 
   // ── Public registration form ──────────────────────────────
