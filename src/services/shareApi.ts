@@ -131,6 +131,19 @@ export interface PlanEvent {
   }>;
   photoCount: number | null;
   flyerUrl: string | null;
+  /** Per-event price per VIP type name. Used by the reservation
+   *  flow to render the table picker; empty when none configured. */
+  vipPrices: Record<string, number>;
+  /** Venue-side VIP type definitions (identity + pax range +
+   *  capacity). Empty when the venue has no VIPs configured or
+   *  the event has no venue at all. */
+  venueVipTypes: Array<{
+    id: string;
+    name: string;
+    minPax: number;
+    maxPax: number;
+    tableCapacity: number;
+  }>;
 }
 
 export interface TodayResponse {
@@ -178,3 +191,33 @@ export const buildPlanUrl = (date?: string | null): string => {
   if (typeof window === 'undefined') return path;
   return `${window.location.origin}${path}`;
 };
+
+// ─── /plan reservation flow (paid VIP table) ───────────────
+export interface PlanReservePayload {
+  date: string;
+  venueId: number;
+  eventId: number | null;
+  vipType: string;
+  pax: number;
+  name: string;
+  phoneCode: string;
+  phoneNum: string;
+  time: string;
+}
+
+export interface PlanReserveResult {
+  ok: true;
+  id: number;
+  venueName: string;
+  vipType: string;
+  pax: number;
+  priceAtBooking: number | null;
+  time: string;
+  date: string;
+}
+
+export const planReserve = (payload: PlanReservePayload): Promise<PlanReserveResult> =>
+  jsonFetch('/api/v1/plan-reserve', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });

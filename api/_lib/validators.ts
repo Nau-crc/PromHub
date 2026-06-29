@@ -136,6 +136,26 @@ export const planRegisterInputSchema = z.object({
 });
 export type PlanRegisterInput = z.infer<typeof planRegisterInputSchema>;
 
+// ── Plan-reserve (public, paid VIP table) ───────────────────
+//  Companion to plan-register but for clients booking a VIP
+//  table at a venue. Payment happens at the venue — we only
+//  record the reservation with its price. One venue per submit.
+export const planReserveInputSchema = z.object({
+  date: isoDate,
+  venueId: z.number().int().positive(),
+  /** Optional pin to a specific event happening at the venue that
+   *  night. When null we still record the reservation; the price
+   *  in `priceAtBooking` is what the client agreed to. */
+  eventId: z.number().int().positive().nullable().optional(),
+  vipType: z.string().min(1).max(80),
+  pax: z.number().int().min(1).max(50),
+  name: z.string().min(1).max(120),
+  phoneCode: z.string().min(2).max(6).default('+34'),
+  phoneNum: z.string().min(4).max(20),
+  time: hhmm.default('20:00'),
+});
+export type PlanReserveInput = z.infer<typeof planReserveInputSchema>;
+
 // ── Reservation ────────────────────────────────────────────
 // ── Workspace settings ─────────────────────────────────────
 //  Single jsonb on the shared tenant — the configurable bits of

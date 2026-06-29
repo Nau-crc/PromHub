@@ -92,7 +92,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const {
       venueInputSchema, eventInputSchema, guestInputSchema,
       reservationInputSchema, snapshotSchema, nightRecordInputSchema,
-      settingsInputSchema, planRegisterInputSchema,
+      settingsInputSchema, planRegisterInputSchema, planReserveInputSchema,
     } = await import('../_lib/validators.js');
     const { parseBody } = await import('../_handler.js');
     const { badRequest, notFound } = await import('../_lib/errors.js');
@@ -546,6 +546,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         flyerUrl: schema.events.flyerUrl,
         seasonStart: schema.events.seasonStart,
         seasonEnd: schema.events.seasonEnd,
+        vipPrices: schema.events.vipPrices,
       }).from(schema.events);
 
       // Match: one-time events fire on their exact eventDate;
@@ -561,31 +562,48 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return true;
       });
 
-      // Pull venue names in one query so we can include the venue
-      // label on each event row without joining N times.
+      // Pull venue names + vipTypes in one query. vipTypes are the
+      // venue-side identity (id/name/min-max-pax/table capacity);
+      // the price for each comes from the event's `vipPrices` map.
+      // We carry both onto the public response so the /plan reserve
+      // flow can render the table-picker without extra round trips.
       const venueIds = [...new Set(matching.map((e) => e.venueId).filter((v): v is number => v != null))];
-      const venuesById = new Map<number, string>();
+      const venuesById = new Map<number, {
+        name: string;
+        vipTypes: Array<{
+          id: string; name: string; minPax: number; maxPax: number; tableCapacity: number;
+        }>;
+      }>();
       if (venueIds.length) {
         const { inArray } = await import('drizzle-orm');
         const venues = await db.select({
           id: schema.venues.id,
           name: schema.venues.name,
+          vipTypes: schema.venues.vipTypes,
         }).from(schema.venues).where(inArray(schema.venues.id, venueIds));
-        for (const v of venues) venuesById.set(v.id, v.name);
+        for (const v of venues) venuesById.set(v.id, { name: v.name, vipTypes: v.vipTypes ?? [] });
       }
 
       return res.status(200).json({
         date,
-        events: matching.map((e) => ({
-          id: e.id,
-          name: e.name,
-          description: e.description ?? '',
-          venueId: e.venueId,
-          venueName: e.venueId != null ? (venuesById.get(e.venueId) ?? null) : null,
-          timeslots: e.timeslots ?? [],
-          photoCount: e.photoCount ?? null,
-          flyerUrl: e.flyerUrl ?? null,
-        })),
+        events: matching.map((e) => {
+          const venue = e.venueId != null ? venuesById.get(e.venueId) : undefined;
+          return {
+            id: e.id,
+            name: e.name,
+            description: e.description ?? '',
+            venueId: e.venueId,
+            venueName: venue?.name ?? null,
+            timeslots: e.timeslots ?? [],
+            photoCount: e.photoCount ?? null,
+            flyerUrl: e.flyerUrl ?? null,
+            // Reservation flow needs vipPrices + the venue's vipTypes
+            // to render the table picker. Empty maps when nothing's
+            // configured — the front-end just hides the table list.
+            vipPrices: e.vipPrices ?? {},
+            venueVipTypes: venue?.vipTypes ?? [],
+          };
+        }),
       });
     }
 
@@ -685,6 +703,71 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       return res.status(201).json({ ok: true, results });
+    }
+
+    // ── /api/v1/plan-reserve ────────────────────────────────
+    // Public VIP-table reservation. Companion to plan-register
+    // but for paying clients booking a table (not invitadas).
+    // Pricing is read from the event's `vipPrices` for the chosen
+    // VIP type name and stamped into the reservation row's notes
+    // so the price-at-booking can't drift if the event's prices
+    // are later edited.
+    if (resource === 'plan-reserve' && segments.length === 1) {
+      if (req.method !== 'POST') throw badRequest(`Method ${req.method} not allowed`);
+      const input = planReserveInputSchema.parse(parseBody(req.body));
+
+      // Verify the venue exists and the VIP type lives on it.
+      const [venue] = await db.select({
+        id: schema.venues.id,
+        name: schema.venues.name,
+        vipTypes: schema.venues.vipTypes,
+      }).from(schema.venues).where(eq(schema.venues.id, input.venueId)).limit(1);
+      if (!venue) throw badRequest('Venue not found');
+      const vipDef = (venue.vipTypes ?? []).find((vt) => vt.name === input.vipType);
+      if (!vipDef) throw badRequest(`VIP type "${input.vipType}" not found at this venue`);
+      if (input.pax < vipDef.minPax || input.pax > vipDef.maxPax) {
+        throw badRequest(
+          `Pax ${input.pax} outside ${input.vipType} range (${vipDef.minPax}–${vipDef.maxPax})`,
+        );
+      }
+
+      // Resolve the event the price comes from. When the client
+      // pins an explicit eventId we use it; otherwise pick the
+      // first event at the venue happening on the given date.
+      let resolvedEvent: { id: number; vipPrices: Record<string, number> } | null = null;
+      if (input.eventId != null) {
+        const [ev] = await db.select({
+          id: schema.events.id,
+          vipPrices: schema.events.vipPrices,
+        }).from(schema.events).where(eq(schema.events.id, input.eventId)).limit(1);
+        if (ev) resolvedEvent = ev;
+      }
+      const priceAtBooking = resolvedEvent?.vipPrices?.[input.vipType] ?? null;
+
+      const [row] = await db.insert(schema.reservations).values({
+        tenantId,
+        venueId: input.venueId,
+        eventId: resolvedEvent?.id ?? null,
+        name: input.name,
+        phoneCode: input.phoneCode,
+        phoneNum: input.phoneNum,
+        vipType: input.vipType,
+        time: input.time,
+        pax: input.pax,
+        fromInvite: false,
+        eventDate: input.date,
+      }).returning({ id: schema.reservations.id });
+
+      return res.status(201).json({
+        ok: true,
+        id: row.id,
+        venueName: venue.name,
+        vipType: input.vipType,
+        pax: input.pax,
+        priceAtBooking,
+        time: input.time,
+        date: input.date,
+      });
     }
 
     // ── /api/v1/night-records ───────────────────────────────
